@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, View } from 'react-native';
 import { AiError, describeAiError } from '@/ai/client';
 import { matchMirror, type MirrorMatch } from '@/ai/engine';
@@ -27,6 +27,17 @@ export default function MirrorPage() {
   const [on, setOn] = useState<Set<string>>(new Set());
   const [manual, setManual] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Delete the imported photo if the user leaves without recording it.
+  const pendingPhoto = useRef<string | null>(null);
+  useEffect(() => {
+    pendingPhoto.current = phase.k === 'pick' ? null : phase.photo;
+  }, [phase]);
+  useEffect(
+    () => () => {
+      if (pendingPhoto.current) void app.images.remove(pendingPhoto.current);
+    },
+    [app.images],
+  );
 
   if (!s) return <Loading />;
   const dateLabel = `${s.today.getMonth() + 1} 月 ${s.today.getDate()} 日`;
@@ -77,6 +88,7 @@ export default function MirrorPage() {
       for (const m of matches) if (on.has(m.itemId) && m.note) await addFitNote(app, m.itemId, m.note, dateLabel);
       if (s.prefs.mirrorAutoLog && on.size > 0) {
         await recordWear(app, { date: s.todayKey, itemIds: [...on], source: 'mirror', photoUri: phase.photo });
+        pendingPhoto.current = null;
         app.toast(`已记录今天的 ${on.size} 件，穿着次数 +1`);
       } else {
         await app.images.remove(phase.photo);

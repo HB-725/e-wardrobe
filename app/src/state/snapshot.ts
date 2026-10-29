@@ -8,6 +8,7 @@ import { listLogs } from '@/db/wear';
 import { outfitKey } from '@/domain/outfit';
 import { type ItemStats, statsById, toDateKey } from '@/domain/stats';
 import type { Avatar, Item, JobType, Outfit, WearLog } from '@/domain/types';
+import { needsReview } from './actions';
 
 /** Everything the main pages need, loaded in one go (a wardrobe is a few hundred rows at most). */
 export interface Snapshot {
@@ -49,7 +50,7 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     todayKey,
     items,
     active,
-    review: items.filter((i) => i.status === 'review'),
+    review: items.filter(needsReview),
     processing: items.filter((i) => i.status === 'processing'),
     failed: items.filter((i) => i.status === 'failed'),
     byId: new Map(items.map((i) => [i.id, i])),

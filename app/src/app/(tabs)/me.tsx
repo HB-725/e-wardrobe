@@ -103,8 +103,12 @@ export default function MePage() {
   const wipe = async () => {
     if (!(await confirmAsync('永久删除全部数据', '衣服、照片、穿搭、穿着记录、个人形象和 API Key 都会从这台手机上删除，无法恢复。'))) return;
     if (!(await confirmAsync('再确认一次', '真的要删除吗？建议先导出 Excel 备份。', '永久删除'))) return;
+    // A job still running would write the avatar / images back after the wipe, so let it finish first.
+    setBusy('wipe');
     app.runner.stop();
+    await app.runner.idle();
     await wipeEverything(app);
+    setBusy(null);
     await setApiKey(null);
     app.setFitting({});
     await app.reloadKey();
@@ -200,7 +204,7 @@ export default function MePage() {
         <Row label="照片与身材数据" value="只保存在这台手机上" />
         <Row label="发送给 AI 的内容" value="仅在生成时发送给 OpenAI" />
         <Row label="用于模型训练" value="OpenAI 默认不用 API 数据训练" />
-        <Row label="永久删除我的全部数据" danger onPress={wipe} last />
+        <Row label={busy === 'wipe' ? '正在删除…' : '永久删除我的全部数据'} danger onPress={busy ? undefined : wipe} last />
       </View>
       <T v="caption" style={{ textAlign: 'center', marginTop: 20 }}>
         衣橱 v{Constants.expoConfig?.version ?? '—'}

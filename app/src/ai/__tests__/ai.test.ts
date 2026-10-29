@@ -355,3 +355,57 @@ describe('races', () => {
     expect([...images.files.keys()].some((k) => k.includes('catalog'))).toBe(false);
   });
 });
+
+describe('review fixes', () => {
+  it('regenerating a wardrobe item keeps it active and attaches new candidates', async () => {
+    const item = await createItem(db, { name: '夹克', slot: 'outer', status: 'active', originalUri: 'mem://o/1', catalogUri: 'mem://c/old', fieldSources: { name: 'user' } });
+    await enqueueJob(db, 'catalog', item.id, { regenerate: true });
+    await drain(new JobRunner(deps(fakeClient()), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('active');
+    expect(after.catalogUri).toBe('mem://c/old');
+    expect(after.candidates).toHaveLength(2);
+  });
+
+  it('a failed regeneration leaves the item active', async () => {
+    const item = await createItem(db, { name: '夹克', slot: 'outer', status: 'archived', originalUri: 'mem://o/1', catalogUri: 'mem://c/old' });
+    await enqueueJob(db, 'catalog', item.id, { regenerate: true });
+    await drain(new JobRunner(deps(fakeClient({ failImage: () => new AiError('rejected', 'no') })), noTimers));
+    expect((await getItem(db, item.id))!.status).toBe('archived');
+  });
+
+  it('skips paid generation when the user settled the item during autofill', async () => {
+    const item = await createItem(db, { name: '新衣服', slot: 'top', status: 'processing', originalUri: 'mem://o/1' });
+    await enqueueJob(db, 'catalog', item.id);
+    const client = fakeClient();
+    const orig = client.visionJson.bind(client);
+    client.visionJson = async (req) => {
+      await updateItem(db, item.id, { status: 'active', name: '我起的名字', fieldSources: { name: 'user' } });
+      return orig(req);
+    };
+    await drain(new JobRunner(deps(client), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.name).toBe('我起的名字');
+    expect(client.calls.some((c) => c.kind === 'image')).toBe(false);
+  });
+
+  it('keeps the previous avatar usable when regenerating it fails', async () => {
+    await saveAvatar(db, { frontUri: 'mem://a/f', backUri: 'mem://a/b', sourceUris: ['mem://body/1'], status: 'processing' });
+    await enqueueJob(db, 'avatar', 'me');
+    await drain(new JobRunner(deps(fakeClient({ failImage: () => new AiError('rejected', 'no') })), noTimers));
+    const a = await getAvatar(db);
+    expect(a.status).toBe('ready');
+    expect(a.frontUri).toBe('mem://a/f');
+    expect(a.error).toBeTruthy();
+  });
+
+  it('does not clear the pause reason when another worker finishes after the cap is hit', async () => {
+    await saveAiSettings(db, { capUsd: 0.005 });
+    for (let i = 0; i < 3; i++) {
+      const it = await createItem(db, { name: `x${i}`, slot: 'top', status: 'processing', originalUri: `mem://o/${i}` });
+      await enqueueJob(db, 'catalog', it.id);
+    }
+    await drain(new JobRunner(deps(fakeClient()), { ...noTimers, concurrency: 2 }));
+    expect(await getAiBlocked(db)).toBe('cap');
+  });
+});

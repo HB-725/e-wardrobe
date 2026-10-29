@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { AiError, describeAiError } from '@/ai/client';
 import { getAiSettings, qualityFor } from '@/ai/config';
 import { generatePhoto } from '@/ai/engine';
 import { estimateImageCost, formatUsd } from '@/ai/models';
 import { SCENES } from '@/ai/prompts';
+import { avatarUsable } from '@/db/misc';
 import { saveImageToLibrary, shareImage } from '@/platform/files';
 import { useApp, useData } from '@/state/app';
 import { itemsOf, loadSnapshot } from '@/state/snapshot';
@@ -23,6 +24,12 @@ export default function PhotoPage() {
   const [shots, setShots] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ text: string; needsUser: boolean } | null>(null);
+  // Generated photos are only kept until the user leaves; saving copies them into the photo library.
+  const shotsRef = useRef<string[]>([]);
+  useEffect(() => {
+    shotsRef.current = shots;
+  }, [shots]);
+  useEffect(() => () => void Promise.all(shotsRef.current.map((u) => app.images.remove(u))), [app.images]);
 
   if (!s || !settings) return <Loading />;
   const ids = (param ?? '').split(',').filter(Boolean);
@@ -58,7 +65,7 @@ export default function PhotoPage() {
             />
           </>
         ) : (
-          <Btn label={`生成 · 约 ${formatUsd(cost)}`} style={{ flex: 1 }} loading={busy} disabled={items.length === 0 || s.avatar.status !== 'ready'} onPress={run} />
+          <Btn label={`生成 · 约 ${formatUsd(cost)}`} style={{ flex: 1 }} loading={busy} disabled={items.length === 0 || !avatarUsable(s.avatar)} onPress={run} />
         )
       }
     >
@@ -104,7 +111,7 @@ export default function PhotoPage() {
           <Btn label="去试衣间" kind="outline" onPress={() => router.navigate('/fitting')} />
         </View>
       ) : null}
-      {s.avatar.status !== 'ready' ? (
+      {!avatarUsable(s.avatar) ? (
         <View style={{ margin: PAD, gap: 8 }}>
           <T v="small">需要先建立个人形象。</T>
           <Btn label="建立形象" kind="outline" onPress={() => router.push('/avatar')} />

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AiError, type AiErrorKind, describeAiError } from '@/ai/client';
 import type { Item } from '@/domain/types';
-import { confirmItem, keepOriginal, regenerateItem, removeItem, retryItem } from '@/state/actions';
+import { confirmItem, keepCurrent, keepOriginal, needsReview, regenerateItem, removeItem, retryItem } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot, type Snapshot } from '@/state/snapshot';
 import { confirmAsync } from '@/ui/dialogs';
@@ -12,11 +12,12 @@ import { type Form, formOf, ItemForm, patchOf } from '@/ui/ItemForm';
 import { Btn, Loading, NavHeader, Screen, T, Tap } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
 
+/** Ready items first, then failed, then still generating; oldest first within a group. */
 function queueOf(s: Snapshot): Item[] {
-  const order = { review: 0, failed: 1, processing: 2 } as Record<string, number>;
+  const rank = (i: Item) => (needsReview(i) ? 0 : i.status === 'failed' ? 1 : 2);
   return s.items
-    .filter((i) => i.status === 'review' || i.status === 'processing' || i.status === 'failed')
-    .sort((a, b) => order[a.status] - order[b.status] || a.createdAt.localeCompare(b.createdAt));
+    .filter((i) => needsReview(i) || i.status === 'processing' || i.status === 'failed')
+    .sort((a, b) => rank(a) - rank(b) || a.createdAt.localeCompare(b.createdAt));
 }
 
 export default function ReviewPage() {
@@ -24,14 +25,17 @@ export default function ReviewPage() {
   const params = useLocalSearchParams<{ id?: string }>();
   const s = useData(loadSnapshot);
   const [curId, setCurId] = useState<string | null>(params.id ?? null);
-  const [pick, setPick] = useState(0);
-  // Edits per item; untouched items always show the latest AI-filled values.
-  const [forms, setForms] = useState<Record<string, Form>>({});
+  // Chosen candidate per item + candidate set, so a regenerated set starts again at the first one.
+  const [picks, setPicks] = useState<Record<string, number>>({});
+  // Only the fields the user touched, per item; everything else follows the latest AI-filled values.
+  const [edits, setEdits] = useState<Record<string, Partial<Form>>>({});
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
 
   const queue = s ? queueOf(s) : [];
-  const cur = queue.find((i) => i.id === curId) ?? queue.find((i) => i.status === 'review') ?? queue[0] ?? null;
+  const cur = queue.find((i) => i.id === curId) ?? queue.find(needsReview) ?? queue[0] ?? null;
+  // Stick to the item on screen so it does not jump when another one finishes generating.
+  if (cur && cur.id !== curId) setCurId(cur.id);
 
   if (!s) return <Loading />;
 
@@ -54,15 +58,19 @@ export default function ReviewPage() {
   const index = queue.findIndex((i) => i.id === cur.id);
   const next = () => {
     const rest = queue.filter((i) => i.id !== cur.id);
-    const n = rest.find((i) => i.status === 'review') ?? rest[0] ?? null;
+    const n = rest.find(needsReview) ?? rest[0] ?? null;
     setCurId(n?.id ?? null);
-    setPick(0);
   };
-  const f = forms[cur.id] ?? formOf(cur);
-  const set = (patch: Partial<Form>) => setForms((x) => ({ ...x, [cur.id]: { ...f, ...patch } }));
+  const f: Form = { ...formOf(cur), ...edits[cur.id] };
+  const set = (patch: Partial<Form>) => setEdits((x) => ({ ...x, [cur.id]: { ...x[cur.id], ...patch } }));
+  const pickKey = `${cur.id}:${cur.candidates[0] ?? ''}`;
+  const pick = Math.min(picks[pickKey] ?? 0, Math.max(0, cur.candidates.length - 1));
+  const setPick = (i: number) => setPicks((x) => ({ ...x, [pickKey]: i }));
   const chosen = cur.candidates[pick] ?? null;
   const checks = cur.checks[pick] ?? [];
-  const otherReady = queue.some((i) => i.id !== cur.id && i.status === 'review');
+  const ready = needsReview(cur);
+  const isRegen = ready && cur.status !== 'review';
+  const otherReady = queue.some((i) => i.id !== cur.id && needsReview(i));
 
   const run = async (fn: () => Promise<void>, advance = true) => {
     setBusy(true);
@@ -78,8 +86,12 @@ export default function ReviewPage() {
     }
   };
 
-  const footer =
-    cur.status === 'review' ? (
+  const footer = isRegen ? (
+    <>
+      <Btn label="保留现在的" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={() => run(() => keepCurrent(app, cur.id, patchOf(cur, f)))} />
+      <Btn label="换成新的" style={{ flex: 2 }} loading={busy} disabled={!chosen} onPress={() => run(() => confirmItem(app, cur.id, pick, patchOf(cur, f)))} />
+    </>
+  ) : cur.status === 'review' ? (
       <>
         <Btn label="只存原图" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={() => run(() => confirmItem(app, cur.id, null, patchOf(cur, f)))} />
         <Btn label={queue.length > 1 ? '保存，下一件' : '保存'} style={{ flex: 2 }} loading={busy} onPress={() => run(() => confirmItem(app, cur.id, pick, patchOf(cur, f)))} />
@@ -99,7 +111,7 @@ export default function ReviewPage() {
   return (
     <Screen footer={footer}>
       <NavHeader
-        title="确认新单品"
+        title={isRegen ? '选择新的标准图' : '确认新单品'}
         subtitle={`第 ${index + 1} 件 / 共 ${queue.length} 件`}
         right={
           <Tap
@@ -117,8 +129,14 @@ export default function ReviewPage() {
       />
       <View style={{ flexDirection: 'row', gap: 8, paddingTop: 16, paddingHorizontal: PAD }}>
         <View style={{ flex: 1, gap: 6 }}>
-          <View style={{ height: 210, backgroundColor: C.card }}>{cur.originalUri ? <Image source={{ uri: cur.originalUri }} style={{ flex: 1 }} contentFit="cover" /> : null}</View>
-          <T v="caption">原图</T>
+          <View style={{ height: 210, backgroundColor: C.card }}>
+            {isRegen && cur.catalogUri ? (
+              <Image source={{ uri: cur.catalogUri }} style={{ flex: 1 }} contentFit="contain" />
+            ) : cur.originalUri ? (
+              <Image source={{ uri: cur.originalUri }} style={{ flex: 1 }} contentFit="cover" />
+            ) : null}
+          </View>
+          <T v="caption">{isRegen && cur.catalogUri ? '现在的标准图' : '原图'}</T>
         </View>
         <View style={{ flex: 1, gap: 6 }}>
           <View style={{ height: 210, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
@@ -141,7 +159,7 @@ export default function ReviewPage() {
           <T style={{ fontSize: 12, fontWeight: '500' }}>{chosen ? `标准图 · 方案 ${pick + 1}` : '标准图'}</T>
         </View>
       </View>
-      {cur.status === 'review' ? (
+      {ready ? (
         <View style={{ flexDirection: 'row', gap: 8, paddingTop: 10, paddingHorizontal: PAD, alignItems: 'center' }}>
           <T v="caption" style={{ marginRight: 4 }}>
             候选

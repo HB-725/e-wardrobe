@@ -7,7 +7,7 @@ import { listOutfits } from '@/db/outfits';
 import { getLogByDate, listLogs } from '@/db/wear';
 import { buildWorkbook, isDuplicate, parseWorkbook } from '@/domain/excel';
 import type { ImageStore } from '@/ai/imageStore';
-import { addFitNote, addGarments, confirmItem, keepOriginal, recordWear, removeItem, saveOutfit, undoWear, userSources } from '../actions';
+import { addFitNote, addGarments, confirmItem, keepCurrent, keepOriginal, recordWear, removeItem, saveOutfit, undoWear, userSources } from '../actions';
 import { normalizeDate } from '@/ui/ItemForm';
 
 class Images implements ImageStore {
@@ -156,5 +156,34 @@ describe('form helpers', () => {
     expect(normalizeDate('2025年9月14日')).toBe('2025-09-14');
     expect(normalizeDate('2025-13-01')).toBeNull();
     expect(normalizeDate('')).toBeNull();
+  });
+});
+
+describe('review fixes', () => {
+  it('adding a garment to today keeps the mirror photo', async () => {
+    const a = await createItem(db, { name: 'a', slot: 'top', status: 'active' });
+    const b = await createItem(db, { name: 'b', slot: 'bottom', status: 'active' });
+    await recordWear(ctx(), { date: '2026-10-29', itemIds: [a.id], source: 'mirror', photoUri: 'p1' });
+    await recordWear(ctx(), { date: '2026-10-29', itemIds: [a.id, b.id], source: 'manual' });
+    const log = (await getLogByDate(db, '2026-10-29'))!;
+    expect(log.photoUri).toBe('p1');
+    expect(log.source).toBe('mirror');
+    expect(images.removed).toEqual([]);
+    await recordWear(ctx(), { date: '2026-10-29', itemIds: [b.id], source: 'manual' });
+    expect(images.removed).toEqual(['p1']);
+  });
+
+  it('deleting an item removes photos of days that become empty', async () => {
+    const a = await createItem(db, { name: 'a', slot: 'top', status: 'active' });
+    await recordWear(ctx(), { date: '2026-10-01', itemIds: [a.id], source: 'mirror', photoUri: 'm1' });
+    await removeItem(ctx(), a.id);
+    expect(images.removed).toContain('m1');
+  });
+
+  it('keeping the current image after a regeneration discards the new candidates', async () => {
+    const a = await createItem(db, { name: 'a', slot: 'top', status: 'active', catalogUri: 'cur', candidates: ['n1', 'n2'] });
+    await keepCurrent(ctx(), a.id);
+    expect((await getItem(db, a.id))!).toMatchObject({ catalogUri: 'cur', candidates: [], status: 'active' });
+    expect(images.removed).toEqual(['n1', 'n2']);
   });
 });

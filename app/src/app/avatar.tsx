@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, TextInput, View } from 'react-native';
 import { type AiSettings, getAiSettings, qualityFor } from '@/ai/config';
 import { estimateImageCost, formatUsd } from '@/ai/models';
@@ -40,6 +40,21 @@ function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
   const [build, setBuild] = useState(avatar.build ?? 'avg');
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  // Photos taken here but never used for a generation are deleted when the page closes.
+  const unused = useRef({ photos });
+  useEffect(() => {
+    unused.current = { photos };
+  }, [photos]);
+  useEffect(
+    () => () => {
+      const { photos: p } = unused.current;
+      // Re-read: a generation started just before closing already references these photos.
+      void getAvatar(app.db).then(async (a) => {
+        for (const u of p) if (u && !a.sourceUris.includes(u)) await app.images.remove(u);
+      });
+    },
+    [app.db, app.images],
+  );
 
   useEffect(() => {
     if (!processing) return;
@@ -222,7 +237,7 @@ function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
         <View style={{ gap: 6 }}>
           <T v="h2">{ready ? '看看像不像你' : failed ? '生成失败' : '正在生成你的形象'}</T>
           <T v="body" style={{ color: failed ? C.danger : C.sub }}>
-            {ready ? '不像的话可以换几张照片重新生成。' : failed ? (avatar.error ?? '请稍后重试') : '大约需要 1 分钟，可以先离开这个页面，完成后会自动更新。'}
+            {ready && avatar.error ? `重新生成失败：${avatar.error}。下面是之前的形象，仍然可以使用。` : ready ? '不像的话可以换几张照片重新生成。' : failed ? (avatar.error ?? '请稍后重试') : '大约需要 1 分钟，可以先离开这个页面，完成后会自动更新。'}
           </T>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>

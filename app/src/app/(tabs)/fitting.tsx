@@ -7,6 +7,7 @@ import { LAYER_ORDER, OCCASIONS, SLOTS } from '@/domain/catalog';
 import { defaultOutfitName, selectionIds, toggleInSelection } from '@/domain/outfit';
 import type { Item, Slot, TryonView } from '@/domain/types';
 import { recordWear, requestTryon, saveOutfit, tryonState } from '@/state/actions';
+import { avatarUsable } from '@/db/misc';
 import { useApp, useData } from '@/state/app';
 import { itemsOf, loadSnapshot, type Snapshot } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
@@ -157,20 +158,21 @@ export default function FittingPage() {
   const [skipIntro, setSkipIntro] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const sel = app.fitting;
-  const ids = selectionIds(sel);
-  const key = ids.join(',');
-  const tryon = useData((db) => tryonState(db, ids, view), [key, view]);
+  // Drop garments that were deleted or archived since they were put on; lookups and requests use the same list.
+  const worn = s ? itemsOf(s, selectionIds(sel)).filter((i) => i.status === 'active') : [];
+  const wornIds = worn.map((i) => i.id);
+  const drawable = worn.filter((i) => i.catalogUri || i.originalUri);
+  const drawableIds = drawable.map((i) => i.id);
+  const key = drawableIds.join(',');
+  const tryon = useData((db) => tryonState(db, drawableIds, view), [key, view]);
 
   if (!s) return <Loading />;
   if (s.avatar.status === 'none' && !skipIntro) return <NoAvatar onSkip={() => setSkipIntro(true)} />;
 
-  // Drop garments that were deleted or archived since they were put on.
-  const worn = itemsOf(s, ids).filter((i) => i.status === 'active');
-  const wornIds = worn.map((i) => i.id);
-  const avatarReady = s.avatar.status === 'ready';
+  const avatarReady = avatarUsable(s.avatar);
   const avatarUri = view === 'back' ? s.avatar.backUri : s.avatar.frontUri;
   const busy = tryon?.status === 'queued';
-  const cost = estimateImageCost(null, { inputImages: worn.length + 1, quality: qualityFor(settings?.quality ?? 'standard', 'tryon') });
+  const cost = estimateImageCost(null, { inputImages: drawable.length + 1, quality: qualityFor(settings?.quality ?? 'standard', 'tryon') });
   const usedSlots = new Set(s.active.map((i) => i.slot));
   const cats = SLOTS.filter((x) => x.id !== 'accessory' || usedSlots.has('accessory'));
 
@@ -208,14 +210,14 @@ export default function FittingPage() {
               </View>
             </View>
           </View>
-          {avatarReady && worn.length > 0 && !tryon?.uri ? (
+          {avatarReady && drawable.length > 0 && !tryon?.uri ? (
             <Btn
               label={busy ? '生成中…' : tryon?.status === 'failed' ? '重新生成上身效果' : `生成上身效果 · 约 ${formatUsd(cost)}`}
               kind="outline"
               height={40}
               disabled={busy}
               onPress={async () => {
-                await requestTryon(app, wornIds, view);
+                await requestTryon(app, drawableIds, view);
                 app.refresh();
               }}
             />
@@ -233,8 +235,8 @@ export default function FittingPage() {
               kind="outline"
               height={44}
               style={{ flex: 1, paddingHorizontal: 4 }}
-              disabled={worn.length === 0 || !avatarReady}
-              onPress={() => router.push(`/photo?items=${wornIds.join(',')}`)}
+              disabled={drawable.length === 0 || !avatarReady}
+              onPress={() => router.push(`/photo?items=${drawableIds.join(',')}`)}
             />
           </View>
         </View>

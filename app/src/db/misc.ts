@@ -80,6 +80,11 @@ export async function saveAvatar(db: Db, patch: Partial<Avatar>): Promise<Avatar
   return next;
 }
 
+/** An avatar with both views can be dressed, even while a newer one is being generated. */
+export function avatarUsable(a: Avatar): boolean {
+  return !!a.frontUri && !!a.backUri && a.status !== 'none';
+}
+
 /** Try-on images belong to one avatar; regenerating the avatar invalidates them via this version. */
 export function avatarVersion(a: Avatar): string {
   return a.frontUri ?? 'none';

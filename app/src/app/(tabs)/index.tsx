@@ -194,6 +194,9 @@ export default function TodayPage() {
         await recordWear(app, { date: s.todayKey, itemIds: cur.items.map((i) => i.id), outfitId: cur.outfitId, source: 'outfit' });
         app.toast(`已记录：${cur.name}，穿着次数 +1`);
       }
+      // The logged card moves to the front; follow it so the button state matches what is on screen.
+      setIdx(0);
+      scroller.current?.scrollTo({ x: 0, animated: true });
       app.refresh();
     } finally {
       setBusy(false);

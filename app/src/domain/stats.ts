@@ -37,7 +37,8 @@ export function computeItemStats(item: Item, logs: WearLog[], today: Date): Item
     wears += 1;
     if (lastWorn === null || log.date > lastWorn) lastWorn = log.date;
   }
-  const since = lastWorn ?? item.createdAt.slice(0, 10);
+  // createdAt is a UTC timestamp; compare in the phone's local calendar.
+  const since = lastWorn ?? toDateKey(new Date(item.createdAt));
   return {
     wears,
     lastWorn,

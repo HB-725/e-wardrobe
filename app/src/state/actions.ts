@@ -39,13 +39,30 @@ export async function confirmItem(ctx: Ctx, id: string, candidate: number | null
   const item = await getItem(ctx.db, id);
   if (!item) return;
   const chosen = candidate === null ? null : (item.candidates[candidate] ?? null);
+  if (candidate !== null && !chosen) throw new Error('candidate out of range');
   for (const c of item.candidates) if (c !== chosen) await ctx.images.remove(c);
   if (item.catalogUri && item.catalogUri !== chosen) await ctx.images.remove(item.catalogUri);
-  await updateItem(ctx.db, id, { ...fields, catalogUri: chosen, candidates: [], checks: [], status: 'active', error: null });
+  await updateItem(ctx.db, id, { ...fields, catalogUri: chosen, candidates: [], checks: [], status: item.status === 'archived' ? 'archived' : 'active', error: null });
 }
 
+/** Dismiss regenerated candidates and keep the current standard image. */
+export async function keepCurrent(ctx: Ctx, id: string, fields: Partial<Item> = {}): Promise<void> {
+  const item = await getItem(ctx.db, id);
+  if (!item) return;
+  for (const c of item.candidates) if (c !== item.catalogUri) await ctx.images.remove(c);
+  await updateItem(ctx.db, id, { ...fields, candidates: [], checks: [] });
+}
+
+/** Items waiting for the user: new garments in review, or wardrobe items with freshly regenerated candidates. */
+export function needsReview(it: Pick<Item, 'status' | 'candidates'>): boolean {
+  return it.status === 'review' || ((it.status === 'active' || it.status === 'archived') && it.candidates.length > 0);
+}
+
+/** New candidates for an item. A wardrobe item stays usable meanwhile; the result shows up in review. */
 export async function regenerateItem(ctx: Ctx, id: string): Promise<void> {
-  await updateItem(ctx.db, id, { status: 'processing', error: null });
+  const item = await getItem(ctx.db, id);
+  if (!item) return;
+  if (item.status !== 'active' && item.status !== 'archived') await updateItem(ctx.db, id, { status: 'processing', error: null });
   await enqueueJob(ctx.db, 'catalog', id, { regenerate: true });
   ctx.runner.kick();
 }
@@ -72,6 +89,10 @@ export async function removeItem(ctx: Ctx, id: string): Promise<void> {
   for (const uri of [item.originalUri, item.tagUri, item.catalogUri, ...item.candidates]) await ctx.images.remove(uri);
   await deleteItem(ctx.db, id);
   // Outfits / days that only consisted of this item would be left empty.
+  const orphanPhotos = await ctx.db.getAllAsync<{ photo_uri: string | null }>(
+    'SELECT photo_uri FROM wear_logs WHERE id NOT IN (SELECT log_id FROM wear_log_items)',
+  );
+  for (const r of orphanPhotos) await ctx.images.remove(r.photo_uri);
   await ctx.db.runAsync('DELETE FROM outfits WHERE id NOT IN (SELECT outfit_id FROM outfit_items)');
   await ctx.db.runAsync('DELETE FROM wear_logs WHERE id NOT IN (SELECT log_id FROM wear_log_items)');
 }
@@ -106,8 +127,12 @@ export async function recordWear(
 ): Promise<void> {
   const outfitId = input.outfitId ?? (await findOutfitByItems(ctx.db, input.itemIds))?.id ?? null;
   const prev = await getLogByDate(ctx.db, input.date);
-  if (prev?.photoUri && prev.photoUri !== input.photoUri) await ctx.images.remove(prev.photoUri);
-  await logWear(ctx.db, { ...input, outfitId });
+  // Adding garments to a day keeps its mirror photo; replacing the outfit drops it.
+  const extendsPrev = !!prev && input.photoUri === undefined && prev.itemIds.every((id) => input.itemIds.includes(id));
+  const photoUri = extendsPrev ? prev!.photoUri : (input.photoUri ?? null);
+  const source = extendsPrev && prev!.source === 'mirror' ? 'mirror' : input.source;
+  if (prev?.photoUri && prev.photoUri !== photoUri) await ctx.images.remove(prev.photoUri);
+  await logWear(ctx.db, { ...input, outfitId, photoUri, source });
 }
 
 export async function undoWear(ctx: Ctx, date: string): Promise<void> {
@@ -165,6 +190,7 @@ export async function requestTryon(ctx: Ctx, itemIds: string[], view: TryonView)
 
 // ---------- privacy ----------
 
+/** Callers must stop the runner and wait for it to go idle first, or a running job writes data back. */
 export async function wipeEverything(ctx: Ctx): Promise<void> {
   // Collect file uris first in case the store cannot wipe its folder (web).
   for (const uri of await listTryonUris(ctx.db)) await ctx.images.remove(uri);

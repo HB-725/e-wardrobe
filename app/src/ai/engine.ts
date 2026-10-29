@@ -2,7 +2,7 @@ import { LAYER_ORDER } from '@/domain/catalog';
 import type { FieldSource, Item, Job, Slot } from '@/domain/types';
 import type { Db } from '@/db/db';
 import { getItem, listItems, updateItem } from '@/db/items';
-import { addUsage, avatarVersion, getAvatar, monthSpend, pruneTryons, putTryon, saveAvatar } from '@/db/misc';
+import { addUsage, avatarUsable, avatarVersion, getAvatar, getTryon, monthSpend, pruneTryons, putTryon, saveAvatar } from '@/db/misc';
 import { AiError, type OpenAiClient } from './client';
 import { getAiSettings, getModelChoice, qualityFor, saveModelChoice } from './config';
 import type { ImageStore } from './imageStore';
@@ -156,7 +156,10 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
       schema: AUTOFILL_SCHEMA as unknown as Record<string, unknown>,
       detail: 'high',
     });
-    item = (await updateItem(db, item.id, applyAutofill(item, r)))!;
+    // Re-read: the user may have typed fields, settled or deleted the item while the model was thinking.
+    const now = await getItem(db, item.id);
+    if (!now || now.status !== 'processing') return;
+    item = (await updateItem(db, item.id, applyAutofill(now, r)))!;
   }
 
   const b64s = await generate(deps, client, 'catalog', {
@@ -181,18 +184,21 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
       detail: 'high',
     });
     checks = uris.map((_, i) => r.candidates[i]?.checks ?? []);
-  } catch (e) {
-    if (e instanceof AiError && e.needsUser) throw e;
+  } catch {
+    // Paid-for candidates are kept even if the check fails (including on the spend cap).
   }
 
-  // The user may have deleted the item or settled it ("只存原图") while we were generating.
   const fresh = await getItem(db, item.id);
-  if (!fresh || fresh.status === 'active' || fresh.status === 'archived') {
+  // A first-time item the user deleted or settled ("只存原图") meanwhile: drop the results.
+  const settled = !fresh || (!job.payload.regenerate && (fresh.status === 'active' || fresh.status === 'archived'));
+  if (settled) {
     for (const u of uris) await images.remove(u);
     return;
   }
   for (const old of fresh.candidates) if (old !== fresh.catalogUri) await images.remove(old);
-  await updateItem(db, item.id, { candidates: uris, checks, status: 'review', error: null });
+  // Regenerating a garment already in the wardrobe keeps it usable; the new candidates wait for review.
+  const keep = fresh.status === 'active' || fresh.status === 'archived';
+  await updateItem(db, item.id, { candidates: uris, checks, status: keep ? fresh.status : 'review', error: null });
 }
 
 async function runAvatar(deps: AiDeps): Promise<void> {
@@ -224,7 +230,8 @@ export function tryonRef(key: string, view: 'front' | 'back'): string {
 }
 
 async function orderedGarments(db: Db, itemIds: string[]): Promise<Item[]> {
-  const items = (await Promise.all(itemIds.map((id) => getItem(db, id)))).filter((x): x is Item => !!x);
+  // Items without any picture (Excel imports) cannot be drawn on the avatar.
+  const items = (await Promise.all(itemIds.map((id) => getItem(db, id)))).filter((x): x is Item => !!x && !!(x.catalogUri ?? x.originalUri));
   return items.sort((a, b) => LAYER_ORDER.indexOf(a.slot) - LAYER_ORDER.indexOf(b.slot));
 }
 
@@ -234,7 +241,7 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
   const itemIds = (job.payload.itemIds as string[] | undefined) ?? key.split('+');
   const avatar = await getAvatar(db);
   const base = view === 'back' ? avatar.backUri : avatar.frontUri;
-  if (avatar.status !== 'ready' || !base) throw new AiError('rejected', 'avatar not ready');
+  if (!avatarUsable(avatar) || !base) throw new AiError('rejected', 'avatar not ready');
   const garments = await orderedGarments(db, itemIds);
   if (garments.length === 0) return;
   const client = await requireClient(deps);
@@ -246,7 +253,10 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
     quality: qualityFor(settings.quality, 'tryon'),
   });
   const uri = await images.saveBase64(b64, 'tryon');
-  await putTryon(db, key, view, avatarVersion(avatar), uri);
+  const version = avatarVersion(avatar);
+  const old = await getTryon(db, key, view, version);
+  await putTryon(db, key, view, version, uri);
+  if (old && old !== uri) await images.remove(old);
 }
 
 export async function runJob(deps: AiDeps, job: Job): Promise<void> {
@@ -267,9 +277,12 @@ export async function runJob(deps: AiDeps, job: Job): Promise<void> {
 export async function markJobFailed(deps: AiDeps, job: Job, message: string): Promise<void> {
   if (job.type === 'catalog') {
     const item = await getItem(deps.db, job.refId);
-    if (item && item.status !== 'active') await updateItem(deps.db, job.refId, { status: 'failed', error: message });
+    // A regenerate of a wardrobe item that fails leaves the item as it was.
+    if (item && (item.status === 'processing' || item.status === 'review')) await updateItem(deps.db, job.refId, { status: 'failed', error: message });
   } else if (job.type === 'avatar') {
-    await saveAvatar(deps.db, { status: 'failed', error: message });
+    const a = await getAvatar(deps.db);
+    // Keep the previous avatar usable when only the regeneration failed; the error is shown on the setup page.
+    await saveAvatar(deps.db, { status: a.frontUri && a.backUri ? 'ready' : 'failed', error: message });
   }
 }
 
@@ -313,9 +326,10 @@ export async function generatePhoto(deps: AiDeps, itemIds: string[], sceneId: st
   await assertBudget(deps);
   const client = await requireClient(deps);
   const avatar = await getAvatar(deps.db);
-  if (avatar.status !== 'ready' || !avatar.frontUri) throw new AiError('rejected', 'avatar not ready');
+  if (!avatarUsable(avatar) || !avatar.frontUri) throw new AiError('rejected', 'avatar not ready');
   const scene = SCENES.find((s) => s.id === sceneId) ?? SCENES[0];
   const garments = await orderedGarments(deps.db, itemIds);
+  if (garments.length === 0) throw new AiError('rejected', 'no garment images');
   const settings = await getAiSettings(deps.db);
   const refs = await Promise.all(garments.map((g) => deps.images.toDataUrl((g.catalogUri ?? g.originalUri)!, 768)));
   const [b64] = await generate(deps, client, 'photo', {

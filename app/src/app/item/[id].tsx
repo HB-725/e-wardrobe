@@ -8,12 +8,13 @@ import { selectionFromItems } from '@/domain/outfit';
 import { computeItemStats, formatYuan } from '@/domain/stats';
 import type { Item } from '@/domain/types';
 import { updateItem } from '@/db/items';
-import { recordWear, regenerateItem, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
+import { latestJobFor } from '@/db/jobs';
+import { needsReview, recordWear, regenerateItem, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { itemsOf, loadSnapshot, tryonFor } from '@/state/snapshot';
 import { confirmAsync } from '@/ui/dialogs';
 import { formOf, ItemForm, patchOf } from '@/ui/ItemForm';
-import { Btn, Loading, NavHeader, Screen, Segmented, SourceBadge, T, Tap } from '@/ui/kit';
+import { Banner, Btn, Loading, NavHeader, Screen, Segmented, SourceBadge, T, Tap } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
 import { ItemImage, OutfitBoard } from '@/ui/visuals';
 
@@ -45,6 +46,7 @@ export default function ItemPage() {
   const app = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const s = useData(loadSnapshot);
+  const job = useData((db) => latestJobFor(db, 'catalog', id), [id]);
   const [view, setView] = useState<'std' | 'raw'>('std');
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<ReturnType<typeof formOf> | null>(null);
@@ -134,6 +136,19 @@ export default function ItemPage() {
           </View>
         ) : null}
       </View>
+      {needsReview(item) && item.status !== 'review' ? (
+        <View style={{ marginTop: 12 }}>
+          <Banner title="新的标准图生成好了" sub="去看看要不要换上" onPress={() => router.push(`/review?id=${item.id}`)} />
+        </View>
+      ) : item.status !== 'processing' && (job?.status === 'queued' || job?.status === 'running') ? (
+        <View style={{ marginTop: 12 }}>
+          <Banner title="正在重新生成标准图" sub="生成好后可以选择换不换" />
+        </View>
+      ) : item.status === 'active' && job?.status === 'failed' && job.payload.regenerate ? (
+        <View style={{ marginTop: 12 }}>
+          <Banner tone="warn" title="重新生成失败" sub={job.lastError ?? undefined} />
+        </View>
+      ) : null}
       <View style={{ paddingTop: 20, paddingHorizontal: PAD, paddingBottom: 8, gap: 4 }}>
         <T v="caption">{category}{item.status === 'archived' ? ' · 已收起' : ''}</T>
         <T v="h2">{item.name}</T>

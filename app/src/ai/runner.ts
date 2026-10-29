@@ -75,7 +75,13 @@ export class JobRunner {
   private async worker(): Promise<void> {
     const { db } = this.deps;
     while (!this.paused) {
-      const job = await this.claim.run(() => claimNextJob(db, this.deps.now?.() ?? new Date()));
+      let job: Job | null;
+      try {
+        job = await this.claim.run(() => claimNextJob(db, this.deps.now?.() ?? new Date()));
+      } catch (e) {
+        console.warn('claim failed', e);
+        return;
+      }
       if (!job) return;
       await this.handle(job);
     }
@@ -86,7 +92,8 @@ export class JobRunner {
     try {
       await runJob(this.deps, job);
       await completeJob(db, job.id);
-      await setAiBlocked(db, null);
+      // Another worker may have just paused the queue (e.g. spend cap); keep its message.
+      if (!this.paused) await setAiBlocked(db, null);
     } catch (e) {
       const message = describeAiError(e);
       if (e instanceof AiError && e.needsUser) {
