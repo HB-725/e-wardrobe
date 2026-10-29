@@ -71,7 +71,8 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
             const fit = (n: number) => {
               const cols = n === 1 ? 1 : 2;
               const rows = Math.ceil(n / cols);
-              return Math.max(0, Math.min((box.width - 2 * pad - gap * (cols - 1)) / cols, ((box.height - 2 * pad - gap * (rows - 1)) / rows) * 0.75));
+              // Floored with a pixel to spare: a rounding hair over the width would wrap the row.
+              return Math.max(0, Math.floor(Math.min((box.width - 2 * pad - gap * (cols - 1)) / cols, ((box.height - 2 * pad - gap * (rows - 1)) / rows) * 0.75)) - 1);
             };
             // Too small to tell garments apart (calendar cells): show only the outermost one.
             if (fit(shown.length) < MIN_TILE && i > 0) return null;
