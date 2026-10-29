@@ -5,6 +5,7 @@ import { countActiveJobs } from '@/db/jobs';
 import { avatarVersion, frontTryons, getAvatar, getSetting } from '@/db/misc';
 import { listOutfits } from '@/db/outfits';
 import { listLogs } from '@/db/wear';
+import { SLOT_ORDER } from '@/domain/catalog';
 import { outfitKey } from '@/domain/outfit';
 import { type ItemStats, statsById, toDateKey } from '@/domain/stats';
 import type { Avatar, Item, JobType, Outfit, WearLog } from '@/domain/types';
@@ -71,8 +72,12 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
   };
 }
 
+/** The items for these ids, top of the body to the bottom (how pictures and names are listed everywhere). */
 export function itemsOf(snap: Snapshot, ids: string[]): Item[] {
-  return ids.map((id) => snap.byId.get(id)).filter((x): x is Item => !!x);
+  return ids
+    .map((id) => snap.byId.get(id))
+    .filter((x): x is Item => !!x)
+    .sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
 }
 
 /** Cached try-on for a combination; items without a picture are not part of try-ons, so they are left out of the key. */

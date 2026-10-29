@@ -124,6 +124,15 @@ export async function recoverRunningJobs(db: Db): Promise<Job[]> {
   return exhausted;
 }
 
+/** A later job for the same subject is waiting or running (it supersedes this one). */
+export async function hasNewerJob(db: Db, job: Pick<Job, 'id' | 'type' | 'refId'>): Promise<boolean> {
+  const row = await db.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM jobs WHERE type = ? AND ref_id = ? AND id != ? AND status IN ('queued', 'running') AND rowid > (SELECT rowid FROM jobs WHERE id = ?)",
+    [job.type, job.refId, job.id, job.id],
+  );
+  return (row?.n ?? 0) > 0;
+}
+
 /** Remember paid-for intermediate results (generated files) so a retry continues instead of paying again. */
 export async function updateJobPayload(db: Db, id: string, payload: Record<string, unknown>): Promise<void> {
   await db.runAsync('UPDATE jobs SET payload = ?, updated_at = ? WHERE id = ?', [JSON.stringify(payload), nowIso(), id]);

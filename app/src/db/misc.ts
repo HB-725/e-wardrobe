@@ -168,6 +168,9 @@ export async function dropTryonsWithItem(db: Db, itemId: string): Promise<string
   const rows = await db.getAllAsync<{ key: string; view: string; uri: string }>('SELECT key, view, uri FROM tryon_cache');
   const hit = rows.filter((r) => r.key.split('+').includes(itemId));
   for (const r of hit) await db.runAsync('DELETE FROM tryon_cache WHERE key = ? AND view = ?', [r.key, r.view]);
+  // Try-ons still waiting would draw the old look; a running one discards its result itself.
+  const jobs = await db.getAllAsync<{ id: string; ref_id: string }>("SELECT id, ref_id FROM jobs WHERE type = 'tryon' AND status != 'running'");
+  for (const j of jobs) if (j.ref_id.split('|')[0].split('+').includes(itemId)) await db.runAsync('DELETE FROM jobs WHERE id = ?', [j.id]);
   return hit.map((r) => r.uri);
 }
 

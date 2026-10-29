@@ -92,7 +92,7 @@ function StatusBanners({ s }: { s: Snapshot }) {
         left={
           <View style={{ flexDirection: 'row' }}>
             {s.review.slice(0, 3).map((it, i) => (
-              <ItemImage key={it.id} item={it} style={{ width: 44, height: 52, backgroundColor: '#FFFFFF', marginLeft: i ? -10 : 0, borderLeftWidth: i ? 2 : 0, borderLeftColor: C.card }} />
+              <ItemImage key={it.id} item={it} style={{ width: 39, height: 52, backgroundColor: '#FFFFFF', marginLeft: i ? -10 : 0, borderLeftWidth: i ? 2 : 0, borderLeftColor: C.card }} />
             ))}
           </View>
         }
@@ -303,7 +303,7 @@ export default function TodayPage() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {idle.map(({ item, days }) => (
               <Tap key={item.id} onPress={() => router.push(`/item/${item.id}`)} style={{ flex: 1, gap: 6 }}>
-                <ItemImage item={item} style={{ height: 104 }} />
+                <ItemImage item={item} style={{ aspectRatio: 0.75 }} />
                 <T style={{ fontSize: 13, fontWeight: '500' }} numberOfLines={1}>
                   {item.name}
                 </T>

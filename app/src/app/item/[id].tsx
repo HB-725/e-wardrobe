@@ -11,6 +11,7 @@ import { latestJobFor } from '@/db/jobs';
 import { needsReview, recordWear, regenerateItem, saveItemEdits, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { useSafe } from '@/state/useSafe';
+import { usePhotoConsent } from '@/state/consent';
 import { itemsOf, loadSnapshot, tryonFor } from '@/state/snapshot';
 import { confirmAsync } from '@/ui/dialogs';
 import { formOf, ItemForm, patchOf } from '@/ui/ItemForm';
@@ -44,6 +45,7 @@ function Attr({ label, children, source, onEmpty }: { label: string; children?: 
 
 export default function ItemPage() {
   const app = useApp();
+  const consent = usePhotoConsent();
   const { id } = useLocalSearchParams<{ id: string }>();
   const s = useData(loadSnapshot);
   const job = useData((db) => latestJobFor(db, 'catalog', id), [id]);
@@ -97,6 +99,7 @@ export default function ItemPage() {
   const addPhoto = safe(async () => {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (r.canceled) return;
+    await consent(); // declining keeps the photo; generation waits until the user agrees
     await setItemPhoto(app, item.id, r.assets[0].uri);
     app.refresh();
     app.toast(item.status === 'active' || item.status === 'archived' ? '照片已换好，新的标准图生成后可以选择换不换' : '照片已添加，正在生成标准图');
@@ -125,11 +128,12 @@ export default function ItemPage() {
   return (
     <Screen>
       <NavHeader title="单品详情" right={<Tap onPress={startEdit} style={{ minWidth: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><T>编辑</T></Tap>} />
-      <View style={{ height: 380, backgroundColor: C.card }}>
+      <View style={{ height: 380, backgroundColor: C.bg, alignItems: 'center' }}>
         {showRaw && item.originalUri ? (
-          <Image source={{ uri: item.originalUri }} style={{ flex: 1 }} contentFit="cover" />
+          <Image source={{ uri: item.originalUri }} style={{ alignSelf: 'stretch', flex: 1 }} contentFit="cover" />
         ) : (
-          <ItemImage item={item} style={{ flex: 1 }} inset={0.08} />
+          // The catalog image at its own 2:3 shape: the whole garment, and no box where its background meets ours.
+          <ItemImage item={item} style={{ height: '100%', aspectRatio: 2 / 3 }} />
         )}
         {!item.originalUri && !item.catalogUri ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 12 }}>

@@ -2,10 +2,10 @@ import { LAYER_ORDER } from '@/domain/catalog';
 import type { FieldSource, Item, Job, Slot } from '@/domain/types';
 import type { Db } from '@/db/db';
 import { getItem, listItems, updateItem } from '@/db/items';
-import { updateJobPayload } from '@/db/jobs';
+import { hasNewerJob, updateJobPayload } from '@/db/jobs';
 import { addUsage, avatarUsable, avatarVersion, getAvatar, getTryon, monthSpend, pruneTryons, putTryon, saveAvatar } from '@/db/misc';
 import { AiError, type OpenAiClient } from './client';
-import { getAiSettings, getModelChoice, qualityFor, saveModelChoice } from './config';
+import { getAiSettings, getModelChoice, hasPhotoConsent, qualityFor, saveModelChoice } from './config';
 import type { ImageStore } from './imageStore';
 import { blockModel, chatCost, imageCost, pickModels } from './models';
 import {
@@ -49,6 +49,11 @@ async function requireClient(deps: AiDeps): Promise<OpenAiClient> {
 export async function assertBudget(deps: AiDeps): Promise<void> {
   const [{ capUsd }, spend] = await Promise.all([getAiSettings(deps.db), monthSpend(deps.db, deps.now?.() ?? new Date())]);
   if (capUsd > 0 && spend.totalUsd >= capUsd) throw new AiError('cap', `spend ${spend.totalUsd} >= cap ${capUsd}`);
+}
+
+/** Every request carries the user's photos; nothing is sent before they agreed to that. */
+async function assertConsent(deps: AiDeps): Promise<void> {
+  if (!(await hasPhotoConsent(deps.db))) throw new AiError('consent', 'photo consent not given');
 }
 
 /** Picks models from /v1/models, re-probing every few days or when nothing usable is chosen. */
@@ -99,6 +104,7 @@ async function generate(
   req: { prompt: string; images: string[]; quality: 'low' | 'medium' | 'high'; n?: number; transparent?: boolean },
 ): Promise<string[]> {
   return withModel(deps, client, 'image', async (model) => {
+    await assertConsent(deps);
     await assertBudget(deps);
     const r = await client.imageEdit({ model, prompt: req.prompt, images: req.images, quality: req.quality, n: req.n, size: '1024x1536', transparent: req.transparent });
     await addUsage(deps.db, { kind, model, costUsd: imageCost(model, r.usage) });
@@ -113,6 +119,7 @@ async function vision<T>(
   req: { system: string; text: string; images: string[]; schemaName: string; schema: Record<string, unknown>; detail?: 'low' | 'high' | 'auto' },
 ): Promise<T> {
   return withModel(deps, client, 'vision', async (model) => {
+    await assertConsent(deps);
     await assertBudget(deps);
     const r = await client.visionJson<T>({ model, ...req });
     await addUsage(deps.db, { kind, model, costUsd: chatCost(model, r.usage) });
@@ -142,10 +149,22 @@ export function applyAutofill(item: Item, r: AutofillResult): Partial<Item> {
 
 // ---------- job handlers ----------
 
-async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
+async function runCatalog(deps: AiDeps, startJob: Job): Promise<void> {
+  let job = startJob;
   const { db, images } = deps;
   let item = await getItem(db, job.refId);
   if (!item || !item.originalUri) return; // deleted meanwhile
+  // The photo was replaced after this job first ran: the newer job owns the item now, and anything this one
+  // generated shows the old photo.
+  const photo = job.payload.photo as string | undefined;
+  if ((photo && photo !== item.originalUri) || (await hasNewerJob(db, job))) {
+    for (const u of (job.payload.generated as string[] | undefined) ?? []) await images.remove(u);
+    return;
+  }
+  if (!photo) {
+    job = { ...job, payload: { ...job.payload, photo: item.originalUri } };
+    await updateJobPayload(db, job.id, job.payload);
+  }
   const client = await requireClient(deps);
   const settings = await getAiSettings(db);
   const original = await images.toDataUrl(item.originalUri, 1024);
@@ -262,6 +281,8 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
   if (!avatarUsable(avatar) || !base) throw new AiError('rejected', 'avatar not ready');
   const garments = await orderedGarments(db, itemIds);
   if (garments.length === 0) return;
+  const look = (gs: Item[]) => gs.map((g) => `${g.id}:${g.slot}:${g.catalogUri ?? g.originalUri}`).join('|');
+  const startLook = look(garments);
   const client = await requireClient(deps);
   const settings = await getAiSettings(db);
   const refs = await Promise.all(garments.map((g) => images.toDataUrl((g.catalogUri ?? g.originalUri)!, 768)));
@@ -271,6 +292,11 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
     quality: qualityFor(settings.quality, 'tryon'),
   });
   const uri = await images.saveBase64(b64, 'tryon');
+  // A garment was deleted, re-pictured or moved to another slot meanwhile: this image no longer shows the outfit.
+  if (look(await orderedGarments(db, itemIds)) !== startLook) {
+    await images.remove(uri);
+    return;
+  }
   const version = avatarVersion(avatar);
   const old = await getTryon(db, key, view, version);
   await putTryon(db, key, view, version, uri);

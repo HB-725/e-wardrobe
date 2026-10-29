@@ -124,9 +124,9 @@ export default function WardrobePage() {
                 accessibilityLabel={`${it.name}${it.status === 'review' ? '（待确认）' : ''}`}
                 accessibilityState={{ selected: on }}
                 onPress={() => (on ? router.push(pageFor(it)) : setSelId(it.id))}
-                style={{ width: '23.6%', height: 80, borderWidth: 2, borderColor: on ? C.ink : C.card }}
+                style={{ width: '23.6%', aspectRatio: 0.75, borderWidth: 2, borderColor: on ? C.ink : C.card }}
               >
-                <ItemImage item={it} style={{ flex: 1 }} inset={0.06} />
+                <ItemImage item={it} style={{ flex: 1 }} />
                 {it.status === 'active' ? <T style={{ position: 'absolute', right: 4, bottom: 2, fontSize: 10, color: C.sub }}>×{wears}</T> : null}
                 {it.status === 'review' || it.status === 'failed' ? (
                   <View style={{ position: 'absolute', left: 0, top: 0, paddingHorizontal: 5, paddingVertical: 1, backgroundColor: it.status === 'failed' ? C.danger : C.ink }}>
@@ -154,7 +154,7 @@ export default function WardrobePage() {
         </ScrollView>
         {sel ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line }}>
-            <ItemImage item={sel} style={{ width: 64, height: 72 }} />
+            <ItemImage item={sel} style={{ width: 54, height: 72 }} />
             <Tap onPress={() => router.push(pageFor(sel))} style={{ flex: 1, gap: 2 }}>
               <T style={{ fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
                 {sel.name}

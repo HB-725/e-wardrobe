@@ -56,7 +56,7 @@ GRADLE
 
 # 4. Generate the native project and build.
 if [ -n "${EW_SIGNING_ENV:-}" ]; then set -a; . "$EW_SIGNING_ENV"; set +a; fi
-if [ -n "${EW_KEYSTORE:-}" ]; then echo "Signing with $EW_KEYSTORE"; else echo "WARNING: no EW_KEYSTORE, signing with the debug key"; fi
+if [ -n "${EW_KEYSTORE:-}" ]; then export EW_KEYSTORE="$(realpath "$EW_KEYSTORE")"; echo "Signing with $EW_KEYSTORE"; else echo "WARNING: no EW_KEYSTORE, signing with the debug key"; fi
 EXPO_OFFLINE=1 CI=1 npx expo prebuild --platform android --no-install --clean
 echo "sdk.dir=$SDK" > android/local.properties
 (cd android && ./gradlew assembleRelease -PreactNativeArchitectures="${ARCHS:-arm64-v8a}" --no-daemon --console=plain)

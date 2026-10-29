@@ -5,7 +5,7 @@ import { countByStatus, createItem, deleteItem, getItem, listItems, setUserField
 import { createOutfit, deleteOutfit, findOutfitByItems, listOutfits, outfitsContaining } from '../outfits';
 import { deleteLogByDate, getLogByDate, listLogs, logWear } from '../wear';
 import { claimNextJob, completeJob, deferJob, enqueueJob, failJob, listJobs, MAX_ATTEMPTS, recoverRunningJobs, retryJob } from '../jobs';
-import { addUsage, avatarVersion, getAvatar, getSetting, getTryon, monthSpend, putTryon, saveAvatar, setSetting, wipeAll } from '../misc';
+import { addUsage, avatarVersion, dropTryonsWithItem, getAvatar, getSetting, getTryon, monthSpend, putTryon, saveAvatar, setSetting, wipeAll } from '../misc';
 
 let db: Db;
 beforeEach(async () => {
@@ -190,6 +190,16 @@ describe('misc', () => {
     expect(await getTryon(db, 'a+b', 'front', v)).toBe('file:///t1.png');
     expect(await getTryon(db, 'a+b', 'front', 'other')).toBeNull();
     expect(await getTryon(db, 'a+b', 'back', v)).toBeNull();
+  });
+
+  it('dropping try-ons for an item also cancels waiting try-on jobs that include it', async () => {
+    await putTryon(db, 'a+b', 'front', 'v', 'file:///t1.png');
+    await putTryon(db, 'c+d', 'front', 'v', 'file:///t2.png');
+    await enqueueJob(db, 'tryon', 'a+b|back');
+    await enqueueJob(db, 'tryon', 'ab+c|back');
+    expect(await dropTryonsWithItem(db, 'a')).toEqual(['file:///t1.png']);
+    expect((await listJobs(db, ['queued'])).map((j) => j.refId)).toEqual(['ab+c|back']);
+    expect(await getTryon(db, 'c+d', 'front', 'v')).toBe('file:///t2.png');
   });
 
   it('sums spend for the month by kind', async () => {

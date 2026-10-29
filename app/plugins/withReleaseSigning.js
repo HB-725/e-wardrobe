@@ -24,7 +24,8 @@ module.exports = function withReleaseSigning(config) {
       /(release\s*\{\s*\n(?:\s*\/\/.*\n)*\s*)signingConfig signingConfigs\.debug/,
       "$1signingConfig System.getenv('EW_KEYSTORE') ? signingConfigs.release : signingConfigs.debug",
     );
-    if (!g.includes('signingConfigs.release')) throw new Error('withReleaseSigning: build.gradle layout changed');
+    if (!g.includes("def ks = System.getenv('EW_KEYSTORE')") || !g.includes('signingConfigs.release'))
+      throw new Error('withReleaseSigning: build.gradle layout changed');
     cfg.modResults.contents = g;
     return cfg;
   });

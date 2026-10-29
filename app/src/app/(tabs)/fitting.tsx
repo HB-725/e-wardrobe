@@ -11,6 +11,7 @@ import { requestTryon, saveOutfit, tryonState } from '@/state/actions';
 import { useRecordToday } from '@/state/recordToday';
 import { avatarUsable } from '@/db/misc';
 import { useApp, useData } from '@/state/app';
+import { usePhotoConsent } from '@/state/consent';
 import { itemsOf, loadSnapshot, type Snapshot } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
 import { Btn, Chip, IconBtn, Loading, PageHeader, PrivacyNote, Screen, Sheet, T, Tap } from '@/ui/kit';
@@ -127,10 +128,10 @@ function Tray({ s, slot, worn, onPick }: { s: Snapshot; slot: Slot; worn: string
             accessibilityLabel={it.name}
             accessibilityState={{ selected: on }}
             onPress={() => onPick(it)}
-            style={{ height: 104, backgroundColor: C.card, borderWidth: 2, borderColor: on ? C.ink : C.card }}
+            style={{ backgroundColor: C.card, borderWidth: 2, borderColor: on ? C.ink : C.card }}
           >
-            <ItemImage item={it} style={{ flex: 1 }} inset={0.06} />
-            <T style={{ fontSize: 11, textAlign: 'center', paddingBottom: 4, paddingHorizontal: 2 }} numberOfLines={1}>
+            <ItemImage item={it} style={{ aspectRatio: 0.75 }} />
+            <T style={{ fontSize: 11, textAlign: 'center', paddingVertical: 4, paddingHorizontal: 2 }} numberOfLines={1}>
               {it.name}
             </T>
             {on ? (
@@ -153,6 +154,7 @@ function Tray({ s, slot, worn, onPick }: { s: Snapshot; slot: Slot; worn: string
 
 export default function FittingPage() {
   const app = useApp();
+  const consent = usePhotoConsent();
   const recordToday = useRecordToday();
   const s = useData(loadSnapshot);
   const settings = useData(getAiSettings);
@@ -225,6 +227,7 @@ export default function FittingPage() {
               height={40}
               disabled={busy}
               onPress={async () => {
+                if (!(await consent())) return;
                 await requestTryon(app, drawableIds, view);
                 app.refresh();
               }}

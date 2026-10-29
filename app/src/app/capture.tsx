@@ -40,6 +40,7 @@ export default function CapturePage() {
   const [torch, setTorch] = useState(false);
   const [shooting, setShooting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const cam = useRef<CameraView>(null);
   const openedBatch = useRef(false);
   const last = pending[pending.length - 1];
@@ -94,9 +95,11 @@ export default function CapturePage() {
 
   // One photo at a time: whatever was saved leaves the pending list, so a retry never duplicates items.
   const finish = async () => {
-    if (pending.length === 0) return;
-    if (!(await consent())) return;
+    if (pending.length === 0 || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
+    // Declining still saves the photos; nothing is sent and the AI work waits until the user agrees.
+    await consent();
     let left = [...pending];
     try {
       while (left.length) {
@@ -110,6 +113,7 @@ export default function CapturePage() {
       app.refresh();
       app.toast(`有 ${left.length} 张没有保存：${String(e)}`);
       setSaving(false);
+      savingRef.current = false;
     }
   };
 

@@ -8,6 +8,7 @@ export type AiErrorKind =
   | 'auth' // key rejected
   | 'quota' // account out of credit
   | 'cap' // monthly in-app spend cap reached
+  | 'consent' // user has not agreed to photos being sent to OpenAI
   | 'rate' // 429 rate limit, retry later
   | 'network' // offline / timeout
   | 'server' // 5xx
@@ -32,7 +33,7 @@ export class AiError extends Error {
 
   /** Cannot succeed until the user changes something (key, credit, cap). */
   get needsUser(): boolean {
-    return this.kind === 'no_key' || this.kind === 'auth' || this.kind === 'quota' || this.kind === 'cap';
+    return this.kind === 'no_key' || this.kind === 'auth' || this.kind === 'quota' || this.kind === 'cap' || this.kind === 'consent';
   }
 }
 
@@ -48,6 +49,8 @@ export function describeAiError(e: unknown): string {
       return 'OpenAI 账户余额不足，充值后会自动继续';
     case 'cap':
       return '已达到本月 AI 花费上限，可在「我的」页面提高上限';
+    case 'consent':
+      return '需要你同意把照片发送给 OpenAI，才能继续生成';
     case 'rate':
       return '请求太频繁，稍后自动重试';
     case 'network':
@@ -251,6 +254,6 @@ export function createOpenAiClient(opts: {
 }
 
 /** Where the user fixes a paused queue: the spend cap lives on the Me page, everything else on the key page. */
-export function blockedRoute(kind: string | null): '/me' | '/apikey' {
-  return kind === 'cap' ? '/me' : '/apikey';
+export function blockedRoute(kind: string | null): '/me' | '/apikey' | '/consent' {
+  return kind === 'cap' ? '/me' : kind === 'consent' ? '/consent' : '/apikey';
 }

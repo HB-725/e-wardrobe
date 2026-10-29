@@ -1,3 +1,4 @@
+import { setPhotoConsent } from '@/ai/config';
 import * as XLSX from 'xlsx';
 import { createTestDb } from '@/test/memoryDb';
 import type { Db } from '@/db/db';
@@ -35,6 +36,7 @@ const ctx = () => ({ db, images, runner: { kick: () => (kicks += 1) } });
 
 beforeEach(async () => {
   db = await createTestDb();
+  await setPhotoConsent(db);
   images = new Images();
   kicks = 0;
 });

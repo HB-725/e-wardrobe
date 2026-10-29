@@ -13,6 +13,9 @@ export const SLOT_LABEL: Record<Slot, string> = Object.fromEntries(
   SLOTS.map((s) => [s.id, s.label]),
 ) as Record<Slot, string>;
 
+/** Display order, top of the body to the bottom. */
+export const SLOT_ORDER: Slot[] = SLOTS.map((s) => s.id);
+
 /** Order garments are layered on the body, inner to outer. */
 export const LAYER_ORDER: Slot[] = ['shoes', 'bottom', 'top', 'outer', 'bag', 'accessory'];
 

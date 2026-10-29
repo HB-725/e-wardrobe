@@ -133,9 +133,9 @@ export default function ReviewPage() {
       />
       <View style={{ flexDirection: 'row', gap: 8, paddingTop: 16, paddingHorizontal: PAD }}>
         <View style={{ flex: 1, gap: 6 }}>
-          <View style={{ height: 210, backgroundColor: C.card }}>
+          <View style={{ aspectRatio: 2 / 3, backgroundColor: C.card }}>
             {isRegen && cur.catalogUri ? (
-              <Image source={{ uri: cur.catalogUri }} style={{ flex: 1 }} contentFit="contain" />
+              <Image source={{ uri: cur.catalogUri }} style={{ flex: 1 }} contentFit="cover" />
             ) : cur.originalUri ? (
               <Image source={{ uri: cur.originalUri }} style={{ flex: 1 }} contentFit="cover" />
             ) : null}
@@ -143,9 +143,9 @@ export default function ReviewPage() {
           <T v="caption">{isRegen && cur.catalogUri ? '现在的标准图' : '原图'}</T>
         </View>
         <View style={{ flex: 1, gap: 6 }}>
-          <View style={{ height: 210, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ aspectRatio: 2 / 3, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
             {chosen ? (
-              <Image source={{ uri: chosen }} style={{ width: '100%', height: '100%' }} contentFit="contain" />
+              <Image source={{ uri: chosen }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             ) : cur.status === 'processing' ? (
               <View style={{ alignItems: 'center', gap: 10, padding: 12 }}>
                 {s.blocked ? null : <ActivityIndicator color={C.ink} />}
@@ -169,8 +169,8 @@ export default function ReviewPage() {
             候选
           </T>
           {cur.candidates.map((c, i) => (
-            <Pressable key={c} accessibilityRole="button" accessibilityLabel={`方案 ${i + 1}`} accessibilityState={{ selected: i === pick }} onPress={() => setPick(i)} style={{ width: 52, height: 58, backgroundColor: C.card, borderWidth: 2, borderColor: i === pick ? C.ink : 'transparent' }}>
-              <Image source={{ uri: c }} style={{ flex: 1 }} contentFit="contain" />
+            <Pressable key={c} accessibilityRole="button" accessibilityLabel={`方案 ${i + 1}`} accessibilityState={{ selected: i === pick }} onPress={() => setPick(i)} style={{ width: 44, height: 66, backgroundColor: C.card, borderWidth: 2, borderColor: i === pick ? C.ink : 'transparent' }}>
+              <Image source={{ uri: c }} style={{ flex: 1 }} contentFit="cover" />
             </Pressable>
           ))}
           <Btn label="重新生成" kind="outline" height={44} style={{ marginLeft: 'auto' }} disabled={busy} onPress={() => run(() => regenerateItem(app, cur.id), false)} />

@@ -176,7 +176,7 @@ export default function MirrorPage() {
           <T style={{ fontSize: 15, fontWeight: '700', marginBottom: 4 }}>{shown.length ? `识别到 ${on.size} 件衣橱里的单品` : phase.error ? '' : '没有认出衣橱里的单品'}</T>
           {shown.map(({ item, note }) => (
             <Tap key={item.id} accessibilityState={{ checked: on.has(item.id) }} onPress={() => toggle(item.id, item)} style={{ minHeight: 64, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.lineSoft, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ItemImage item={item} style={{ width: 46, height: 46 }} />
+              <ItemImage item={item} style={{ width: 42, height: 56 }} />
               <View style={{ flex: 1, gap: 2 }}>
                 <T style={{ fontSize: 14, fontWeight: '500' }}>{item.name}</T>
                 <T v="caption">{note}</T>
@@ -211,7 +211,7 @@ export default function MirrorPage() {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {list.map((it) => (
                     <Tap key={it.id} accessibilityLabel={it.name} accessibilityState={{ selected: on.has(it.id) }} onPress={() => toggle(it.id, it)} style={{ width: 72, gap: 4 }}>
-                      <ItemImage item={it} style={{ width: 72, height: 80, borderWidth: 2, borderColor: on.has(it.id) ? C.ink : C.card }} />
+                      <ItemImage item={it} style={{ width: 66, height: 88, borderWidth: 2, borderColor: on.has(it.id) ? C.ink : C.card }} />
                       <T style={{ fontSize: 11 }} numberOfLines={1}>
                         {it.name}
                       </T>

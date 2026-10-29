@@ -49,6 +49,17 @@ export async function setAiBlocked(db: Db, reason: string | null): Promise<void>
   await setSetting(db, K.blocked, reason ?? '');
 }
 
+const PHOTO_CONSENT = 'privacy.photoConsent';
+
+/** Whether the user agreed that their photos are sent to OpenAI (asked once, before the first send). */
+export async function hasPhotoConsent(db: Db): Promise<boolean> {
+  return (await getSetting(db, PHOTO_CONSENT)) === '1';
+}
+
+export async function setPhotoConsent(db: Db): Promise<void> {
+  await setSetting(db, PHOTO_CONSENT, '1');
+}
+
 export type ImageTask = 'catalog' | 'avatar' | 'tryon' | 'photo';
 
 export function qualityFor(level: QualityLevel, task: ImageTask): 'low' | 'medium' | 'high' {

@@ -4,7 +4,7 @@ import { createItem, getItem, updateItem } from '@/db/items';
 import { enqueueJob, listJobs } from '@/db/jobs';
 import { addUsage, getAvatar, getSetting, getTryon, monthSpend, saveAvatar, avatarVersion } from '@/db/misc';
 import { AiError, classify, createOpenAiClient, type FetchLike, type OpenAiClient, reasoningEffort } from '../client';
-import { getAiBlocked, getModelChoice, saveAiSettings } from '../config';
+import { getAiBlocked, getModelChoice, saveAiSettings, setPhotoConsent } from '../config';
 import { type AiDeps, applyAutofill, matchMirror, tryonRef } from '../engine';
 import type { ImageStore } from '../imageStore';
 import { blockModel, EMPTY_CHOICE, imageCost, pickModels } from '../models';
@@ -79,6 +79,7 @@ let db: Db;
 let images: MemoryImages;
 beforeEach(async () => {
   db = await createTestDb();
+  await setPhotoConsent(db);
   images = new MemoryImages();
 });
 
@@ -494,5 +495,63 @@ describe('paid results survive retries', () => {
     await runner.idle();
     expect((await getItem(db, item.id))!.status).toBe('failed');
     expect(client.calls).toHaveLength(0);
+  });
+});
+
+describe('round 6 fixes', () => {
+  it('sends nothing before the user agreed to photos going to OpenAI, and continues once they do', async () => {
+    db = await createTestDb(); // no consent
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://original/1.jpg' });
+    await enqueueJob(db, 'catalog', item.id);
+    const client = fakeClient();
+    const runner = new JobRunner(deps(client), noTimers);
+    await drain(runner);
+    expect(client.calls).toHaveLength(0);
+    expect(await getAiBlocked(db)).toBe('consent');
+    expect((await listJobs(db, ['queued']))[0].attempts).toBe(0);
+    await setPhotoConsent(db);
+    await drain(runner);
+    expect((await getItem(db, item.id))!.status).toBe('review');
+  });
+
+  it('a job for a replaced photo neither pays again nor publishes old-photo candidates', async () => {
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'active', originalUri: 'mem://original/new.jpg', catalogUri: 'mem://catalog/old' });
+    const stale = await images.saveBase64('b2xk', 'catalog');
+    await enqueueJob(db, 'catalog', item.id, { photo: 'mem://original/old.jpg', generated: [stale] });
+    const client = fakeClient();
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls).toHaveLength(0);
+    expect(images.files.has(stale)).toBe(false);
+    expect((await getItem(db, item.id))!.candidates).toEqual([]);
+  });
+
+  it('an older catalog job yields to a newer one for the same item', async () => {
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://original/1.jpg' });
+    const first = await enqueueJob(db, 'catalog', item.id);
+    await db.runAsync("UPDATE jobs SET status = 'running' WHERE id = ?", [first.id]);
+    await enqueueJob(db, 'catalog', item.id, {}, { evenIfRunning: true });
+    await db.runAsync("UPDATE jobs SET status = 'queued' WHERE id = ?", [first.id]);
+    const client = fakeClient();
+    await drain(new JobRunner(deps(client), noTimers));
+    // one autofill + one generation + one check: the older job did nothing
+    expect(client.calls.filter((c) => c.kind === 'image')).toHaveLength(1);
+  });
+
+  it('discards a try-on when a garment changes while it is being generated', async () => {
+    await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', status: 'ready' });
+    const a = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'mem://catalog/a' });
+    const key = a.id;
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: [a.id] });
+    const base = fakeClient();
+    const client: OpenAiClient = {
+      ...base,
+      async imageEdit(req) {
+        await updateItem(db, a.id, { catalogUri: 'mem://catalog/a2' });
+        return base.imageEdit(req);
+      },
+    };
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(await getTryon(db, key, 'front', avatarVersion(await getAvatar(db)))).toBeNull();
+    expect([...images.files.keys()].some((u) => u.includes('tryon'))).toBe(false);
   });
 });

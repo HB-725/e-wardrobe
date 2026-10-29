@@ -11,6 +11,7 @@ import { avatarUsable } from '@/db/misc';
 import { saveImageToLibrary, shareImage } from '@/platform/files';
 import { useApp, useData } from '@/state/app';
 import { useSafe } from '@/state/useSafe';
+import { usePhotoConsent } from '@/state/consent';
 import { itemsOf, loadSnapshot } from '@/state/snapshot';
 import { Btn, Chip, Loading, NavHeader, Screen, T } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
@@ -18,6 +19,7 @@ import { OutfitBoard } from '@/ui/visuals';
 
 export default function PhotoPage() {
   const app = useApp();
+  const consent = usePhotoConsent();
   const safe = useSafe();
   const { items: param } = useLocalSearchParams<{ items?: string }>();
   const s = useData(loadSnapshot);
@@ -47,6 +49,7 @@ export default function PhotoPage() {
   const cost = estimateImageCost(null, { inputImages: items.length + 1, quality: qualityFor(settings.quality, 'photo') });
 
   const run = async () => {
+    if (!(await consent())) return;
     setBusy(true);
     setError(null);
     try {
