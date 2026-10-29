@@ -39,6 +39,23 @@ export function useApp(): AppValue {
 }
 
 /**
+ * Screens that load the same thing (loadSnapshot is used by every tab) share one load per data version, so a write
+ * costs one reload rather than one per mounted screen.
+ */
+const sharedLoads = new WeakMap<object, { db: Db; version: number; at: number; promise: Promise<unknown> }>();
+/** Only loads started together are shared, in case some write ever forgets to bump the version. */
+const SHARE_MS = 1500;
+function shared<T>(load: (db: Db) => Promise<T>, db: Db, version: number): Promise<T> {
+  const hit = sharedLoads.get(load);
+  if (hit && hit.db === db && hit.version === version && Date.now() - hit.at < SHARE_MS) return hit.promise as Promise<T>;
+  const promise = load(db);
+  sharedLoads.set(load, { db, version, at: Date.now(), promise });
+  // A failed load must not stay cached.
+  promise.catch(() => sharedLoads.delete(load));
+  return promise;
+}
+
+/**
  * Loads data with `load(db)` and reloads whenever anything is written (app version bump) or `deps` change.
  * Returns undefined until the first load finishes.
  */
@@ -47,7 +64,7 @@ export function useData<T>(load: (db: Db) => Promise<T>, deps: unknown[] = []): 
   const [data, setData] = useState<T | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    load(db)
+    (deps.length === 0 ? shared(load, db, version) : load(db))
       .then((d) => alive && setData(d))
       .catch((e) => console.warn('load failed', e));
     return () => {
@@ -106,7 +123,16 @@ async function createCore(onChange: () => void): Promise<Core> {
       return holder.client.client;
     },
   };
-  const runner = new JobRunner(ai, { onChange });
+  // A batch import finishes a job every few seconds; coalesce the queue's updates into one refresh.
+  let pending: ReturnType<typeof setTimeout> | null = null;
+  const queueChanged = () => {
+    if (pending) return;
+    pending = setTimeout(() => {
+      pending = null;
+      onChange();
+    }, 400);
+  };
+  const runner = new JobRunner(ai, { onChange: queueChanged });
   return {
     db,
     ai,

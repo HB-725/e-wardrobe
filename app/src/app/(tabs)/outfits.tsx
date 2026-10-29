@@ -77,8 +77,14 @@ function OutfitSheet({ s, outfit, onClose }: { s: Snapshot; outfit: Outfit | nul
   );
 }
 
+/** Outfits rendered at a time (each draws up to four pictures). */
+const PAGE = 20;
+
 function Library({ s, onOpen }: { s: Snapshot; onOpen: (o: Outfit) => void }) {
   const [tag, setTag] = useState('all');
+  const [shown, setShown] = useState(PAGE);
+  const wears = new Map<string, number>();
+  for (const l of s.logs) if (l.outfitId) wears.set(l.outfitId, (wears.get(l.outfitId) ?? 0) + 1);
   const used = new Set(s.outfits.flatMap((o) => o.occasions));
   const tags = [{ id: 'all', label: '全部' }, ...OCCASIONS.filter((o) => used.has(o.id))];
   const list = s.outfits.filter((o) => tag === 'all' || o.occasions.includes(tag));
@@ -99,14 +105,14 @@ function Library({ s, onOpen }: { s: Snapshot; onOpen: (o: Outfit) => void }) {
         {tags.map((t) => {
           const on = t.id === tag;
           return (
-            <Pressable key={t.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => setTag(t.id)} style={{ minHeight: 44, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: on ? C.ink : 'transparent', marginBottom: -1 }}>
+            <Pressable key={t.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => { setTag(t.id); setShown(PAGE); }} style={{ minHeight: 44, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: on ? C.ink : 'transparent', marginBottom: -1 }}>
               <T style={{ fontSize: 14, fontWeight: on ? '700' : '400', color: on ? C.ink : C.sub }}>{t.label}</T>
             </Pressable>
           );
         })}
       </ScrollView>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: PAD, paddingTop: 18, columnGap: 12, rowGap: 22 }}>
-        {list.map((o) => {
+        {list.slice(0, shown).map((o) => {
           const items = itemsOf(s, o.itemIds);
           return (
             <Tap key={o.id} accessibilityLabel={o.name} onPress={() => onOpen(o)} style={{ width: '47.5%', gap: 8 }}>
@@ -116,13 +122,16 @@ function Library({ s, onOpen }: { s: Snapshot; onOpen: (o: Outfit) => void }) {
                   {o.name}
                 </T>
                 <T v="caption" numberOfLines={1}>
-                  {[o.occasions.map((x) => OCCASION_LABEL[x] ?? x).join('、'), `穿过 ${wearCount(s, o)} 次`].filter(Boolean).join(' · ')}
+                  {[o.occasions.map((x) => OCCASION_LABEL[x] ?? x).join('、'), `穿过 ${wears.get(o.id) ?? 0} 次`].filter(Boolean).join(' · ')}
                 </T>
               </View>
             </Tap>
           );
         })}
       </View>
+      {list.length > shown ? (
+        <Btn label={`显示更多（还有 ${list.length - shown} 套）`} kind="outline" onPress={() => setShown((n) => n + PAGE)} style={{ marginHorizontal: PAD, marginTop: 22 }} />
+      ) : null}
     </>
   );
 }

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { isSeason, SEASONS, SLOTS, OCCASION_LABEL } from './catalog';
-import { computeItemStats } from './stats';
+import { type ItemStats, statsById } from './stats';
 import type { Item, Outfit, Season, Slot, WearLog } from './types';
 
 /** Column headers double as the import template: users can fill a sheet with these names and import it. */
@@ -33,8 +33,7 @@ const STATUS_LABEL: Record<Item['status'], string> = {
   failed: '生成失败',
 };
 
-export function itemRow(item: Item, logs: WearLog[], today: Date): Row {
-  const s = computeItemStats(item, logs, today);
+export function itemRow(item: Item, s: ItemStats): Row {
   return {
     名称: item.name,
     品类: SLOTS.find((x) => x.id === item.slot)?.label ?? item.slot,
@@ -58,8 +57,11 @@ export function itemRow(item: Item, logs: WearLog[], today: Date): Row {
 /** Builds the export workbook (单品 / 穿搭 / 穿着记录) and returns it as base64 xlsx. */
 export function buildWorkbook(items: Item[], outfits: Outfit[], logs: WearLog[], today: Date): string {
   const names = new Map(items.map((i) => [i.id, i.name]));
+  const stats = statsById(items, logs, today);
+  const outfitWears = new Map<string, number>();
+  for (const l of logs) if (l.outfitId) outfitWears.set(l.outfitId, (outfitWears.get(l.outfitId) ?? 0) + 1);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(items.map((i) => itemRow(i, logs, today)), { header: [...ITEM_COLUMNS] }), '单品');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(items.map((i) => itemRow(i, stats.get(i.id)!)), { header: [...ITEM_COLUMNS] }), '单品');
   XLSX.utils.book_append_sheet(
     wb,
     XLSX.utils.json_to_sheet(
@@ -67,7 +69,7 @@ export function buildWorkbook(items: Item[], outfits: Outfit[], logs: WearLog[],
         名称: o.name,
         场合: o.occasions.map((x) => OCCASION_LABEL[x] ?? x).join('、'),
         单品: o.itemIds.map((id) => names.get(id) ?? '').join('、'),
-        穿过次数: logs.filter((l) => l.outfitId === o.id).length,
+        穿过次数: outfitWears.get(o.id) ?? 0,
       })),
       { header: ['名称', '场合', '单品', '穿过次数'] },
     ),

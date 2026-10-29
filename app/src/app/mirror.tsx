@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, ScrollView, View } from 'react-native';
 import { AiError, blockedRoute, describeAiError } from '@/ai/client';
 import { matchMirror, type MirrorMatch } from '@/ai/engine';
 import { SLOT_LABEL, SLOTS } from '@/domain/catalog';
@@ -208,16 +208,24 @@ export default function MirrorPage() {
             return (
               <View key={slot.id} style={{ gap: 8, paddingBottom: 14 }}>
                 <T v="caption">{SLOT_LABEL[slot.id]}</T>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {list.map((it) => (
-                    <Tap key={it.id} accessibilityLabel={it.name} accessibilityState={{ selected: on.has(it.id) }} onPress={() => toggle(it.id, it)} style={{ width: 72, gap: 4 }}>
+                {/* One horizontally scrolling row per category: only what is on screen is drawn. */}
+                <FlatList
+                  horizontal
+                  data={list}
+                  keyExtractor={(it) => it.id}
+                  extraData={on}
+                  initialNumToRender={6}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 6 }}
+                  renderItem={({ item: it }) => (
+                    <Tap accessibilityRole="checkbox" accessibilityLabel={it.name} accessibilityState={{ checked: on.has(it.id) }} onPress={() => toggle(it.id, it)} style={{ width: 72, gap: 4 }}>
                       <ItemImage item={it} style={{ width: 66, height: 88, borderWidth: 2, borderColor: on.has(it.id) ? C.ink : C.card }} />
                       <T style={{ fontSize: 11 }} numberOfLines={1}>
                         {it.name}
                       </T>
                     </Tap>
-                  ))}
-                </View>
+                  )}
+                />
               </View>
             );
           })}

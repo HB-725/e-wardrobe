@@ -52,6 +52,7 @@ export async function seedDemo(db: Db, variant: string): Promise<void> {
     fieldSources: { name: 'ai', colorName: 'ai', subcategory: 'ai' },
   });
 
+  if (variant === 'big') await seedBig(db, daysAgo, [jacket, tee, jeans, sneakers, coat, shirt, knit, chinos, skirt, loafers, tote]);
   if (variant === 'noavatar') return;
   await saveAvatar(db, { frontUri: img('avatar_front'), backUri: img('avatar_back'), sourceUris: [], heightCm: 175, weightKg: 64, build: 'slim', status: 'ready' });
   await setSetting(db, 'prefs', JSON.stringify({ nickname: '小林', mirrorAutoLog: true, idleDays: 30 }));
@@ -75,4 +76,23 @@ export async function seedDemo(db: Db, variant: string): Promise<void> {
   for (const [kind, usd] of [['catalog', 0.012], ['catalog', 0.014], ['avatar', 0.045], ['tryon', 0.032], ['photo', 0.032], ['mirror', 0.002]] as const) {
     await db.runAsync('INSERT INTO usage (id, kind, model, cost_usd, created_at) VALUES (?, ?, ?, ?, ?)', [Math.random().toString(36).slice(2), kind, 'demo', usd, now]);
   }
+}
+
+/** `?demo=big`: a large wardrobe (about 600 garments, two years of wear logs) to check speed and memory. */
+async function seedBig(db: Db, daysAgo: (n: number) => string, base: Item[]): Promise<void> {
+  const made: Item[] = [];
+  await db.withTransactionAsync(async (tx) => {
+    for (let i = 0; i < 590; i++) {
+      const b = base[i % base.length];
+      made.push(await createItem(tx, { name: `${b.name} ${i + 1}`, slot: b.slot, subcategory: b.subcategory, colorName: b.colorName, colorHex: b.colorHex, seasons: b.seasons, catalogUri: b.catalogUri, status: 'active' }));
+    }
+  });
+  const all = [...base, ...made];
+  const pick = (slot: Item['slot'], d: number) => {
+    const xs = all.filter((x) => x.slot === slot);
+    return xs[(d * 7 + slot.length) % xs.length].id;
+  };
+  await db.withTransactionAsync(async (tx) => {
+    for (let d = 30; d < 730; d++) await logWear(tx, { date: daysAgo(d), itemIds: [pick('top', d), pick('bottom', d), pick('shoes', d)], source: 'manual' });
+  });
 }

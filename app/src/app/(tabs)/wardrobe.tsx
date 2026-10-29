@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { memo, useState } from 'react';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { SLOTS } from '@/domain/catalog';
 import { wearRank } from '@/domain/stats';
 import type { Item, Slot } from '@/domain/types';
@@ -13,6 +13,32 @@ import { C, PAD } from '@/ui/theme';
 import { ItemImage } from '@/ui/visuals';
 
 type Cat = 'all' | Slot | 'archived';
+
+const COLS = 4;
+
+type Cell = { kind: 'item'; key: string; item: Item } | { kind: 'add'; key: string } | { kind: 'pad'; key: string };
+
+/** One garment in the grid; memoised so a refresh re-renders only what changed. */
+const Tile = memo(function Tile({ item: it, on, wears, onPress }: { item: Item; on: boolean; wears: number; onPress: (it: Item) => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${it.name}${it.status === 'review' ? '（待确认）' : ''}`}
+      accessibilityHint={on ? '再点一次打开' : '选中后再点一次打开'}
+      accessibilityState={{ selected: on }}
+      onPress={() => onPress(it)}
+      style={{ flex: 1, aspectRatio: 0.75, borderWidth: 2, borderColor: on ? C.ink : C.card }}
+    >
+      <ItemImage item={it} style={{ flex: 1 }} />
+      {it.status === 'active' ? <T style={{ position: 'absolute', right: 3, bottom: 3, fontSize: 10, color: C.sub, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 3 }}>×{wears}</T> : null}
+      {it.status === 'review' || it.status === 'failed' ? (
+        <View style={{ position: 'absolute', left: 0, top: 0, paddingHorizontal: 5, paddingVertical: 1, backgroundColor: it.status === 'failed' ? C.danger : C.ink }}>
+          <T style={{ color: '#FFFFFF', fontSize: 10 }}>{it.status === 'failed' ? '失败' : '待确认'}</T>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+});
 
 const STATUS_ORDER: Record<Item['status'], number> = { review: 0, failed: 1, processing: 2, active: 3, archived: 4 };
 
@@ -55,6 +81,10 @@ export default function WardrobePage() {
   const list = visibleItems(s, cat);
   const sel = (selId && s.byId.get(selId)) || list[0] || null;
   const archivedCount = s.items.filter((i) => i.status === 'archived').length;
+  const onTile = (it: Item) => (sel?.id === it.id ? router.push(pageFor(it)) : setSelId(it.id));
+  const cells: Cell[] = list.map((item) => ({ kind: 'item', key: item.id, item }));
+  if (cat !== 'archived') cells.push({ kind: 'add', key: 'add' });
+  while (cells.length % COLS) cells.push({ kind: 'pad', key: `pad${cells.length}` });
   const tabs: { id: Cat; label: string }[] = [{ id: 'all', label: '全部' }, ...SLOTS.filter((x) => x.id !== 'accessory' || s.items.some((i) => i.slot === 'accessory'))];
 
   const cta = () => {
@@ -113,45 +143,40 @@ export default function WardrobePage() {
         })}
       </View>
       <View style={{ flex: 1, marginHorizontal: PAD, marginBottom: 16, padding: 12, borderWidth: 1, borderColor: C.ink, gap: 12 }}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {list.map((it) => {
-            const on = sel?.id === it.id;
-            const wears = s.stats.get(it.id)?.wears ?? 0;
-            return (
+        <FlatList
+          style={{ flex: 1 }}
+          data={cells}
+          keyExtractor={(c) => c.key}
+          numColumns={COLS}
+          columnWrapperStyle={{ gap: 6 }}
+          contentContainerStyle={{ gap: 6 }}
+          initialNumToRender={24}
+          windowSize={5}
+          removeClippedSubviews
+          renderItem={({ item: c }) =>
+            c.kind === 'item' ? (
+              <Tile item={c.item} on={sel?.id === c.item.id} wears={s.stats.get(c.item.id)?.wears ?? 0} onPress={onTile} />
+            ) : c.kind === 'add' ? (
               <Pressable
-                key={it.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${it.name}${it.status === 'review' ? '（待确认）' : ''}`}
-                accessibilityState={{ selected: on }}
-                onPress={() => (on ? router.push(pageFor(it)) : setSelId(it.id))}
-                style={{ width: '23.6%', aspectRatio: 0.75, borderWidth: 2, borderColor: on ? C.ink : C.card }}
+                accessibilityLabel="添加新衣服"
+                onPress={() => router.push('/capture')}
+                style={{ flex: 1, aspectRatio: 0.75, borderWidth: 1, borderStyle: 'dashed', borderColor: C.muted, alignItems: 'center', justifyContent: 'center' }}
               >
-                <ItemImage item={it} style={{ flex: 1 }} />
-                {it.status === 'active' ? <T style={{ position: 'absolute', right: 3, bottom: 3, fontSize: 10, color: C.sub, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 3 }}>×{wears}</T> : null}
-                {it.status === 'review' || it.status === 'failed' ? (
-                  <View style={{ position: 'absolute', left: 0, top: 0, paddingHorizontal: 5, paddingVertical: 1, backgroundColor: it.status === 'failed' ? C.danger : C.ink }}>
-                    <T style={{ color: '#FFFFFF', fontSize: 10 }}>{it.status === 'failed' ? '失败' : '待确认'}</T>
-                  </View>
-                ) : null}
+                <Icon name="plus" size={20} color={C.faint} strokeWidth={1.6} />
               </Pressable>
-            );
-          })}
-          {cat !== 'archived' ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="添加新衣服"
-              onPress={() => router.push('/capture')}
-              style={{ width: '23.6%', height: 80, borderWidth: 1, borderStyle: 'dashed', borderColor: C.muted, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Icon name="plus" size={20} color={C.faint} strokeWidth={1.6} />
-            </Pressable>
-          ) : null}
-          {archivedCount > 0 || cat === 'archived' ? (
-            <Tap onPress={() => setCat(cat === 'archived' ? 'all' : 'archived')} style={{ width: '100%', minHeight: 40, justifyContent: 'center' }}>
-              <T style={{ fontSize: 12, color: C.sub, textDecorationLine: 'underline' }}>{cat === 'archived' ? '返回全部' : `已收起 ${archivedCount} 件`}</T>
-            </Tap>
-          ) : null}
-        </ScrollView>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )
+          }
+          ListFooterComponent={
+            archivedCount > 0 || cat === 'archived' ? (
+              <Tap onPress={() => setCat(cat === 'archived' ? 'all' : 'archived')} style={{ minHeight: 40, justifyContent: 'center' }}>
+                <T style={{ fontSize: 12, color: C.sub, textDecorationLine: 'underline' }}>{cat === 'archived' ? '返回全部' : `已收起 ${archivedCount} 件`}</T>
+              </Tap>
+            ) : undefined
+          }
+        />
         {sel ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line }}>
             <ItemImage item={sel} style={{ width: 54, height: 72 }} />

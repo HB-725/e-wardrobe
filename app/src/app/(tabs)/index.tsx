@@ -26,6 +26,8 @@ interface Card {
   badge: string | null;
 }
 
+const MAX_CARDS = 10;
+
 function buildCards(s: Snapshot): Card[] {
   const activeIds = new Set(s.active.map((i) => i.id));
   const cards: Card[] = todaySuggestions(s.outfits, s.logs, activeIds, s.today).map((sg) => ({
@@ -41,7 +43,8 @@ function buildCards(s: Snapshot): Card[] {
     if (i > 0) cards.unshift(...cards.splice(i, 1));
     if (i < 0) cards.unshift({ key: 'today', outfitId: null, name: '今天的穿搭', items: itemsOf(s, s.todayLog.itemIds), badge: null });
   }
-  return cards;
+  // The longest-unworn few are suggestion enough; the full library is on the Outfits tab.
+  return cards.slice(0, MAX_CARDS);
 }
 
 function DateHeader({ s }: { s: Snapshot }) {

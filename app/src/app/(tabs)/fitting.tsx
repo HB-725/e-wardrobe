@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { blockedRoute } from '@/ai/client';
 import { getAiSettings, qualityFor } from '@/ai/config';
 import { estimateImageCost, formatUsd } from '@/ai/models';
@@ -118,12 +118,17 @@ function SaveSheet({ visible, onClose, items, onSaved }: { visible: boolean; onC
 function Tray({ s, slot, worn, onPick }: { s: Snapshot; slot: Slot; worn: string | undefined; onPick: (it: Item) => void }) {
   const list = s.active.filter((i) => i.slot === slot);
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 6, gap: 6 }}>
-      {list.map((it) => {
+    <FlatList
+      style={{ flex: 1 }}
+      contentContainerStyle={{ padding: 6, gap: 6 }}
+      data={list}
+      keyExtractor={(it) => it.id}
+      initialNumToRender={6}
+      windowSize={5}
+      renderItem={({ item: it }) => {
         const on = worn === it.id;
         return (
           <Pressable
-            key={it.id}
             accessibilityRole="button"
             accessibilityLabel={it.name}
             accessibilityState={{ selected: on }}
@@ -141,14 +146,14 @@ function Tray({ s, slot, worn, onPick }: { s: Snapshot; slot: Slot; worn: string
             ) : null}
           </Pressable>
         );
-      })}
-      {list.length === 0 ? (
+      }}
+      ListEmptyComponent={
         <Tap onPress={() => router.push('/capture')} style={{ height: 104, borderWidth: 1, borderStyle: 'dashed', borderColor: C.muted, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <Icon name="plus" size={18} color={C.faint} />
           <T style={{ fontSize: 11, color: C.sub }}>还没有这类衣服</T>
         </Tap>
-      ) : null}
-    </ScrollView>
+      }
+    />
   );
 }
 
