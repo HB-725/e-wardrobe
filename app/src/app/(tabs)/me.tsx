@@ -15,6 +15,8 @@ import { toDateKey } from '@/domain/stats';
 import { pickSpreadsheet, shareBase64File, XLSX_MIME } from '@/platform/files';
 import { setApiKey } from '@/platform/secrets';
 import { userSources, wipeEverything } from '@/state/actions';
+import { BackupError, createBackup, readBackupInfo, restoreBackup } from '@/state/backup';
+import { BACKUP_SUPPORTED, pickExistingBackupFolder, pickNewBackupFolder } from '@/platform/backupStorage';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
 import { confirmAsync, notify } from '@/ui/dialogs';
@@ -44,6 +46,7 @@ export default function MePage() {
   const [sheet, setSheet] = useState<SheetKind>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [progress, setProgress] = useState('');
 
   if (!s || !me) return <Loading />;
   const { settings, spend } = me;
@@ -100,9 +103,52 @@ export default function MePage() {
     }
   };
 
+  const backup = async () => {
+    const target = await pickNewBackupFolder(app.images);
+    if (!target) return;
+    setBusy('backup');
+    try {
+      const r = await createBackup(app.db, target.storage, (d, t) => setProgress(`${d}/${t}`));
+      notify('备份完成', `已把 ${r.items} 件衣服、${r.images} 张图片和全部穿搭、记录保存到「${target.name}」。换手机时在新手机上选「从备份恢复」。`);
+    } catch (e) {
+      notify('备份失败', String(e));
+    } finally {
+      setBusy(null);
+      setProgress('');
+    }
+  };
+
+  const restore = async () => {
+    const storage = await pickExistingBackupFolder(app.images);
+    if (!storage) return;
+    try {
+      const info = await readBackupInfo(storage);
+      const when = info.createdAt.slice(0, 16).replace('T', ' ');
+      if (!(await confirmAsync('从备份恢复', `备份时间 ${when}，共 ${info.items} 件衣服、${info.outfits} 套穿搭。手机上现有的数据会被替换。`, '恢复'))) return;
+    } catch (e) {
+      notify('无法恢复', e instanceof BackupError ? e.message : String(e));
+      return;
+    }
+    setBusy('restore');
+    app.runner.hold();
+    try {
+      await app.runner.idle();
+      const r = await restoreBackup(app.db, app.images, storage, (d, t) => setProgress(`${d}/${t}`));
+      app.setFitting({});
+      notify('恢复完成', `已恢复 ${r.items} 件衣服和 ${r.images} 张图片。`);
+    } catch (e) {
+      notify('恢复失败', `手机上的数据没有改动。${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      app.runner.release();
+      setBusy(null);
+      setProgress('');
+      app.refresh();
+    }
+  };
+
   const wipe = async () => {
     if (!(await confirmAsync('永久删除全部数据', '衣服、照片、穿搭、穿着记录、个人形象和 API Key 都会从这台手机上删除，无法恢复。'))) return;
-    if (!(await confirmAsync('再确认一次', '真的要删除吗？可以先导出 Excel 留一份清单（只有文字信息，不含照片和穿搭）。', '永久删除'))) return;
+    if (!(await confirmAsync('再确认一次', '真的要删除吗？建议先做一次「完整备份」。', '永久删除'))) return;
     // A job still running would write the avatar / images back after the wipe, so let it finish first.
     setBusy('wipe');
     app.runner.hold();
@@ -202,7 +248,13 @@ export default function MePage() {
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>数据</SectionTitle>
         <Row label={busy === 'export' ? '正在导出…' : '导出衣橱到 Excel'} value=".xlsx" onPress={busy ? undefined : exportExcel} />
-        <Row label={busy === 'import' ? '正在导入…' : '从 Excel 导入'} value="按导出文件的列名" onPress={busy ? undefined : importExcel} last />
+        <Row label={busy === 'import' ? '正在导入…' : '从 Excel 导入'} value="按导出文件的列名" onPress={busy ? undefined : importExcel} last={!BACKUP_SUPPORTED} />
+        {BACKUP_SUPPORTED ? (
+          <>
+            <Row label={busy === 'backup' ? `正在备份… ${progress}` : '完整备份（含照片）'} sub="存到手机或网盘的文件夹，换手机时恢复" onPress={busy ? undefined : backup} />
+            <Row label={busy === 'restore' ? `正在恢复… ${progress}` : '从备份恢复'} sub="选择之前备份的那个文件夹" onPress={busy ? undefined : restore} last />
+          </>
+        ) : null}
       </View>
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
