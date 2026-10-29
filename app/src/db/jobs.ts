@@ -109,6 +109,19 @@ export async function deferJob(db: Db, job: Job, reason: string): Promise<void> 
   );
 }
 
+/** Offline: try again in a minute (or when the app comes back to the foreground) without using up an attempt. */
+export async function waitForNetwork(db: Db, job: Job, reason: string, now = new Date()): Promise<void> {
+  await db.runAsync(
+    "UPDATE jobs SET status = 'queued', attempts = MAX(0, attempts - 1), last_error = ?, next_run_at = ?, updated_at = ? WHERE id = ?",
+    [reason, new Date(now.getTime() + 60_000).toISOString(), nowIso(), job.id],
+  );
+}
+
+/** Makes waiting jobs due now (the app came back to the foreground, possibly online again). */
+export async function wakeWaitingJobs(db: Db, now = new Date()): Promise<void> {
+  await db.runAsync("UPDATE jobs SET next_run_at = ? WHERE status = 'queued' AND next_run_at > ?", [now.toISOString(), now.toISOString()]);
+}
+
 /**
  * Jobs interrupted by an app kill are re-queued on next launch, unless they already used all attempts (a job that
  * crashes the app every time must not be paid for again and again). Returns the jobs given up on.

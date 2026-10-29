@@ -65,6 +65,10 @@ export default function MirrorPage() {
       app.toast(`照片读取失败：${String(e)}`);
       return;
     }
+    await match(photo);
+  };
+
+  const match = async (photo: string) => {
     setPhase({ k: 'matching', photo });
     try {
       const res = await matchMirror(app.ai, photo);
@@ -73,7 +77,7 @@ export default function MirrorPage() {
       setOn(new Set(res.matches.filter((m) => m.confidence !== 'low').map((m) => m.itemId)));
       setPhase({ k: 'done', photo, error: null, needsKey: null });
     } catch (e) {
-      setPhase({ k: 'done', photo, error: describeAiError(e), needsKey: e instanceof AiError && e.needsUser ? e.kind : null });
+      setPhase({ k: 'done', photo, error: describeAiError(e, true), needsKey: e instanceof AiError && e.needsUser ? e.kind : null });
     } finally {
       app.refresh();
     }
@@ -84,8 +88,8 @@ export default function MirrorPage() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else {
-        // one item per slot
-        if (item) for (const x of [...next]) if (s.byId.get(x)?.slot === item.slot) next.delete(x);
+        // one item per slot (several accessories can be worn at once)
+        if (item && item.slot !== 'accessory') for (const x of [...next]) if (s.byId.get(x)?.slot === item.slot) next.delete(x);
         next.add(id);
       }
       return next;
@@ -96,14 +100,16 @@ export default function MirrorPage() {
     if (phase.k !== 'done') return;
     setSaving(true);
     try {
-      for (const m of matches) if (on.has(m.itemId) && m.note) await addFitNote(app, m.itemId, m.note, dateLabel);
-      if (s.prefs.mirrorAutoLog && on.size > 0) {
-        if (!(await recordToday({ itemIds: [...on], source: 'mirror', photoUri: phase.photo }))) return;
+      const logging = s.prefs.mirrorAutoLog && on.size > 0;
+      // Ask about replacing today's record first: cancelling there must not leave fit notes behind.
+      if (logging && !(await recordToday({ itemIds: [...on], source: 'mirror', photoUri: phase.photo }))) return;
+      for (const m of notes) await addFitNote(app, m.itemId, m.note, dateLabel);
+      if (logging) {
         pendingPhoto.current = null;
         app.toast(`已记录今天的 ${on.size} 件，穿着次数 +1`);
       } else {
         await app.images.remove(phase.photo);
-        app.toast('已保存合身笔记');
+        if (notes.length) app.toast('已保存合身笔记');
       }
       app.refresh();
       router.back();
@@ -168,14 +174,18 @@ export default function MirrorPage() {
             <View style={{ backgroundColor: '#FBF1E3', padding: 12, gap: 8, marginBottom: 12 }}>
               <T style={{ fontSize: 13 }}>识别失败：{phase.error}</T>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {phase.needsKey ? <Btn label="去处理" kind="outline" height={36} onPress={() => router.push(blockedRoute(phase.needsKey))} /> : null}
+                {phase.needsKey ? (
+                  <Btn label="去处理" kind="outline" height={36} onPress={() => router.push(blockedRoute(phase.needsKey))} />
+                ) : (
+                  <Btn label="重试" kind="outline" height={36} onPress={() => void match(phase.photo)} />
+                )}
                 <Btn label="手动选择" kind="outline" height={36} onPress={() => setManual(true)} />
               </View>
             </View>
           ) : null}
           <T style={{ fontSize: 15, fontWeight: '700', marginBottom: 4 }}>{shown.length ? `识别到 ${on.size} 件衣橱里的单品` : phase.error ? '' : '没有认出衣橱里的单品'}</T>
           {shown.map(({ item, note }) => (
-            <Tap key={item.id} accessibilityState={{ checked: on.has(item.id) }} onPress={() => toggle(item.id, item)} style={{ minHeight: 64, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.lineSoft, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Tap key={item.id} accessibilityRole="checkbox" accessibilityLabel={item.name} accessibilityState={{ checked: on.has(item.id) }} onPress={() => toggle(item.id, item)} style={{ minHeight: 64, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.lineSoft, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <ItemImage item={item} style={{ width: 42, height: 56 }} />
               <View style={{ flex: 1, gap: 2 }}>
                 <T style={{ fontSize: 14, fontWeight: '500' }}>{item.name}</T>

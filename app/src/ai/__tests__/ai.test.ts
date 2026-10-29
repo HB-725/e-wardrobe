@@ -1,11 +1,12 @@
 import { createTestDb } from '@/test/memoryDb';
 import type { Db } from '@/db/db';
+import type { Item } from '@/domain/types';
 import { createItem, getItem, updateItem } from '@/db/items';
 import { enqueueJob, listJobs } from '@/db/jobs';
 import { addUsage, getAvatar, getSetting, getTryon, monthSpend, saveAvatar, avatarVersion } from '@/db/misc';
 import { AiError, classify, createOpenAiClient, type FetchLike, type OpenAiClient, reasoningEffort } from '../client';
 import { getAiBlocked, getModelChoice, saveAiSettings, setPhotoConsent } from '../config';
-import { type AiDeps, applyAutofill, matchMirror, tryonRef } from '../engine';
+import { type AiDeps, applyAutofill, matchMirror, pickMirrorCandidates, tryonRef } from '../engine';
 import type { ImageStore } from '../imageStore';
 import { blockModel, EMPTY_CHOICE, imageCost, pickModels } from '../models';
 import type { AutofillResult } from '../prompts';
@@ -342,7 +343,8 @@ describe('mirror', () => {
     const r = await matchMirror(deps(client), 'mem://mirror/1');
     const ids = new Map([[a.id, 'a'], [b.id, 'b'], [c.id, 'c']]);
     // listItems orders newest first, so index 1 is the newest item
-    expect(r.matches.map((m) => ids.get(m.itemId))).toEqual(['c', 'b']);
+    // per category the more confident match wins: medium (a) over low (b)
+    expect(r.matches.map((m) => ids.get(m.itemId))).toEqual(['c', 'a']);
     expect(r.matches[0].note).toBe('裤脚堆在鞋面上');
     expect(r.unmatched).toEqual(['灰色围巾']);
     expect(await getSetting(db, 'ai.blocked')).toBeNull();
@@ -563,5 +565,41 @@ describe('round 6 fixes', () => {
     await drain(new JobRunner(deps(client), noTimers));
     expect(await getTryon(db, key, 'front', avatarVersion(await getAvatar(db)))).toBeNull();
     expect([...images.files.keys()].some((u) => u.includes('tryon'))).toBe(false);
+  });
+});
+
+describe('mirror candidates', () => {
+  const mk = (id: string, slot: Item['slot'], createdAt: string) => ({ id, slot, createdAt }) as Item;
+  it('gives every category a share and includes new garments, not only the most worn', () => {
+    const tops = Array.from({ length: 100 }, (_, i) => mk(`t${i}`, 'top', `2025-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00Z`));
+    const shoes = Array.from({ length: 5 }, (_, i) => mk(`s${i}`, 'shoes', '2025-01-01T00:00:00Z'));
+    const brandNew = mk('new', 'top', '2026-10-28T00:00:00Z');
+    const wear = new Map(tops.slice(0, 60).map((t, i) => [t.id, { n: 100 - i, last: '2026-01-01' }]));
+    const picked = pickMirrorCandidates([...tops, brandNew, ...shoes], wear, 20);
+    expect(picked).toHaveLength(20);
+    expect(picked.filter((x) => x.slot === 'shoes').length).toBeGreaterThanOrEqual(4);
+    expect(picked.map((x) => x.id)).toContain('new');
+    expect(picked.map((x) => x.id)).toContain('t0');
+  });
+});
+
+describe('offline', () => {
+  it('waits for the network instead of using up attempts, and does not count a timeout as offline', async () => {
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://original/1.jpg' });
+    await enqueueJob(db, 'catalog', item.id);
+    let now = new Date('2030-01-01T00:00:00Z');
+    const client = fakeClient();
+    client.visionJson = async () => {
+      throw new AiError('network', 'Network request failed');
+    };
+    const runner = new JobRunner({ db, images, getClient: async () => client, now: () => now }, noTimers);
+    for (let i = 0; i < 5; i++) {
+      await drain(runner);
+      now = new Date(now.getTime() + 61_000);
+    }
+    const [job] = await listJobs(db, ['queued']);
+    expect(job.attempts).toBe(0);
+    expect((await getItem(db, item.id))!.status).toBe('processing');
+    expect(new AiError('timeout', '').retryable).toBe(true);
   });
 });

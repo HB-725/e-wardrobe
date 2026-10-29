@@ -1,5 +1,5 @@
 import type { Job } from '@/domain/types';
-import { claimNextJob, completeJob, deferJob, failJob, nextDueAt, recoverRunningJobs } from '@/db/jobs';
+import { claimNextJob, completeJob, deferJob, failJob, nextDueAt, recoverRunningJobs, waitForNetwork } from '@/db/jobs';
 import { AiError, describeAiError } from './client';
 import { setAiBlocked } from './config';
 import { type AiDeps, markJobFailed, runJob } from './engine';
@@ -110,7 +110,10 @@ export class JobRunner {
       if (!this.paused) await setAiBlocked(db, null);
     } catch (e) {
       const message = describeAiError(e);
-      if (e instanceof AiError && e.needsUser) {
+      if (e instanceof AiError && e.kind === 'network') {
+        // Nothing reached OpenAI, so nothing was paid: wait for the connection instead of giving up after 3 tries.
+        await waitForNetwork(db, job, message, this.deps.now?.());
+      } else if (e instanceof AiError && e.needsUser) {
         await deferJob(db, job, message);
         await setAiBlocked(db, e.kind);
         this.paused = true;

@@ -371,19 +371,55 @@ export interface MirrorMatch {
 /** Reference images per mirror call; most-worn first so the usual suspects are always included. */
 const MIRROR_MAX_ITEMS = 60;
 
+/**
+ * The garments shown to the model next to a mirror photo (it can only take so many). Every category gets a share,
+ * and within one the most-worn, most recently worn and newest garments take turns, so new clothes are recognised too.
+ */
+export function pickMirrorCandidates(items: Item[], wear: Map<string, { n: number; last: string }>, max: number): Item[] {
+  if (items.length <= max) return items;
+  const bySlot = new Map<Slot, Item[]>();
+  for (const it of items) bySlot.set(it.slot, [...(bySlot.get(it.slot) ?? []), it]);
+  const quota = new Map<Slot, number>();
+  for (const [slot, xs] of bySlot) quota.set(slot, Math.min(xs.length, Math.max(4, Math.floor((xs.length / items.length) * max))));
+  // Trim the largest shares until the total fits.
+  let total = [...quota.values()].reduce((a, b) => a + b, 0);
+  while (total > max) {
+    const [slot, q] = [...quota.entries()].sort((a, b) => b[1] - a[1])[0];
+    quota.set(slot, q - 1);
+    total -= 1;
+  }
+  const out: Item[] = [];
+  for (const [slot, xs] of bySlot) {
+    const orders = [
+      [...xs].sort((a, b) => (wear.get(b.id)?.n ?? 0) - (wear.get(a.id)?.n ?? 0)),
+      [...xs].sort((a, b) => (wear.get(b.id)?.last ?? '').localeCompare(wear.get(a.id)?.last ?? '')),
+      [...xs].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    ];
+    const chosen = new Set<string>();
+    for (let k = 0; chosen.size < quota.get(slot)!; k++) {
+      const next = orders[k % 3].find((x) => !chosen.has(x.id));
+      if (next) chosen.add(next.id);
+    }
+    out.push(...xs.filter((x) => chosen.has(x.id)));
+  }
+  return out;
+}
+
 export async function matchMirror(deps: AiDeps, photoUri: string): Promise<{ matches: MirrorMatch[]; unmatched: string[] }> {
   await assertBudget(deps);
   const client = await requireClient(deps);
-  const wears = new Map(
-    (await deps.db.getAllAsync<{ item_id: string; n: number }>('SELECT item_id, COUNT(*) AS n FROM wear_log_items GROUP BY item_id')).map((r) => [r.item_id, r.n]),
+  const rows = await deps.db.getAllAsync<{ item_id: string; n: number; last: string }>(
+    'SELECT li.item_id, COUNT(*) AS n, MAX(l.date) AS last FROM wear_log_items li JOIN wear_logs l ON l.id = li.log_id GROUP BY li.item_id',
   );
-  const items = (await listItems(deps.db, ['active']))
-    .filter((i) => i.catalogUri || i.originalUri)
-    .sort((a, b) => (wears.get(b.id) ?? 0) - (wears.get(a.id) ?? 0))
-    .slice(0, MIRROR_MAX_ITEMS);
+  const wear = new Map(rows.map((r) => [r.item_id, { n: r.n, last: r.last }]));
+  const items = pickMirrorCandidates(
+    (await listItems(deps.db, ['active'])).filter((i) => i.catalogUri || i.originalUri),
+    wear,
+    MIRROR_MAX_ITEMS,
+  );
   if (items.length === 0) return { matches: [], unmatched: [] };
-  const refs: string[] = [];
-  for (const i of items) refs.push(await deps.images.toDataUrl((i.catalogUri ?? i.originalUri)!, 256));
+  // The decoder limits itself to a few images at a time.
+  const refs = await Promise.all(items.map((i) => deps.images.toDataUrl((i.catalogUri ?? i.originalUri)!, 256)));
   const r = await vision<MirrorResult>(deps, client, 'mirror', {
     system: MIRROR_SYSTEM,
     text: mirrorText(items.map((i, k) => ({ index: k + 1, name: i.name, slot: i.slot, color: i.colorName }))),
@@ -392,11 +428,13 @@ export async function matchMirror(deps: AiDeps, photoUri: string): Promise<{ mat
     schema: MIRROR_SCHEMA as unknown as Record<string, unknown>,
     detail: 'auto',
   });
+  // Best match per category (several accessories may be worn together).
+  const rank = { high: 0, medium: 1, low: 2 } as const;
   const seenSlots = new Set<Slot>();
   const matches: MirrorMatch[] = [];
-  for (const m of r.matches) {
+  for (const m of [...r.matches].sort((a, b) => rank[a.confidence] - rank[b.confidence])) {
     const it = items[m.index - 1];
-    if (!it || seenSlots.has(it.slot)) continue;
+    if (!it || matches.some((x) => x.itemId === it.id) || (it.slot !== 'accessory' && seenSlots.has(it.slot))) continue;
     seenSlots.add(it.slot);
     matches.push({ itemId: it.id, confidence: m.confidence, note: m.note.trim() });
   }

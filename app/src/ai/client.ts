@@ -10,7 +10,8 @@ export type AiErrorKind =
   | 'cap' // monthly in-app spend cap reached
   | 'consent' // user has not agreed to photos being sent to OpenAI
   | 'rate' // 429 rate limit, retry later
-  | 'network' // offline / timeout
+  | 'network' // could not connect (offline); nothing was sent
+  | 'timeout' // no answer in time; the request may still have been processed (and billed)
   | 'server' // 5xx
   | 'model' // model unavailable or deprecated, pick another
   | 'rejected' // request refused (safety system, bad image)
@@ -28,7 +29,7 @@ export class AiError extends Error {
 
   /** Worth trying the same request again later. */
   get retryable(): boolean {
-    return this.kind === 'rate' || this.kind === 'network' || this.kind === 'server' || this.kind === 'model' || this.kind === 'bad_response';
+    return this.kind === 'rate' || this.kind === 'network' || this.kind === 'timeout' || this.kind === 'server' || this.kind === 'model' || this.kind === 'bad_response';
   }
 
   /** Cannot succeed until the user changes something (key, credit, cap). */
@@ -38,8 +39,12 @@ export class AiError extends Error {
 }
 
 /** Short Chinese explanation for the UI. */
-export function describeAiError(e: unknown): string {
+/** `interactive`: the user is waiting on screen and retries by hand, so do not promise an automatic retry. */
+export function describeAiError(e: unknown, interactive = false): string {
   if (!(e instanceof AiError)) return e instanceof Error ? e.message : String(e);
+  if (interactive && e.kind === 'network') return '网络连接失败，请检查网络后重试';
+  if (interactive && e.kind === 'timeout') return 'AI 太久没有回应，请稍后重试';
+  if (interactive && (e.kind === 'rate' || e.kind === 'server' || e.kind === 'bad_response')) return 'AI 服务暂时不可用，请稍后重试';
   switch (e.kind) {
     case 'no_key':
       return '还没有填写 API Key，去「我的」页面填写';
@@ -54,7 +59,9 @@ export function describeAiError(e: unknown): string {
     case 'rate':
       return '请求太频繁，稍后自动重试';
     case 'network':
-      return '网络连接失败，联网后自动重试';
+      return '网络连接失败，联网后会自动继续';
+    case 'timeout':
+      return 'AI 太久没有回应，稍后自动重试';
     case 'server':
       return 'AI 服务暂时不可用，稍后自动重试';
     case 'model':
@@ -173,6 +180,7 @@ export function createOpenAiClient(opts: {
         signal: ctrl?.signal,
       });
     } catch (e) {
+      if (ctrl?.signal.aborted) throw new AiError('timeout', `no response in ${timeoutMs / 1000}s`);
       throw new AiError('network', e instanceof Error ? e.message : String(e));
     } finally {
       if (timer) clearTimeout(timer);

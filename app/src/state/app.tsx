@@ -8,6 +8,7 @@ import type { AiDeps } from '@/ai/engine';
 import type { ImageStore } from '@/ai/imageStore';
 import { JobRunner } from '@/ai/runner';
 import type { Db } from '@/db/db';
+import { wakeWaitingJobs } from '@/db/jobs';
 import type { Selection } from '@/domain/outfit';
 import { openAppDb } from '@/platform/db';
 import { nativeImages } from '@/platform/images';
@@ -176,7 +177,9 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
     // Resume the queue when the app comes back to the foreground (network may be back).
     const sub = AppState.addEventListener('change', (st) => {
       if (st !== 'active') return;
-      core.runner.kick();
+      void wakeWaitingJobs(core.db)
+        .catch(() => undefined)
+        .then(() => core.runner.kick());
       refresh(); // the date may have changed while in the background
     });
     // Also roll over at midnight while the app stays open.

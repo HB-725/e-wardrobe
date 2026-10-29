@@ -57,7 +57,7 @@ export default function PhotoPage() {
       if (!mounted.current) return void app.images.remove(uri);
       setShots((x) => [...x, uri]);
     } catch (e) {
-      setError({ text: describeAiError(e), kind: e instanceof AiError && e.needsUser ? e.kind : null });
+      setError({ text: describeAiError(e, true), kind: e instanceof AiError && e.needsUser ? e.kind : null });
     } finally {
       setBusy(false);
       app.refresh();
