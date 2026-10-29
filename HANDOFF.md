@@ -18,7 +18,7 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（87 个测试）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（93 个测试）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
@@ -50,6 +50,7 @@
 - [x] APK 0.3.0（arm64，versionCode 3）；软件模拟器上完整跑通（含真实 AI、备份恢复）
 - [x] 完整备份 / 恢复（含照片），存到用户选的文件夹
 - [x] 第五轮：评审修复（审核锁、生成中换照片、Key 读取容错、ErrorBoundary、上身效果失效、孤儿图片清理）、首次发送照片前的隐私提示、关于 / 开源许可、正式签名，0.4.0（versionCode 4）
+- [x] 第六轮：照片同意在 AI 引擎里强制（未同意时队列暂停，横幅引导到 /consent）；换照片后的旧任务不再重复付费；上身效果生成中衣服变化则丢弃；商品图铺满 3:4 格子（去掉背景色差方框）；快速预览人物满高、卡片在右边缘
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
 - [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
 - 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。
