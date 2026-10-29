@@ -185,13 +185,14 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
     if (e instanceof AiError && e.needsUser) throw e;
   }
 
+  // The user may have deleted the item or settled it ("只存原图") while we were generating.
   const fresh = await getItem(db, item.id);
-  if (!fresh) {
+  if (!fresh || fresh.status === 'active' || fresh.status === 'archived') {
     for (const u of uris) await images.remove(u);
     return;
   }
   for (const old of fresh.candidates) if (old !== fresh.catalogUri) await images.remove(old);
-  await updateItem(db, item.id, { candidates: uris, checks, status: fresh.status === 'active' ? 'active' : 'review', error: null });
+  await updateItem(db, item.id, { candidates: uris, checks, status: 'review', error: null });
 }
 
 async function runAvatar(deps: AiDeps): Promise<void> {

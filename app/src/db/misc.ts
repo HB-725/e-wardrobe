@@ -157,3 +157,12 @@ export async function pruneTryons(db: Db, currentVersion: string): Promise<strin
   await db.runAsync('DELETE FROM tryon_cache WHERE avatar_version != ?', [currentVersion]);
   return rows.map((r) => r.uri);
 }
+
+/** Front-view try-on images for the current avatar, keyed by outfit key. */
+export async function frontTryons(db: Db, version: string): Promise<Map<string, string>> {
+  const rows = await db.getAllAsync<{ key: string; uri: string }>(
+    "SELECT key, uri FROM tryon_cache WHERE view = 'front' AND avatar_version = ?",
+    [version],
+  );
+  return new Map(rows.map((r) => [r.key, r.uri]));
+}

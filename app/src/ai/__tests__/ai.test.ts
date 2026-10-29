@@ -1,6 +1,6 @@
 import { createTestDb } from '@/test/memoryDb';
 import type { Db } from '@/db/db';
-import { createItem, getItem } from '@/db/items';
+import { createItem, getItem, updateItem } from '@/db/items';
 import { enqueueJob, listJobs } from '@/db/jobs';
 import { addUsage, getAvatar, getSetting, getTryon, monthSpend, saveAvatar, avatarVersion } from '@/db/misc';
 import { AiError, classify, createOpenAiClient, type FetchLike, type OpenAiClient, reasoningEffort } from '../client';
@@ -335,5 +335,23 @@ describe('mirror', () => {
     expect(r.matches[0].note).toBe('裤脚堆在鞋面上');
     expect(r.unmatched).toEqual(['灰色围巾']);
     expect(await getSetting(db, 'ai.blocked')).toBeNull();
+  });
+});
+
+describe('races', () => {
+  it('drops generated candidates when the user kept the original meanwhile', async () => {
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://original/9.jpg' });
+    await enqueueJob(db, 'catalog', item.id);
+    const client = fakeClient();
+    const orig = client.imageEdit.bind(client);
+    client.imageEdit = async (req) => {
+      await updateItem(db, item.id, { status: 'active' });
+      return orig(req);
+    };
+    await drain(new JobRunner(deps(client), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('active');
+    expect(after.candidates).toEqual([]);
+    expect([...images.files.keys()].some((k) => k.includes('catalog'))).toBe(false);
   });
 });

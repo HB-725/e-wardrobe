@@ -47,10 +47,25 @@
           "photosPermission": "用于从相册导入衣服照片",
           "cameraPermission": "用于拍摄衣服、吊牌和镜子照片"
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "用于保存生成的穿搭大片",
+          "savePhotosPermission": "用于保存生成的穿搭大片",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
     }
   }
 }

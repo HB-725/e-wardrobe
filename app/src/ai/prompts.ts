@@ -165,7 +165,7 @@ export function tryonPrompt(slots: Slot[], view: 'front' | 'back'): string {
     'Image 1 is a person in a studio. Dress this person in the garments shown in the other images',
     `(${list}).`,
     view === 'back'
-      ? 'The person is seen from behind: show the back side of each garment as it would naturally look.'
+      ? 'The person is seen from behind: show the back side of each garment as it would naturally look. Prints, logos, buttons and pockets that are on the front of a garment must not appear on its back; an inner top is only visible where it shows below or above the outer layer.'
       : 'Keep the front view.',
     'Replace the plain base clothes; layer naturally (outerwear over top, top tucked or untucked as fits the style). Shoes replace bare feet.',
     'Keep the person exactly the same: face, hair, body shape, pose, framing, background and lighting must not change.',
@@ -205,7 +205,8 @@ export function mirrorText(items: { index: number; name: string; slot: Slot; col
   return [
     '第 1 张是用户今天的镜子照片。后面依次是衣橱里的单品图，编号如下：',
     ...items.map((it) => `${it.index}. ${SLOT_LABEL[it.slot]} · ${it.name}${it.color ? ` · ${it.color}` : ''}`),
-    '在 matches 里列出照片中穿着的单品编号，每个品类最多一件。confidence：high / medium / low。',
+    '逐层检查照片里的外套、上衣、下装、鞋、包和配饰；外套敞开时，里面的上衣也要算。',
+    '在 matches 里列出照片中穿着的单品编号，每个品类最多一件。颜色、版型、细节都相符才算匹配。confidence：high / medium / low。',
     'note：如果能看出实际上身效果和单品图不同（更宽松、衣长、裤脚堆积等），写一句不超过 30 字的合身笔记，否则写空字符串。',
     'unmatched：照片中穿着、但衣橱里没有的衣服，简短描述。',
   ].join('\n');
