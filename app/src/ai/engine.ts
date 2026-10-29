@@ -94,10 +94,10 @@ async function generate(
   deps: AiDeps,
   client: OpenAiClient,
   kind: Job['type'] | 'photo',
-  req: { prompt: string; images: string[]; quality: 'low' | 'medium' | 'high'; n?: number },
+  req: { prompt: string; images: string[]; quality: 'low' | 'medium' | 'high'; n?: number; transparent?: boolean },
 ): Promise<string[]> {
   return withModel(deps, client, 'image', async (model) => {
-    const r = await client.imageEdit({ model, prompt: req.prompt, images: req.images, quality: req.quality, n: req.n, size: '1024x1536' });
+    const r = await client.imageEdit({ model, prompt: req.prompt, images: req.images, quality: req.quality, n: req.n, size: '1024x1536', transparent: req.transparent });
     await addUsage(deps.db, { kind, model, costUsd: imageCost(model, r.usage) });
     return r.images;
   });
@@ -167,6 +167,8 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
     images: [original],
     quality: qualityFor(settings.quality, 'catalog'),
     n: Math.max(1, Math.min(3, settings.candidates)),
+    // Opaque on purpose: transparent cut-outs look perfect, but image models read transparent pixels as black,
+    // so dark garments vanish when they are fed back in for try-ons (verified with black jeans).
   });
   const uris: string[] = [];
   for (const b64 of b64s) uris.push(await images.saveBase64(b64, 'catalog'));

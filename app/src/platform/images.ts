@@ -11,25 +11,30 @@ function folderDir(folder: ImageFolder): Directory {
   return dir;
 }
 
-async function render(uri: string, maxEdge: number, base64: boolean) {
+function hasAlpha(uri: string): boolean {
+  return /\.(webp|png)(\?|$)/i.test(uri);
+}
+
+async function render(uri: string, maxEdge: number, base64: boolean, keepAlpha = false) {
   const ref = await ImageManipulator.manipulate(uri).renderAsync();
   let out = ref;
   if (Math.max(ref.width, ref.height) > maxEdge) {
     const size = ref.width >= ref.height ? { width: maxEdge } : { height: maxEdge };
     out = await ImageManipulator.manipulate(ref).resize(size).renderAsync();
   }
-  return out.saveAsync({ format: SaveFormat.JPEG, compress: 0.85, base64 });
+  return out.saveAsync({ format: keepAlpha ? SaveFormat.WEBP : SaveFormat.JPEG, compress: 0.85, base64 });
 }
 
 /** Photos and generated images live under the app's private document directory (removed on uninstall). */
 export const nativeImages: ImageStore = {
   async toDataUrl(uri, maxEdge) {
-    const r = await render(uri, maxEdge, true);
-    return `data:image/jpeg;base64,${r.base64}`;
+    const alpha = hasAlpha(uri);
+    const r = await render(uri, maxEdge, true, alpha);
+    return `data:image/${alpha ? 'webp' : 'jpeg'};base64,${r.base64}`;
   },
 
-  async saveBase64(b64, folder) {
-    const file = new File(folderDir(folder), `${newId()}.jpg`);
+  async saveBase64(b64, folder, ext = 'jpg') {
+    const file = new File(folderDir(folder), `${newId()}.${ext}`);
     file.create({ overwrite: true });
     file.write(b64, { encoding: 'base64' });
     return file.uri;

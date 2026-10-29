@@ -42,10 +42,11 @@ class DiskImages implements ImageStore {
   private n = 0;
   constructor(private readonly dir: string) {}
   async toDataUrl(uri: string) {
-    return `data:image/jpeg;base64,${fs.readFileSync(uri).toString('base64')}`;
+    const mime = uri.endsWith('.webp') ? 'webp' : 'jpeg';
+    return `data:image/${mime};base64,${fs.readFileSync(uri).toString('base64')}`;
   }
-  async saveBase64(b64: string, folder: string) {
-    const p = path.join(this.dir, 'out', `${folder}-${++this.n}.jpg`);
+  async saveBase64(b64: string, folder: string, ext = 'jpg') {
+    const p = path.join(this.dir, 'out', `${folder}-${++this.n}.${ext}`);
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, Buffer.from(b64, 'base64'));
     return p;

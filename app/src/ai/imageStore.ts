@@ -2,10 +2,10 @@
 export type ImageFolder = 'original' | 'tag' | 'body' | 'mirror' | 'catalog' | 'avatar' | 'tryon' | 'photo';
 
 export interface ImageStore {
-  /** JPEG data URL, downscaled so the long edge is at most `maxEdge` pixels. */
+  /** Data URL (JPEG, or WEBP when the source has transparency), downscaled so the long edge is at most `maxEdge`. */
   toDataUrl(uri: string, maxEdge: number): Promise<string>;
-  /** Persist a base64 JPEG, returns its uri. */
-  saveBase64(b64: string, folder: ImageFolder): Promise<string>;
+  /** Persist a base64 image (JPEG unless `ext` says webp), returns its uri. */
+  saveBase64(b64: string, folder: ImageFolder, ext?: 'jpg' | 'webp'): Promise<string>;
   /** Copy a camera / picker photo into app storage (downscaled to a sensible size), returns its uri. */
   importPhoto(uri: string, folder: ImageFolder): Promise<string>;
   remove(uri: string | null | undefined): Promise<void>;

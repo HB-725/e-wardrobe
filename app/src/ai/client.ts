@@ -82,6 +82,8 @@ export interface ImageEditRequest {
   size?: '1024x1024' | '1024x1536' | '1536x1024';
   quality?: 'low' | 'medium' | 'high';
   n?: number;
+  /** Transparent output needs webp (or png); catalog cut-outs use it so they sit on any background. */
+  transparent?: boolean;
 }
 
 export interface VisionJsonRequest {
@@ -196,8 +198,9 @@ export function createOpenAiClient(opts: {
         size: req.size ?? '1024x1536',
         quality: req.quality ?? 'low',
         n: req.n ?? 1,
-        output_format: 'jpeg',
-        output_compression: 90,
+        background: req.transparent ? 'transparent' : 'opaque',
+        output_format: req.transparent ? 'webp' : 'jpeg',
+        output_compression: req.transparent ? 80 : 90,
       });
       const images = (r.data ?? []).map((d) => d.b64_json).filter((x): x is string => !!x);
       if (images.length === 0) throw new AiError('bad_response', 'no image returned');

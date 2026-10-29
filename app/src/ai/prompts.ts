@@ -76,8 +76,8 @@ export function catalogPrompt(slot: Slot, name: string | null): string {
   return [
     `Turn the photo into a clean e-commerce catalog image of this exact ${what}${name ? ` (${name})` : ''}.`,
     framing,
-    `Solid plain background colour ${CATALOG_BG}, no props, no hanger, no person, no text, no watermark.`,
-    'Centered with even margins, the item fills about 80% of the frame height. Soft diffused studio light, subtle soft shadow under the item.',
+    `Perfectly flat, uniform background of exactly ${CATALOG_BG} (RGB 241,241,242) edge to edge: no gradient, no vignette, no floor line, no props, no hanger, no person, no text, no watermark.`,
+    'Centered with even margins, the item fills about 80% of the frame height. Soft diffused studio light, only a very faint contact shadow.',
     'Change only the photography: you may smooth wrinkles, straighten the angle, even out the lighting and complete parts that were hidden or folded.',
     'Never change the item itself: keep the exact colour, cut and silhouette, length, number and position of buttons, pockets and zips, prints, logos, stitching and fabric texture.',
   ].join(' ');

@@ -14,8 +14,8 @@ async function toDataUrl(uri: string): Promise<string> {
 
 export const nativeImages: ImageStore = {
   toDataUrl: (uri) => toDataUrl(uri),
-  async saveBase64(b64) {
-    return `data:image/jpeg;base64,${b64}`;
+  async saveBase64(b64, _folder, ext = 'jpg') {
+    return `data:image/${ext === 'webp' ? 'webp' : 'jpeg'};base64,${b64}`;
   },
   importPhoto: (uri) => toDataUrl(uri),
   async remove() {},
