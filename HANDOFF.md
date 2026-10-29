@@ -18,7 +18,7 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（100 个测试）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（105 个测试）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
@@ -63,7 +63,7 @@
   Excel / CSV 导入（UTF-8 CSV、品类关键词、非法日期提示、单事务、10 MB 上限）；隐私政策 PRIVACY.md、举报 AI 内容入口、按钮文字自动缩小、触控区域、系统大字体上限 1.35x
 - 0.5.0 模拟器验证（API 33，x86 包，覆盖安装在 0.4.1 数据上）：数据和上身效果保留、关于显示 v0.5.0 (6)、App 内隐私政策页、虚拟化衣橱网格和试衣间托盘、镜子照片识别（真实 API：T 恤 + 运动鞋高置信度，短裤列为衣橱里没有）→ 记录今天
 - 上架前要做（不是代码）：Play 后台填隐私政策链接（PRIVACY.md 合并到 main 后的 GitHub 地址；App 内「关于 → 隐私政策」是同样内容的本地页面）、Data safety 表单声明「照片会发送给 OpenAI 处理」、内容分级；
-  xlsx 0.18.5 有已知 CVE（解析用户自己选的文件，风险低）：修复版只在 SheetJS 自己的 CDN 上，这台机器的网络访问不到，能访问时执行 `cd app && npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`（npm 上的 @e965/xlsx 是第三方转发，未采用）
+  表格读写改为自己的 `src/domain/xlsx.ts`（基于 fflate，MIT）：xlsx（SheetJS 0.18.5，有已知 CVE）只留在 devDependencies 里给测试做双向兼容校验，不进 APK。`npm audit --omit=dev` 剩下的是 Expo CLI / config 的构建期依赖（zod、deepmerge），不打进 App
 - [x] 0.5.0 已发给用户（versionCode 6，APK SHA-256 54d62064…7bf4b2c3，可覆盖 0.4.x）
 - [ ] 视觉风格：另一个会话说用户觉得 UI「太方」，给了 S1 / S2 两个柔和方案，用户尚未在本会话确认，未改
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入

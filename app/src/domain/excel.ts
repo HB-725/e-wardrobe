@@ -1,6 +1,6 @@
-import * as XLSX from 'xlsx';
 import { isSeason, SEASONS, SLOTS, OCCASION_LABEL } from './catalog';
 import { type ItemStats, statsById } from './stats';
+import { base64ToBytes, bytesToBase64, type Cell, parseCsv, readXlsx, serialToDateKey, type Sheet, writeXlsx, XlsxError } from './xlsx';
 import type { Item, Outfit, Season, Slot, WearLog } from './types';
 
 /** Column headers double as the import template: users can fill a sheet with these names and import it. */
@@ -60,30 +60,30 @@ export function buildWorkbook(items: Item[], outfits: Outfit[], logs: WearLog[],
   const stats = statsById(items, logs, today);
   const outfitWears = new Map<string, number>();
   for (const l of logs) if (l.outfitId) outfitWears.set(l.outfitId, (outfitWears.get(l.outfitId) ?? 0) + 1);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(items.map((i) => itemRow(i, stats.get(i.id)!)), { header: [...ITEM_COLUMNS] }), '单品');
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.json_to_sheet(
-      outfits.map((o) => ({
-        名称: o.name,
-        场合: o.occasions.map((x) => OCCASION_LABEL[x] ?? x).join('、'),
-        单品: o.itemIds.map((id) => names.get(id) ?? '').join('、'),
-        穿过次数: outfitWears.get(o.id) ?? 0,
-      })),
-      { header: ['名称', '场合', '单品', '穿过次数'] },
-    ),
-    '穿搭',
-  );
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.json_to_sheet(
-      logs.map((l) => ({ 日期: l.date, 单品: l.itemIds.map((id) => names.get(id) ?? '').join('、'), 来源: l.source === 'mirror' ? '镜子照片' : '手动' })),
-      { header: ['日期', '单品', '来源'] },
-    ),
-    '穿着记录',
-  );
-  return XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+  const table = (header: string[], rows: Row[]): Cell[][] => [header, ...rows.map((row) => header.map((h) => row[h] ?? ''))];
+  const sheets: Sheet[] = [
+    { name: '单品', rows: table([...ITEM_COLUMNS], items.map((i) => itemRow(i, stats.get(i.id)!))) },
+    {
+      name: '穿搭',
+      rows: table(
+        ['名称', '场合', '单品', '穿过次数'],
+        outfits.map((o) => ({
+          名称: o.name,
+          场合: o.occasions.map((x) => OCCASION_LABEL[x] ?? x).join('、'),
+          单品: o.itemIds.map((id) => names.get(id) ?? '').join('、'),
+          穿过次数: outfitWears.get(o.id) ?? 0,
+        })),
+      ),
+    },
+    {
+      name: '穿着记录',
+      rows: table(
+        ['日期', '单品', '来源'],
+        logs.map((l) => ({ 日期: l.date, 单品: l.itemIds.map((id) => names.get(id) ?? '').join('、'), 来源: l.source === 'mirror' ? '镜子照片' : '手动' })),
+      ),
+    },
+  ];
+  return bytesToBase64(writeXlsx(sheets));
 }
 
 const SLOT_ALIASES: Record<string, Slot> = {
@@ -125,9 +125,7 @@ function str(v: unknown): string | null {
 
 function parseDate(v: unknown): string | null {
   if (typeof v === 'number' && v > 20000 && v < 80000) {
-    // Excel serial date
-    const d = XLSX.SSF.parse_date_code(v);
-    return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+    return serialToDateKey(v); // Excel serial date
   }
   const s = str(v);
   if (!s) return null;
@@ -166,34 +164,22 @@ export interface ImportResult {
 export class SpreadsheetError extends Error {}
 
 /** Excel workbooks are read as binary; CSV text must be UTF-8 (Excel's "CSV UTF-8"), older ANSI/GBK files are not. */
-function readBook(base64: string, fileName: string): XLSX.WorkBook {
-  if (!/\.csv$/i.test(fileName)) return XLSX.read(base64, { type: 'base64' });
-  const text = decodeUtf8(base64ToBinary(base64));
-  if (text === null) throw new SpreadsheetError('这个 CSV 不是 UTF-8 编码。请在 Excel 里另存为「Excel 工作簿 (.xlsx)」或「CSV UTF-8」后再导入。');
-  return XLSX.read(text.replace(/^\uFEFF/, ''), { type: 'string' });
-}
-
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-const B64_INDEX = new Map([...B64].map((c, i) => [c.charCodeAt(0), i]));
-
-function base64ToBinary(b64: string): string {
-  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
-  const at = (i: number) => (i < clean.length ? B64_INDEX.get(clean.charCodeAt(i))! : 0);
-  const parts: string[] = [];
-  let chunk: number[] = [];
-  for (let i = 0; i < clean.length; i += 4) {
-    const v = (at(i) << 18) | (at(i + 1) << 12) | (at(i + 2) << 6) | at(i + 3);
-    chunk.push((v >> 16) & 255);
-    if (i + 2 < clean.length) chunk.push((v >> 8) & 255);
-    if (i + 3 < clean.length) chunk.push(v & 255);
-    if (chunk.length >= 8190) {
-      parts.push(String.fromCharCode(...chunk));
-      chunk = [];
-    }
+function readBook(base64: string, fileName: string): Sheet[] {
+  const bytes = base64ToBytes(base64);
+  if (/\.csv$/i.test(fileName)) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    const text = decodeUtf8(bin);
+    if (text === null) throw new SpreadsheetError('这个 CSV 不是 UTF-8 编码。请在 Excel 里另存为「Excel 工作簿 (.xlsx)」或「CSV UTF-8」后再导入。');
+    return [{ name: 'CSV', rows: parseCsv(text.replace(/^\uFEFF/, '')) }];
   }
-  parts.push(String.fromCharCode(...chunk));
-  return parts.join('');
+  try {
+    return readXlsx(bytes);
+  } catch (e) {
+    if (e instanceof XlsxError && e.message === 'old-xls') throw new SpreadsheetError('这是旧版 .xls 文件。请在 Excel 或 WPS 里另存为「Excel 工作簿 (.xlsx)」后再导入。');
+    if (e instanceof XlsxError) throw new SpreadsheetError('无法读取这个文件，请确认是 Excel（.xlsx）或 CSV 文件。');
+    throw e;
+  }
 }
 
 /** Strict UTF-8 decoding of a binary string; null if the bytes are not valid UTF-8. */
@@ -225,10 +211,11 @@ export function decodeUtf8(bin: string): string | null {
 
 /** Reads the first sheet (or the one named 单品). Rows need at least 名称 and a recognisable 品类. */
 export function parseWorkbook(base64: string, fileName = 'import.xlsx'): ImportResult {
-  const wb = readBook(base64, fileName);
-  const sheet = wb.Sheets['单品'] ?? wb.Sheets[wb.SheetNames[0]];
-  if (!sheet) return { items: [], skipped: [], warnings: [] };
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  const book = readBook(base64, fileName);
+  const sheet = book.find((x) => x.name === '单品') ?? book[0];
+  if (!sheet || sheet.rows.length === 0) return { items: [], skipped: [], warnings: [] };
+  const header = sheet.rows[0].map((h) => String(h).trim());
+  const rows = sheet.rows.slice(1).map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i] ?? ''])) as Record<string, unknown>);
   const items: ImportedItem[] = [];
   const skipped: ImportResult['skipped'] = [];
   const warnings: ImportResult['warnings'] = [];

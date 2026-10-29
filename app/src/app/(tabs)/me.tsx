@@ -59,7 +59,7 @@ const LICENSES: [string, string][] = [
   ['React Navigation · Expo Router', 'MIT'],
   ['Reanimated · Gesture Handler · Screens', 'MIT'],
   ['react-native-svg', 'MIT'],
-  ['SheetJS (xlsx)', 'Apache-2.0'],
+  ['fflate', 'MIT'],
   ['SQLite', 'Public Domain'],
 ];
 
