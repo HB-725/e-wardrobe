@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Builds a release APK on a Linux build box without Android Studio.
 # Usage: scripts/build-apk.sh   (from the app/ directory)
+# Release signing: export EW_KEYSTORE, EW_KEYSTORE_PASSWORD and EW_KEY_ALIAS (or EW_SIGNING_ENV=path/to/signing.env).
+# Without them the APK is signed with the debug key (testing only; it cannot update a release-signed install).
+# ARCHS overrides the CPU architectures (default arm64-v8a; add armeabi-v7a for old 32-bit phones).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 SDK="${ANDROID_HOME:-$HOME/android-sdk}"
@@ -52,7 +55,9 @@ allprojects {
 GRADLE
 
 # 4. Generate the native project and build.
-EXPO_OFFLINE=1 CI=1 npx expo prebuild --platform android --no-install
+if [ -n "${EW_SIGNING_ENV:-}" ]; then set -a; . "$EW_SIGNING_ENV"; set +a; fi
+if [ -n "${EW_KEYSTORE:-}" ]; then echo "Signing with $EW_KEYSTORE"; else echo "WARNING: no EW_KEYSTORE, signing with the debug key"; fi
+EXPO_OFFLINE=1 CI=1 npx expo prebuild --platform android --no-install --clean
 echo "sdk.dir=$SDK" > android/local.properties
-(cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --console=plain)
+(cd android && ./gradlew assembleRelease -PreactNativeArchitectures="${ARCHS:-arm64-v8a}" --no-daemon --console=plain)
 ls -la android/app/build/outputs/apk/release/

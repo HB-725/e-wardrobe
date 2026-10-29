@@ -18,14 +18,17 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（69 个测试）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（87 个测试）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
 ## 构建 APK（这台机器）
 - 一条命令：`cd app && scripts/build-apk.sh`。它会装 Android SDK（platform 37 / build-tools 37 / NDK 27.1）、JDK 17，写 Gradle 镜像配置（Maven Central 对这台机器限流 429，改用 Google 的 Central 镜像），然后 `expo prebuild` + `gradlew assembleRelease`（只打 arm64-v8a）。
-- 产物：`app/android/app/build/outputs/apk/release/app-release.apk`。目前用模板自带的 debug keystore 签名（每次构建签名一致，可以覆盖安装）；正式发布前要换成自己的 keystore。
-- 机器没有 KVM，跑不了模拟器；APK 需要用户真机安装验证。
+- 产物：`app/android/app/build/outputs/apk/release/app-release.apk`。
+- 签名（0.4.0 起）：`plugins/withReleaseSigning.js` 让 release 包用环境变量 `EW_KEYSTORE` / `EW_KEYSTORE_PASSWORD` / `EW_KEY_ALIAS` 指定的 keystore 签名；
+  也可以 `EW_SIGNING_ENV=path/signing.env scripts/build-apk.sh`。正式 keystore（`ewardrobe-release.jks` + `signing.env`）已交给用户保管，**不在仓库里**，丢了就无法再给已安装的用户发更新。
+  没有这些变量时退回 debug key 并打印 WARNING——debug 签名的包不能覆盖安装 release 签名的包（反之亦然），只能卸载重装，而卸载会删掉手机上的数据（allowBackup 关闭），所以先在 App 里做完整备份。
+- `ARCHS="arm64-v8a,armeabi-v7a"` 可以加 32 位手机支持（包会变大）。
 
 ## 真机 / 模拟器验证
 - 这台机器没有 KVM，但可以用纯软件模拟器做冒烟测试（很慢：开机约 15 分钟，每步约 1 分钟）：
@@ -46,6 +49,7 @@
 - [x] 两轮代码审视（共 26 个问题已修复并加测试，73 个测试）
 - [x] APK 0.3.0（arm64，versionCode 3）；软件模拟器上完整跑通（含真实 AI、备份恢复）
 - [x] 完整备份 / 恢复（含照片），存到用户选的文件夹
+- [x] 第五轮：评审修复（审核锁、生成中换照片、Key 读取容错、ErrorBoundary、上身效果失效、孤儿图片清理）、首次发送照片前的隐私提示、关于 / 开源许可、正式签名，0.4.0（versionCode 4）
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
 - [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
 - 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。

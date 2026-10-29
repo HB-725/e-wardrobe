@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Linking, TextInput, View } from 'react-native';
 import { getAiSettings, getModelChoice, type QualityLevel, saveAiSettings, savePrefs } from '@/ai/config';
 import { formatUsd } from '@/ai/models';
 import type { Db } from '@/db/db';
@@ -18,6 +18,7 @@ import { userSources, wipeEverything } from '@/state/actions';
 import { BackupError, createBackup, readBackupInfo, restoreBackup } from '@/state/backup';
 import { BACKUP_SUPPORTED, pickBackupFile, pickNewBackupFile } from '@/platform/backupStorage';
 import { ArchiveError } from '@/state/archive';
+import { PHOTO_NOTICE } from '@/state/consent';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
 import { confirmAsync, notify } from '@/ui/dialogs';
@@ -38,7 +39,18 @@ async function loadMe(db: Db) {
   return { settings, spend, models, last4 };
 }
 
-type SheetKind = 'cap' | 'quality' | 'idle' | 'name' | null;
+type SheetKind = 'cap' | 'quality' | 'idle' | 'name' | 'licenses' | null;
+
+const FEEDBACK_URL = 'https://github.com/HB-725/e-wardrobe/issues';
+const LICENSES: [string, string][] = [
+  ['React · React Native', 'MIT'],
+  ['Expo 及其模块', 'MIT'],
+  ['React Navigation · Expo Router', 'MIT'],
+  ['Reanimated · Gesture Handler · Screens', 'MIT'],
+  ['react-native-svg', 'MIT'],
+  ['SheetJS (xlsx)', 'Apache-2.0'],
+  ['SQLite', 'Public Domain'],
+];
 
 export default function MePage() {
   const app = useApp();
@@ -288,12 +300,19 @@ export default function MePage() {
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>隐私</SectionTitle>
         <Row label="照片与身材数据" value="只保存在这台手机上" />
-        <Row label="发送给 AI 的内容" value="仅在生成时发送给 OpenAI" />
+        <Row label="发送给 AI 的内容" value="仅在生成时发送给 OpenAI" onPress={() => notify('照片如何处理', PHOTO_NOTICE)} />
         <Row label="用于模型训练" value="OpenAI 默认不用 API 数据训练" />
         <Row label={busy === 'wipe' ? '正在删除…' : '永久删除我的全部数据'} danger onPress={busy ? undefined : wipe} last />
       </View>
+
+      <View style={{ marginTop: 24, marginHorizontal: PAD }}>
+        <SectionTitle>关于</SectionTitle>
+        <Row label="版本" value={`v${Constants.expoConfig?.version ?? '—'}`} />
+        <Row label="反馈问题" value="GitHub" onPress={() => Linking.openURL(FEEDBACK_URL).catch(() => app.toast('无法打开浏览器'))} />
+        <Row label="开源许可" onPress={() => setSheet('licenses')} last />
+      </View>
       <T v="caption" style={{ textAlign: 'center', marginTop: 20 }}>
-        衣橱 v{Constants.expoConfig?.version ?? '—'}
+        衣橱 · 数据只属于你
       </T>
 
       <Sheet visible={sheet === 'cap'} onClose={() => setSheet(null)} title="每月花费上限">
@@ -345,6 +364,16 @@ export default function MePage() {
                 app.refresh();
               }}
             />
+          ))}
+        </View>
+      </Sheet>
+      <Sheet visible={sheet === 'licenses'} onClose={() => setSheet(null)} title="开源许可">
+        <T v="small" style={{ color: C.sub }}>
+          衣橱使用了以下开源软件，感谢它们的作者。完整许可文本见各项目主页。
+        </T>
+        <View>
+          {LICENSES.map(([n, l], i) => (
+            <Row key={n} label={n} value={l} last={i === LICENSES.length - 1} />
           ))}
         </View>
       </Sheet>
