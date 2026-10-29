@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { ActivityIndicator, Text, View, type ViewStyle } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { SLOT_ORDER } from '@/domain/catalog';
@@ -40,6 +41,7 @@ export function ItemImage({ item, style }: { item: Pick<Item, 'catalogUri' | 'or
 
 /** Flat-lay of an outfit's garments in a 2×2 grid; used when no AI try-on image exists yet. */
 export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]; tryonUri?: string | null; style?: ViewStyle; compact?: boolean }) {
+  const [box, setBox] = useState({ width: 0, height: 0 });
   if (tryonUri) {
     return (
       <View style={[{ backgroundColor: C.card, overflow: 'hidden' }, style]}>
@@ -52,18 +54,33 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
   const shown = [...items].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot)).slice(0, 4);
   const extra = items.length - shown.length;
   const gap = compact ? 2 : 6;
+  const pad = compact ? 2 : 10;
   return (
-    <View style={[{ backgroundColor: '#FFFFFF', padding: compact ? 2 : 10, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center', gap }, style]}>
-      {shown.map((it, i) => (
-        <View key={it.id} style={{ width: shown.length === 1 ? '90%' : `${(100 - 8) / 2}%`, aspectRatio: 0.75 }}>
-          <ItemImage item={it} style={{ flex: 1 }} />
-          {extra > 0 && !compact && i === shown.length - 1 ? (
-            <View style={{ position: 'absolute', right: 2, bottom: 2, backgroundColor: C.ink, paddingHorizontal: 5 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 10 }}>+{extra}</Text>
-            </View>
-          ) : null}
-        </View>
-      ))}
+    <View
+      style={[{ backgroundColor: '#FFFFFF', padding: pad, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center', gap, overflow: 'hidden' }, style]}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (width !== box.width || height !== box.height) setBox({ width, height });
+      }}
+    >
+      {box.width > 0
+        ? shown.map((it, i) => {
+            // 3:4 tiles as large as fit both across and down (two columns unless there is a single garment).
+            const cols = shown.length === 1 ? 1 : 2;
+            const rows = Math.ceil(shown.length / cols);
+            const w = Math.max(0, Math.min((box.width - 2 * pad - gap * (cols - 1)) / cols, ((box.height - 2 * pad - gap * (rows - 1)) / rows) * 0.75));
+            return (
+              <View key={it.id} style={{ width: w, height: w / 0.75 }}>
+                <ItemImage item={it} style={{ flex: 1 }} />
+                {extra > 0 && !compact && i === shown.length - 1 ? (
+                  <View style={{ position: 'absolute', right: 2, bottom: 2, backgroundColor: C.ink, paddingHorizontal: 5 }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: 10 }}>+{extra}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })
+        : null}
     </View>
   );
 }
