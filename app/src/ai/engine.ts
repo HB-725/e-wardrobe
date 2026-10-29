@@ -151,6 +151,7 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
   const original = await images.toDataUrl(item.originalUri, 1024);
 
   const startStatus = item.status;
+  const startPhoto = item.originalUri;
   if (!job.payload.regenerate) {
     const tag = item.tagUri ? await images.toDataUrl(item.tagUri, 1024) : null;
     const r = await vision<AutofillResult>(deps, client, 'catalog', {
@@ -202,7 +203,8 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
   const fresh = await getItem(db, item.id);
   // A first-time item the user deleted or settled ("只存原图") meanwhile: drop the results.
   const inWardrobe = (st: Item['status']) => st === 'active' || st === 'archived';
-  const settled = !fresh || (!inWardrobe(startStatus) && inWardrobe(fresh.status));
+  // ...or replaced the photo, in which case a newer job regenerates from the new one.
+  const settled = !fresh || fresh.originalUri !== startPhoto || (!inWardrobe(startStatus) && inWardrobe(fresh.status));
   if (settled) {
     for (const u of uris) await images.remove(u);
     return;

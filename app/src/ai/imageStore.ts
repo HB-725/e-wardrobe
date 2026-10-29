@@ -11,4 +11,6 @@ export interface ImageStore {
   remove(uri: string | null | undefined): Promise<void>;
   /** Delete every stored image (privacy wipe). */
   wipe(): Promise<void>;
+  /** Stored images with their modification time (ms), for orphan cleanup. Optional (web / tests). */
+  listAll?(): Promise<{ uri: string; modified: number }[]>;
 }

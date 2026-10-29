@@ -163,6 +163,40 @@ export async function pruneTryons(db: Db, currentVersion: string): Promise<strin
   return rows.map((r) => r.uri);
 }
 
+/** Removes cached try-ons that include this item (its picture or category changed, or it was deleted). */
+export async function dropTryonsWithItem(db: Db, itemId: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ key: string; view: string; uri: string }>('SELECT key, view, uri FROM tryon_cache');
+  const hit = rows.filter((r) => r.key.split('+').includes(itemId));
+  for (const r of hit) await db.runAsync('DELETE FROM tryon_cache WHERE key = ? AND view = ?', [r.key, r.view]);
+  return hit.map((r) => r.uri);
+}
+
+/** Every image uri the database still points at (for cleaning up orphaned files). */
+export async function referencedImages(db: Db): Promise<Set<string>> {
+  const out = new Set<string>();
+  const add = (v: string | null | undefined) => v && out.add(v);
+  for (const r of await db.getAllAsync<{ a: string | null; b: string | null; c: string | null; d: string }>('SELECT original_uri AS a, catalog_uri AS b, tag_uri AS c, candidates AS d FROM items')) {
+    add(r.a);
+    add(r.b);
+    add(r.c);
+    parseJson<string[]>(r.d, []).forEach(add);
+  }
+  for (const r of await db.getAllAsync<{ u: string | null }>('SELECT photo_uri AS u FROM wear_logs')) add(r.u);
+  for (const r of await db.getAllAsync<{ u: string }>('SELECT uri AS u FROM tryon_cache')) add(r.u);
+  for (const r of await db.getAllAsync<{ a: string | null; b: string | null; s: string }>('SELECT front_uri AS a, back_uri AS b, source_uris AS s FROM avatar')) {
+    add(r.a);
+    add(r.b);
+    parseJson<string[]>(r.s, []).forEach(add);
+  }
+  // Paid intermediate results of unfinished jobs.
+  for (const r of await db.getAllAsync<{ p: string }>("SELECT payload AS p FROM jobs WHERE status IN ('queued', 'running')")) {
+    const p = parseJson<{ generated?: string[]; front?: string }>(r.p, {});
+    (p.generated ?? []).forEach(add);
+    add(p.front);
+  }
+  return out;
+}
+
 /** Front-view try-on images for the current avatar, keyed by outfit key. */
 export async function frontTryons(db: Db, version: string): Promise<Map<string, string>> {
   const rows = await db.getAllAsync<{ key: string; uri: string }>(

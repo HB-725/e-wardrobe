@@ -76,18 +76,15 @@ export default function ReviewPage() {
     setBusy(true);
     try {
       await fn();
-    } catch (e) {
-      // e.g. the candidates changed under us after a regeneration; show the fresh state instead.
-      app.toast(`没有完成：${describeAiError(e)}`);
-      app.refresh();
-      return;
-    }
-    try {
       app.refresh();
       if (advance) {
         setDone((d) => d + 1);
         next();
       }
+    } catch (e) {
+      // e.g. the candidates changed under us after a regeneration; show the fresh state instead.
+      app.toast(`没有完成：${describeAiError(e)}`);
+      app.refresh();
     } finally {
       setBusy(false);
     }

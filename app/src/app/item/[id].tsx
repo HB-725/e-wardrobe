@@ -7,9 +7,8 @@ import { SLOT_LABEL, seasonsLabel } from '@/domain/catalog';
 import { selectionFromItems } from '@/domain/outfit';
 import { computeItemStats, currentDateKey, formatYuan } from '@/domain/stats';
 import type { Item } from '@/domain/types';
-import { updateItem } from '@/db/items';
 import { latestJobFor } from '@/db/jobs';
-import { needsReview, recordWear, regenerateItem, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
+import { needsReview, recordWear, regenerateItem, saveItemEdits, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { useSafe } from '@/state/useSafe';
 import { itemsOf, loadSnapshot, tryonFor } from '@/state/snapshot';
@@ -87,7 +86,7 @@ export default function ItemPage() {
     if (!form) return;
     setBusy(true);
     try {
-      await updateItem(app.db, item.id, patchOf(item, form));
+      await saveItemEdits(app, item.id, patchOf(item, form));
       setEditing(false);
       app.refresh();
     } finally {

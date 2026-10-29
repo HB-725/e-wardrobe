@@ -40,7 +40,7 @@ export async function seedDemo(db: Db, variant: string): Promise<void> {
     colorName: '灰褐',
     status: 'review',
     originalUri: img('puffer'),
-    candidates: [img('puffer'), img('jacket2')],
+    candidates: [img('puffer')],
     checks: [
       [
         { label: '主色：灰褐', ok: true, note: '一致' },
@@ -48,7 +48,6 @@ export async function seedDemo(db: Db, variant: string): Promise<void> {
         { label: '版型与衣长', ok: true, note: '一致' },
         { label: '面料光泽', ok: false, note: '略有简化' },
       ],
-      [{ label: '主色', ok: false, note: '颜色不同' }],
     ],
     fieldSources: { name: 'ai', colorName: 'ai', subcategory: 'ai' },
   });

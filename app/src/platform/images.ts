@@ -112,6 +112,17 @@ export const nativeImages: ImageStore = {
     }
   },
 
+  async listAll() {
+    const root = new Directory(Paths.document, ROOT);
+    if (!root.exists) return [];
+    const out: { uri: string; modified: number }[] = [];
+    for (const dir of root.list()) {
+      if (!(dir instanceof Directory)) continue;
+      for (const f of dir.list()) if (f instanceof File) out.push({ uri: f.uri, modified: f.lastModified ?? Date.now() }); // unknown time: treat as new, keep it
+    }
+    return out;
+  },
+
   async wipe() {
     const dir = new Directory(Paths.document, ROOT);
     if (dir.exists) dir.delete();

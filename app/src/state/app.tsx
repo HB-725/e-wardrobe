@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { Animated, AppState, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createOpenAiClient, type OpenAiClient } from '@/ai/client';
+import { cleanOrphanImages } from './actions';
 import { setAiBlocked } from '@/ai/config';
 import type { AiDeps } from '@/ai/engine';
 import type { ImageStore } from '@/ai/imageStore';
@@ -74,6 +75,16 @@ function Toast({ message }: { message: string | null }) {
   );
 }
 
+/** A keystore problem must not stop the app from opening; it then simply behaves as if no key was saved. */
+async function readKey(): Promise<string | null> {
+  try {
+    return await getApiKey();
+  } catch (e) {
+    console.warn('secure store unavailable', e);
+    return null;
+  }
+}
+
 interface Core {
   db: Db;
   ai: AiDeps;
@@ -84,7 +95,7 @@ interface Core {
 /** Opens the database and wires the AI engine; the API key is read from secure storage and cached here. */
 async function createCore(onChange: () => void): Promise<Core> {
   const db = await openAppDb();
-  const holder: { key: string | null; client: { key: string; client: OpenAiClient } | null } = { key: await getApiKey(), client: null };
+  const holder: { key: string | null; client: { key: string; client: OpenAiClient } | null } = { key: await readKey(), client: null };
   const ai: AiDeps = {
     db,
     images: nativeImages,
@@ -101,7 +112,7 @@ async function createCore(onChange: () => void): Promise<Core> {
     ai,
     runner,
     async reloadKey() {
-      holder.key = await getApiKey();
+      holder.key = await readKey();
       // Whatever paused the queue may be fixed now; the runner sets it again if not.
       await setAiBlocked(db, null);
       runner.kick();
@@ -134,6 +145,8 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
   useEffect(() => {
     if (!core) return;
     void core.runner.start();
+    // Housekeeping once per launch, after the queue has re-queued interrupted work.
+    void cleanOrphanImages({ db: core.db, images: nativeImages, runner: core.runner }).catch((e) => console.warn('cleanup failed', e));
     // Resume the queue when the app comes back to the foreground (network may be back).
     const sub = AppState.addEventListener('change', (st) => {
       if (st !== 'active') return;

@@ -11,6 +11,7 @@ import { getApiKey } from '@/platform/secrets';
 import type { Avatar } from '@/domain/types';
 import { startAvatar } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
+import { usePhotoConsent } from '@/state/consent';
 import { useSafe } from '@/state/useSafe';
 import { confirmAsync } from '@/ui/dialogs';
 import { Icon } from '@/ui/Icon';
@@ -36,6 +37,7 @@ export default function AvatarSetup() {
 function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSettings; blocked: string | null }) {
   const app = useApp();
   const safe = useSafe();
+  const consent = usePhotoConsent();
   const params = useLocalSearchParams<{ step?: string }>();
   const processing = avatar.status === 'processing';
   const [step, setStep] = useState(Number(params.step) || (processing ? 3 : 1));
@@ -111,6 +113,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
       app.toast('上一次生成还没结束，完成后再试');
       return;
     }
+    if (!(await consent())) return;
     if (!(await getApiKey())) {
       app.toast('先填写 OpenAI API Key');
       router.push('/apikey');
@@ -181,7 +184,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
           <T v="small">· 从头到脚完整入镜，手臂微微张开</T>
           <T v="small">· 光线均匀，背景越简单越好</T>
         </View>
-        <PrivacyNote text="照片只保存在这台手机上，可随时永久删除" />
+        <PrivacyNote text="生成时发送给 OpenAI，照片和结果只保存在这台手机上" />
       </View>
     );
     footer = (

@@ -8,6 +8,7 @@ import { ActivityIndicator, BackHandler, Linking, Platform, Pressable, Text, Vie
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addGarments } from '@/state/actions';
 import { useApp } from '@/state/app';
+import { usePhotoConsent } from '@/state/consent';
 import { confirmAsync } from '@/ui/dialogs';
 import { Icon } from '@/ui/Icon';
 import { Btn, IconBtn, T } from '@/ui/kit';
@@ -30,6 +31,7 @@ const MAX_BATCH = 50;
 
 export default function CapturePage() {
   const app = useApp();
+  const consent = usePhotoConsent();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ mode?: string }>();
   const [mode, setMode] = useState<Mode>(params.mode === 'batch' ? 'batch' : 'cloth');
@@ -93,6 +95,7 @@ export default function CapturePage() {
   // One photo at a time: whatever was saved leaves the pending list, so a retry never duplicates items.
   const finish = async () => {
     if (pending.length === 0) return;
+    if (!(await consent())) return;
     setSaving(true);
     let left = [...pending];
     try {

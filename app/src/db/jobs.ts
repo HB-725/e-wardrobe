@@ -37,9 +37,11 @@ export async function enqueueJob(
   type: JobType,
   refId: string,
   payload: Record<string, unknown> = {},
+  /** Queue a fresh run even if one is running now (its inputs changed, e.g. a new photo). */
+  opts: { evenIfRunning?: boolean } = {},
 ): Promise<Job> {
   const existing = await db.getFirstAsync<JobRow>(
-    "SELECT * FROM jobs WHERE type = ? AND ref_id = ? AND status IN ('queued', 'running')",
+    `SELECT * FROM jobs WHERE type = ? AND ref_id = ? AND status IN (${opts.evenIfRunning ? "'queued'" : "'queued', 'running'"})`,
     [type, refId],
   );
   if (existing) return fromRow(existing);

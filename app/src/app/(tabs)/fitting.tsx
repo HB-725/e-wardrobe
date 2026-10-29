@@ -52,7 +52,7 @@ function NoAvatar({ onSkip }: { onSkip: () => void }) {
       <View style={{ paddingTop: 20, paddingHorizontal: PAD, gap: 10 }}>
         <Btn label="开始建立形象" height={52} onPress={() => router.push('/avatar')} />
         <Btn label="先不建，直接搭配" kind="ghost" height={44} onPress={onSkip} />
-        <PrivacyNote text="照片只保存在这台手机上" />
+        <PrivacyNote text="全身照生成时发送给 OpenAI，只保存在这台手机上" />
       </View>
     </Screen>
   );
@@ -170,7 +170,8 @@ export default function FittingPage() {
   const tryon = useData((db) => tryonState(db, drawableIds, view), [key, view]);
 
   if (!s) return <Loading />;
-  // Someone arriving with garments already chosen ("去试穿") goes straight to the room.
+  // Someone arriving with garments already chosen ("去试穿") goes straight to the room, and stays there.
+  if (worn.length > 0 && !skipIntro) setSkipIntro(true);
   if (s.avatar.status === 'none' && !skipIntro && worn.length === 0) return <NoAvatar onSkip={() => setSkipIntro(true)} />;
 
   const avatarReady = avatarUsable(s.avatar);

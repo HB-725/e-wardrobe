@@ -8,6 +8,7 @@ import { matchMirror, type MirrorMatch } from '@/ai/engine';
 import { SLOT_LABEL, SLOTS } from '@/domain/catalog';
 import type { Item } from '@/domain/types';
 import { addFitNote } from '@/state/actions';
+import { usePhotoConsent } from '@/state/consent';
 import { useRecordToday } from '@/state/recordToday';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
@@ -22,6 +23,7 @@ type Phase = { k: 'pick' } | { k: 'matching'; photo: string } | { k: 'done'; pho
 export default function MirrorPage() {
   const app = useApp();
   const recordToday = useRecordToday();
+  const consent = usePhotoConsent();
   const s = useData(loadSnapshot);
   const [phase, setPhase] = useState<Phase>({ k: 'pick' });
   const [matches, setMatches] = useState<MirrorMatch[]>([]);
@@ -45,6 +47,7 @@ export default function MirrorPage() {
   const dateLabel = `${s.today.getMonth() + 1} 月 ${s.today.getDate()} 日`;
 
   const choose = async (camera: boolean) => {
+    if (!(await consent())) return;
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9 };
     if (camera && Platform.OS !== 'web') {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -128,7 +131,7 @@ export default function MirrorPage() {
           <Btn label="拍一张镜子照" icon="camera" height={52} onPress={() => choose(true)} />
           <Btn label="从相册选" kind="outline" onPress={() => choose(false)} />
           <T v="caption" style={{ textAlign: 'center' }}>
-            识别一次大约 $0.002。照片只保存在这台手机上。
+            识别一次大约 $0.002。照片会发送给 OpenAI 识别，只保存在这台手机上。
           </T>
         </View>
       </Screen>

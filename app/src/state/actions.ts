@@ -4,7 +4,7 @@ import type { Db } from '@/db/db';
 import { createItem, deleteItem, getItem, updateItem } from '@/db/items';
 import { deleteJobsFor, enqueueJob, latestJobFor, retryJob } from '@/db/jobs';
 import { createOutfit, deleteOutfit, findOutfitByItems, getOutfit, updateOutfit } from '@/db/outfits';
-import { avatarVersion, getAvatar, getTryon, listTryonUris, saveAvatar, wipeAll } from '@/db/misc';
+import { avatarVersion, dropTryonsWithItem, getAvatar, getTryon, listTryonUris, referencedImages, saveAvatar, wipeAll } from '@/db/misc';
 import { deleteLogByDate, getLogByDate, logWear } from '@/db/wear';
 import { outfitKey } from '@/domain/outfit';
 import type { Avatar, Item, Outfit, TryonView, WearSource } from '@/domain/types';
@@ -42,6 +42,8 @@ export async function confirmItem(ctx: Ctx, id: string, candidate: number | null
   if (candidate !== null && !chosen) throw new Error('candidate out of range');
   for (const c of item.candidates) if (c !== chosen) await ctx.images.remove(c);
   if (item.catalogUri && item.catalogUri !== chosen) await ctx.images.remove(item.catalogUri);
+  // Try-ons were drawn from the old picture (or category).
+  if (chosen !== item.catalogUri || (fields.slot && fields.slot !== item.slot)) await dropTryons(ctx, id);
   await updateItem(ctx.db, id, { ...fields, catalogUri: chosen, candidates: [], checks: [], status: item.status === 'archived' ? 'archived' : 'active', error: null });
 }
 
@@ -87,6 +89,7 @@ export async function removeItem(ctx: Ctx, id: string): Promise<void> {
   if (!item) return;
   await deleteJobsFor(ctx.db, id);
   for (const uri of [item.originalUri, item.tagUri, item.catalogUri, ...item.candidates]) await ctx.images.remove(uri);
+  await dropTryons(ctx, id);
   await deleteItem(ctx.db, id);
   // Outfits / days that only consisted of this item would be left empty.
   const orphanPhotos = await ctx.db.getAllAsync<{ photo_uri: string | null }>(
@@ -99,6 +102,34 @@ export async function removeItem(ctx: Ctx, id: string): Promise<void> {
 
 export async function setArchived(ctx: Ctx, id: string, archived: boolean): Promise<void> {
   await updateItem(ctx.db, id, { status: archived ? 'archived' : 'active' });
+}
+
+async function dropTryons(ctx: Ctx, itemId: string): Promise<void> {
+  for (const uri of await dropTryonsWithItem(ctx.db, itemId)) await ctx.images.remove(uri);
+}
+
+/** Saves edits from the detail page; a category change invalidates that item's try-ons. */
+export async function saveItemEdits(ctx: Ctx, id: string, patch: Partial<Item>): Promise<void> {
+  const item = await getItem(ctx.db, id);
+  if (!item) return;
+  if (patch.slot && patch.slot !== item.slot) await dropTryons(ctx, id);
+  await updateItem(ctx.db, id, patch);
+}
+
+/**
+ * Deletes image files nothing points at any more (left by an app kill mid-import, an interrupted restore, …).
+ * Recent files are skipped: they may belong to an import that has not been saved to the database yet.
+ */
+export async function cleanOrphanImages(ctx: Ctx, now = Date.now()): Promise<number> {
+  if (!ctx.images.listAll) return 0;
+  const used = await referencedImages(ctx.db);
+  let removed = 0;
+  for (const f of await ctx.images.listAll()) {
+    if (used.has(f.uri) || now - f.modified < 60 * 60 * 1000) continue;
+    await ctx.images.remove(f.uri);
+    removed += 1;
+  }
+  return removed;
 }
 
 export function displayUri(item: Pick<Item, 'catalogUri' | 'originalUri' | 'candidates'>): string | null {
@@ -208,7 +239,8 @@ export async function setItemPhoto(ctx: Ctx, id: string, uri: string): Promise<v
   const keep = item.status === 'active' || item.status === 'archived';
   await updateItem(ctx.db, id, { originalUri, ...(keep ? {} : { status: 'processing' as const }), error: null });
   await deleteJobsFor(ctx.db, id);
-  await enqueueJob(ctx.db, 'catalog', id);
+  // A job still running uses the old photo; it notices the change and drops its result, this one redoes it.
+  await enqueueJob(ctx.db, 'catalog', id, {}, { evenIfRunning: true });
   ctx.runner.kick();
 }
 

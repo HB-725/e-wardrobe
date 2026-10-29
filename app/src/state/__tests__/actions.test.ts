@@ -207,3 +207,34 @@ describe('round 2 fixes', () => {
     expect(isDuplicate([base], { ...imported, size: 'M' })).toBe(true);
   });
 });
+
+describe('round 5', () => {
+  it('drops cached try-ons that include an item whose picture changed or that was deleted', async () => {
+    const { putTryon, getTryon } = jest.requireActual('@/db/misc') as typeof import('@/db/misc');
+    const a = await createItem(db, { name: 'a', slot: 'top', status: 'review', catalogUri: 'old', candidates: ['new'] });
+    const b = await createItem(db, { name: 'b', slot: 'bottom', status: 'active' });
+    await putTryon(db, [a.id, b.id].sort().join('+'), 'front', 'v', 'tryon-ab');
+    await putTryon(db, b.id, 'front', 'v', 'tryon-b');
+    await confirmItem(ctx(), a.id, 0);
+    expect(await getTryon(db, [a.id, b.id].sort().join('+'), 'front', 'v')).toBeNull();
+    expect(images.removed).toContain('tryon-ab');
+    expect(await getTryon(db, b.id, 'front', 'v')).toBe('tryon-b');
+    await removeItem(ctx(), b.id);
+    expect(images.removed).toContain('tryon-b');
+  });
+
+  it('cleans up orphaned image files but keeps recent and referenced ones', async () => {
+    const { cleanOrphanImages } = jest.requireActual('../actions') as typeof import('../actions');
+    await createItem(db, { name: 'a', slot: 'top', status: 'active', catalogUri: 'kept' });
+    const now = Date.now();
+    const store = Object.assign(images, {
+      listAll: async () => [
+        { uri: 'kept', modified: 0 },
+        { uri: 'orphan', modified: 0 },
+        { uri: 'fresh', modified: now - 1000 },
+      ],
+    });
+    expect(await cleanOrphanImages({ db, images: store, runner: { kick() {} } }, now)).toBe(1);
+    expect(images.removed).toEqual(['orphan']);
+  });
+});

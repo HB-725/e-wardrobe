@@ -1,9 +1,12 @@
 import { Image } from 'expo-image';
 import { ActivityIndicator, Text, View, type ViewStyle } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { SLOTS } from '@/domain/catalog';
 import type { Item, Slot } from '@/domain/types';
 import { displayUri } from '@/state/actions';
 import { C } from './theme';
+
+const SLOT_ORDER = SLOTS.map((s) => s.id);
 
 /** A garment picture on the card colour. Falls back to the name when there is no image (Excel imports). */
 export function ItemImage({ item, style, inset = 0.1 }: { item: Pick<Item, 'catalogUri' | 'originalUri' | 'candidates' | 'name' | 'status'>; style?: ViewStyle; inset?: number }) {
@@ -41,7 +44,8 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
       </View>
     );
   }
-  const shown = items.slice(0, 4);
+  // Read top to bottom like a person: outerwear, top, bottoms, shoes, bag, accessories.
+  const shown = [...items].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot)).slice(0, 4);
   const extra = items.length - shown.length;
   const gap = compact ? 2 : 6;
   return (
@@ -74,14 +78,7 @@ export function Silhouette({ color = '#B9B9BE' }: { color?: string }) {
  * Where each garment sits around the figure in the instant (free) preview, as fractions of the stage.
  * The figure occupies the middle; garments are pinned beside the body part they belong to.
  */
-const PLACEMENT: Record<Slot, { left: number; top: number; size: number }> = {
-  outer: { left: 0.03, top: 0.18, size: 0.38 },
-  top: { left: 0.59, top: 0.18, size: 0.38 },
-  bottom: { left: 0.03, top: 0.5, size: 0.38 },
-  accessory: { left: 0.65, top: 0.03, size: 0.3 },
-  bag: { left: 0.61, top: 0.5, size: 0.36 },
-  shoes: { left: 0.31, top: 0.8, size: 0.38 },
-};
+const CARD_TOP: Record<Slot, number> = { accessory: 0.02, outer: 0.17, top: 0.32, bag: 0.47, bottom: 0.62, shoes: 0.8 };
 
 export function Stage({
   avatarUri,
@@ -102,34 +99,28 @@ export function Stage({
         <Image source={{ uri: tryonUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" transition={200} />
       ) : (
         <>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} contentFit="cover" contentPosition="center" />
-          ) : (
-            <View style={{ position: 'absolute', left: '22%', right: '22%', top: '4%', bottom: '4%' }}>
-              <Silhouette />
+          {/* The figure stands on the left; the chosen garments line up beside it at the height they are worn,
+              so nothing looks "worn" until the AI try-on is generated. */}
+          <View style={{ position: 'absolute', left: 0, width: '66%', top: '2%', bottom: '2%' }}>
+            {avatarUri ? <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="contain" /> : <Silhouette />}
+          </View>
+          {items.map((it) => (
+            <View
+              key={it.id}
+              style={{
+                position: 'absolute',
+                right: '3%',
+                top: `${CARD_TOP[it.slot] * 100}%`,
+                width: '32%',
+                aspectRatio: 0.85,
+                padding: 2,
+                backgroundColor: '#FFFFFF',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+              }}
+            >
+              <ItemImage item={it} style={{ flex: 1 }} inset={0.03} />
             </View>
-          )}
-          {items.map((it) => {
-            const p = PLACEMENT[it.slot];
-            // Framed like stickers so the garment photo's own background never clashes with the avatar's.
-            return (
-              <View
-                key={it.id}
-                style={{
-                  position: 'absolute',
-                  left: `${p.left * 100}%`,
-                  top: `${p.top * 100}%`,
-                  width: `${p.size * 100}%`,
-                  aspectRatio: 0.85,
-                  padding: 3,
-                  backgroundColor: '#FFFFFF',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
-                }}
-              >
-                <ItemImage item={it} style={{ flex: 1 }} inset={0.03} />
-              </View>
-            );
-          })}
+          ))}
         </>
       )}
       {busy ? (
