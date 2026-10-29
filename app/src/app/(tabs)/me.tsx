@@ -16,7 +16,8 @@ import { pickSpreadsheet, shareBase64File, XLSX_MIME } from '@/platform/files';
 import { setApiKey } from '@/platform/secrets';
 import { userSources, wipeEverything } from '@/state/actions';
 import { BackupError, createBackup, readBackupInfo, restoreBackup } from '@/state/backup';
-import { BACKUP_SUPPORTED, pickExistingBackupFolder, pickNewBackupFolder } from '@/platform/backupStorage';
+import { BACKUP_SUPPORTED, pickBackupFile, pickNewBackupFile } from '@/platform/backupStorage';
+import { ArchiveError } from '@/state/archive';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
 import { confirmAsync, notify } from '@/ui/dialogs';
@@ -104,30 +105,55 @@ export default function MePage() {
   };
 
   const backup = async () => {
-    const target = await pickNewBackupFolder(app.images);
+    let target: Awaited<ReturnType<typeof pickNewBackupFile>>;
+    try {
+      target = await pickNewBackupFile(app.images);
+    } catch (e) {
+      notify('无法在这里创建备份', `换一个文件夹试试。${e instanceof Error ? e.message : String(e)}`);
+      return;
+    }
     if (!target) return;
     setBusy('backup');
+    // Running AI jobs replace and delete pictures; pause them so the backup is consistent.
+    app.runner.hold();
     try {
+      await app.runner.idle();
       const r = await createBackup(app.db, target.storage, (d, t) => setProgress(`${d}/${t}`));
-      notify('备份完成', `已把 ${r.items} 件衣服、${r.images} 张图片和全部穿搭、记录保存到「${target.name}」。换手机时在新手机上选「从备份恢复」。`);
+      await target.verify();
+      notify(
+        '备份完成',
+        `已把 ${r.items} 件衣服、${r.images} 张图片和全部穿搭、记录保存为「${target.name}」。\n\n备份里有全身照、身材数据和镜子照片（不含 API Key），请放在只有你能访问的地方。换手机时在新手机上选「从备份恢复」。`,
+      );
     } catch (e) {
-      notify('备份失败', String(e));
+      target.discard();
+      notify('备份失败', e instanceof Error ? e.message : String(e));
     } finally {
+      app.runner.release();
       setBusy(null);
       setProgress('');
     }
   };
 
   const restore = async () => {
-    const storage = await pickExistingBackupFolder(app.images);
+    let storage: Awaited<ReturnType<typeof pickBackupFile>>;
+    try {
+      storage = await pickBackupFile(app.images);
+    } catch (e) {
+      notify('无法打开这个文件', String(e));
+      return;
+    }
     if (!storage) return;
     try {
       const info = await readBackupInfo(storage);
       const d = new Date(info.createdAt);
       const when = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-      if (!(await confirmAsync('从备份恢复', `备份时间 ${when}，共 ${info.items} 件衣服、${info.outfits} 套穿搭。手机上现有的数据会被替换。`, '恢复'))) return;
+      if (!(await confirmAsync('从备份恢复', `备份时间 ${when}，共 ${info.items} 件衣服、${info.outfits} 套穿搭。手机上现有的数据会被替换。`, '恢复'))) {
+        await storage.close();
+        return;
+      }
     } catch (e) {
-      notify('无法恢复', e instanceof BackupError ? e.message : String(e));
+      notify('无法恢复', e instanceof BackupError || e instanceof ArchiveError ? e.message : String(e));
+      await storage.close();
       return;
     }
     setBusy('restore');
@@ -140,6 +166,7 @@ export default function MePage() {
     } catch (e) {
       notify('恢复失败', `手机上的数据没有改动。${e instanceof Error ? e.message : String(e)}`);
     } finally {
+      await storage.close();
       app.runner.release();
       setBusy(null);
       setProgress('');
@@ -252,8 +279,8 @@ export default function MePage() {
         <Row label={busy === 'import' ? '正在导入…' : '从 Excel 导入'} value="按导出文件的列名" onPress={busy ? undefined : importExcel} last={!BACKUP_SUPPORTED} />
         {BACKUP_SUPPORTED ? (
           <>
-            <Row label={busy === 'backup' ? `正在备份… ${progress}` : '完整备份（含照片）'} sub="存到手机或网盘的文件夹，换手机时恢复" onPress={busy ? undefined : backup} />
-            <Row label={busy === 'restore' ? `正在恢复… ${progress}` : '从备份恢复'} sub="选择之前备份的那个文件夹" onPress={busy ? undefined : restore} last />
+            <Row label={busy === 'backup' ? `正在备份… ${progress}` : '完整备份（含照片）'} sub="生成一个备份文件，存到手机或网盘，换手机时恢复" onPress={busy ? undefined : backup} />
+            <Row label={busy === 'restore' ? `正在恢复… ${progress}` : '从备份恢复'} sub="选择之前的 .wardrobe 备份文件" onPress={busy ? undefined : restore} last />
           </>
         ) : null}
       </View>

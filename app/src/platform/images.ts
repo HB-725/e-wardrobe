@@ -46,6 +46,19 @@ function isCacheFile(uri: string): boolean {
   return uri.startsWith(Paths.cache.uri);
 }
 
+/** Writes raw image bytes (restored from a backup) into app storage. */
+export async function saveImageBytes(bytes: Uint8Array, folder: ImageFolder, ext: 'jpg' | 'webp'): Promise<string> {
+  const file = new File(folderDir(folder), `${newId()}.${ext}`);
+  file.create({ overwrite: true });
+  try {
+    await file.write(bytes);
+  } catch (e) {
+    if (file.exists) file.delete();
+    throw e;
+  }
+  return file.uri;
+}
+
 /** Photos and generated images live under the app's private document directory (removed on uninstall). */
 export const nativeImages: ImageStore = {
   async toDataUrl(uri, maxEdge) {
@@ -63,7 +76,13 @@ export const nativeImages: ImageStore = {
   async saveBase64(b64, folder, ext = 'jpg') {
     const file = new File(folderDir(folder), `${newId()}.${ext}`);
     file.create({ overwrite: true });
-    await file.write(b64, { encoding: 'base64' });
+    try {
+      await file.write(b64, { encoding: 'base64' });
+    } catch (e) {
+      // Do not leave a half-written file behind (disk full).
+      if (file.exists) file.delete();
+      throw e;
+    }
     return file.uri;
   },
 

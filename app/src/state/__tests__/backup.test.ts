@@ -139,3 +139,35 @@ describe('backup', () => {
     await expect(readBackupInfo(new Folder(src.disk, src.images))).rejects.toThrow('backup.json');
   });
 });
+
+describe('backup edge cases', () => {
+  it('does not restore an avatar stuck in processing, and keeps candidate checks aligned', async () => {
+    const src = await seed();
+    await saveAvatar(src.db, { status: 'processing' });
+    const tee = (await getItem(src.db, src.tee.id))!;
+    await src.db.runAsync('UPDATE items SET checks = ? WHERE id = ?', [JSON.stringify([[{ label: 'A', ok: true, note: '' }], [{ label: 'B', ok: false, note: '' }]]), tee.id]);
+    src.disk.files.delete(tee.candidates[0]); // first candidate's picture went missing
+    const folder = new Folder(src.disk, src.images);
+    await createBackup(src.db, folder);
+    const db2 = await createTestDb();
+    await restoreBackup(db2, new Images(src.disk, 'n3'), Object.assign(new Folder(src.disk, src.images), { texts: folder.texts, blobs: folder.blobs }));
+    expect((await getAvatar(db2)).status).toBe('ready');
+    const t2 = (await getItem(db2, src.tee.id))!;
+    expect(t2.candidates).toHaveLength(1);
+    expect(t2.checks).toEqual([[{ label: 'B', ok: false, note: '' }]]);
+  });
+
+  it('cleans up copied pictures when the database step fails', async () => {
+    const src = await seed();
+    const folder = new Folder(src.disk, src.images);
+    await createBackup(src.db, folder);
+    const json = JSON.parse(folder.texts.get('backup.json')!);
+    json.tables.outfit_items.push({ outfit_id: 'nope', item_id: 'nope' }); // breaks a foreign key
+    folder.texts.set('backup.json', JSON.stringify(json));
+    const db2 = await createTestDb();
+    const images2 = new Images(src.disk, 'n4');
+    await expect(restoreBackup(db2, images2, Object.assign(new Folder(src.disk, images2), { texts: folder.texts, blobs: folder.blobs }))).rejects.toThrow();
+    expect([...src.disk.files.keys()].some((k) => k.startsWith('n4/'))).toBe(false);
+    expect(await listItems(db2)).toEqual([]);
+  });
+});

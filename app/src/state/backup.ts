@@ -39,7 +39,7 @@ const URI_LIST_COLUMNS: Partial<Record<Table, Record<string, ImageFolder>>> = {
   avatar: { source_uris: 'body' },
 };
 /** Settings that describe this phone (its key, its queue) rather than the user's data; never backed up or replaced. */
-const DEVICE_SETTINGS = ['ai.blocked', 'ai.keyLast4'];
+const DEVICE_SETTINGS = ['ai.blocked', 'ai.keyLast4', 'ai.models'];
 
 interface BackupFile {
   format: typeof BACKUP_FORMAT;
@@ -63,6 +63,8 @@ export async function createBackup(db: Db, storage: BackupStorage, onProgress?: 
   tables.settings = tables.settings.filter((r) => !DEVICE_SETTINGS.includes(String(r.key)));
   // Unfinished garments come back as "failed" so the user can retry or keep the photo.
   tables.items = tables.items.map((r) => (r.status === 'processing' ? { ...r, status: 'failed', error: '从备份恢复，请重新生成' } : r));
+  // Same for an avatar that was being generated: keep the previous one if there is one.
+  tables.avatar = tables.avatar.map((r) => (r.status === 'processing' ? { ...r, status: r.front_uri && r.back_uri ? 'ready' : 'none' } : r));
 
   const names = new Map<string, string>();
   const folders: Record<string, ImageFolder> = {};
@@ -158,27 +160,40 @@ export async function restoreBackup(
       for (const c of Object.keys(URI_LIST_COLUMNS[t] ?? {})) oldUris.push(...parseJson<string[]>(r[c] as string, []));
     }
   }
-  await db.withTransactionAsync(async (tx) => {
-    for (const t of [...TABLES].reverse()) {
-      if (t === 'settings') await tx.runAsync(`DELETE FROM settings WHERE key NOT IN (${DEVICE_SETTINGS.map(() => '?').join(', ')})`, DEVICE_SETTINGS);
-      else await tx.execAsync(`DELETE FROM ${t}`);
-    }
-    await tx.execAsync('DELETE FROM jobs');
-    for (const t of TABLES) {
-      const single = Object.keys(URI_COLUMNS[t] ?? {});
-      const lists = Object.keys(URI_LIST_COLUMNS[t] ?? {});
-      for (const r of f.tables[t] ?? []) {
-        if (t === 'settings' && DEVICE_SETTINGS.includes(String(r.key))) continue;
-        const row: Row = { ...r };
-        for (const c of single) row[c] = map(row[c]);
-        for (const c of lists) row[c] = JSON.stringify(parseJson<string[]>(row[c] as string, []).map((x) => map(x)).filter(Boolean));
-        if (t === 'tryon_cache' && !row.uri) continue;
-        if (t === 'tryon_cache' && !row.avatar_version) row.avatar_version = 'none';
-        const cols = Object.keys(row);
-        await tx.runAsync(`INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => row[c]));
+  try {
+    await db.withTransactionAsync(async (tx) => {
+      for (const t of [...TABLES].reverse()) {
+        if (t === 'settings') await tx.runAsync(`DELETE FROM settings WHERE key NOT IN (${DEVICE_SETTINGS.map(() => '?').join(', ')})`, DEVICE_SETTINGS);
+        else await tx.execAsync(`DELETE FROM ${t}`);
       }
-    }
-  });
+      await tx.execAsync('DELETE FROM jobs');
+      for (const t of TABLES) {
+        const single = Object.keys(URI_COLUMNS[t] ?? {});
+        const lists = Object.keys(URI_LIST_COLUMNS[t] ?? {});
+        for (const r of f.tables[t] ?? []) {
+          if (t === 'settings' && DEVICE_SETTINGS.includes(String(r.key))) continue;
+          const row: Row = { ...r };
+          for (const c of single) row[c] = map(row[c]);
+          for (const c of lists) row[c] = JSON.stringify(parseJson<string[]>(row[c] as string, []).map((x) => map(x)).filter(Boolean));
+          if (t === 'tryon_cache' && !row.uri) continue;
+          if (t === 'items') {
+            // Keep candidates and their fidelity checks aligned when some candidate pictures were missing.
+            const cands = parseJson<string[]>(r.candidates as string, []);
+            const checks = parseJson<unknown[]>(r.checks as string, []);
+            row.checks = JSON.stringify(cands.map((c, i) => [map(c), checks[i] ?? []] as const).filter(([u]) => !!u).map(([, k]) => k));
+          }
+          if (t === 'avatar' && (!row.front_uri || !row.back_uri) && row.status === 'ready') row.status = 'none';
+          if (t === 'tryon_cache' && !row.avatar_version) row.avatar_version = 'none';
+          const cols = Object.keys(row);
+          await tx.runAsync(`INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => row[c]));
+        }
+      }
+    });
+  } catch (e) {
+    // The database was left as it was; the copied pictures are not referenced by anything.
+    for (const uri of mapping.values()) await images.remove(uri);
+    throw e;
+  }
   // The previous data's pictures are no longer referenced.
   const kept = new Set(mapping.values());
   for (const u of new Set(oldUris)) if (!kept.has(u)) await images.remove(u);

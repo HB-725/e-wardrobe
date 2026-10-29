@@ -1,12 +1,12 @@
 import type { ImageStore } from '@/ai/imageStore';
-import type { BackupStorage } from '@/state/backup';
+import type { ArchiveReader, ArchiveWriter } from '@/state/archive';
 
 /** The web preview has no persistent storage to back up. */
-export async function pickNewBackupFolder(_images: ImageStore): Promise<{ storage: BackupStorage; name: string } | null> {
+export async function pickNewBackupFile(_images: ImageStore): Promise<{ storage: ArchiveWriter; name: string; verify(): Promise<void>; discard(): void } | null> {
   return null;
 }
 
-export async function pickExistingBackupFolder(_images: ImageStore): Promise<BackupStorage | null> {
+export async function pickBackupFile(_images: ImageStore): Promise<ArchiveReader | null> {
   return null;
 }
 
