@@ -18,7 +18,7 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（93 个测试）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（94 个测试）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
@@ -51,6 +51,11 @@
 - [x] 完整备份 / 恢复（含照片），存到用户选的文件夹
 - [x] 第五轮：评审修复（审核锁、生成中换照片、Key 读取容错、ErrorBoundary、上身效果失效、孤儿图片清理）、首次发送照片前的隐私提示、关于 / 开源许可、正式签名，0.4.0（versionCode 4）
 - [x] 第六轮：照片同意在 AI 引擎里强制（未同意时队列暂停，横幅引导到 /consent）；换照片后的旧任务不再重复付费；上身效果生成中衣服变化则丢弃；商品图铺满 3:4 格子（去掉背景色差方框）；快速预览人物满高、卡片在右边缘
+- [x] 0.4.0 已发给用户（正式签名，APK SHA-256 2e43b194…2528b16）
+- [x] 第七轮（0.4.1）：去掉 READ_MEDIA_IMAGES / READ_MEDIA_VISUAL_USER_SELECTED（模拟器 API 33 实测：系统照片选择器、保存到相册都不需要）；
+  模拟器上完整跑通同意流程（拒绝 → 照片照样保存、队列暂停 → /consent 同意 → 自动继续）、录入、形象、快速预览、保存穿搭、今天穿这套、日历、生成大片；
+  修复「生成大片 / 上身效果把纯 T 恤画成外套 + 内搭」（提示词重写，真实 API 正面 6/6 正确）；上身效果可「不满意？重新生成」；Android 上 2 件拼贴换行
+- 已知 AI 局限：背面上身效果对「胸前小印花」的 T 恤，约一半仍会把印花画到背后（gpt-image-1-mini 对文字约束不够稳），靠重新生成解决；账户若未验证组织，gpt-image-1 会 400，只能用 mini
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
 - [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
 - 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。
