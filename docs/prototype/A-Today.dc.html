@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>今天</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111111}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFFFFF; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #111111">
+  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 84px; overflow-y: auto">
+    <section style="padding: 30px 20px 0; display: flex; align-items: flex-end; justify-content: space-between">
+      <span style="display: flex; align-items: flex-end; gap: 12px">
+        <span style="font-size: 76px; font-weight: 300; line-height: 0.82; letter-spacing: -0.04em">29</span>
+        <span style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 2px">
+          <span style="font-size: 11px; letter-spacing: 0.24em; color: #6B6B6B">OCTOBER</span>
+          <span style="font-size: 16px; font-weight: 500">十月 · 星期四</span>
+        </span>
+      </span>
+      <span style="padding-bottom: 2px; font-size: 12px; color: #6B6B6B">本周 {{loggedCount}} / 7</span>
+    </section>
+    <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 18px 20px 0">
+      <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="height: 3px; background: {{d.bar}}"></span>
+          <span style="font-size: 11px; color: {{d.fg}}; font-weight: {{d.weight}}">{{d.dow}}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <a href="A-Review.dc.html" style="margin: 20px 20px 0; padding: 12px 14px; background: #F1F1F2; text-decoration: none; color: #111111; display: flex; align-items: center; gap: 14px">
+      <span style="flex: none; display: flex">
+        <span style="width: 44px; height: 52px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><span style="width: 34px"><dc-import name="Garment" kind="knit" color="#B9B4AC" hint-size="34px,41px"></dc-import></span></span>
+        <span style="width: 44px; height: 52px; margin-left: -10px; background: #FFFFFF; border-left: 2px solid #F1F1F2; display: flex; align-items: center; justify-content: center"><span style="width: 34px"><dc-import name="Garment" kind="shirt" color="#F2F1EC" hint-size="34px,41px"></dc-import></span></span>
+        <span style="width: 44px; height: 52px; margin-left: -10px; background: #FFFFFF; border-left: 2px solid #F1F1F2; display: flex; align-items: center; justify-content: center"><span style="width: 34px"><dc-import name="Garment" kind="jeans" color="#2B2B2E" hint-size="34px,41px"></dc-import></span></span>
+      </span>
+      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 14px; font-weight: 700">3 件新衣服生成好了</span>
+        <span style="font-size: 12px; color: #6B6B6B">确认后就会出现在衣橱里</span>
+      </span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+    </a>
+
+    <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 26px 20px 12px">
+      <h1 style="margin: 0; font-size: 20px; font-weight: 700">{{heading}}</h1>
+      <span style="font-size: 12px; color: #6B6B6B">{{pos}} / {{count}}</span>
+    </div>
+    <div style="overflow: hidden">
+      <div style="display: flex; gap: 12px; padding-left: 20px; transform: translateX({{shift}}px); transition: transform 0.4s cubic-bezier(.2,.8,.2,1)">
+        <sc-for list="{{cards}}" as="c" hint-placeholder-count="3">
+          <button type="button" onClick="{{c.pick}}" aria-label="{{c.name}}" style="position: relative; flex: none; width: 250px; height: 316px; padding: 0; border: 0; background: #F1F1F2; font: inherit; color: #111111; text-align: left; cursor: pointer; opacity: {{c.opacity}}; transition: opacity 0.4s">
+            <span style="position: absolute; left: 0; right: 0; top: 22px; display: flex; justify-content: center">
+              <span style="width: 98px"><dc-import name="Avatar" outer="{{c.outer}}" outer-color="{{c.outerColor}}" top="{{c.top}}" top-color="{{c.topColor}}" bottom="{{c.bottom}}" bottom-color="{{c.bottomColor}}" shoes="{{c.shoes}}" shoes-color="{{c.shoesColor}}" bag="{{c.bag}}" bag-color="{{c.bagColor}}" hint-size="98px,216px"></dc-import></span>
+            </span>
+            <sc-if value="{{c.badge}}" hint-placeholder-val="{{ false }}">
+              <span style="position: absolute; left: 14px; top: 14px; font-size: 11px; letter-spacing: 0.06em; color: #6B6B6B">{{c.badgeText}}</span>
+            </sc-if>
+            <sc-if value="{{c.isLogged}}" hint-placeholder-val="{{ false }}">
+              <span style="position: absolute; right: 12px; top: 12px; padding: 3px 8px; background: #111111; color: #FFFFFF; font-size: 11px">今天 ✓</span>
+            </sc-if>
+            <span style="position: absolute; left: 14px; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 3px">
+              <span style="font-size: 16px; font-weight: 700">{{c.name}}</span>
+              <span style="font-size: 12px; color: #6B6B6B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.meta}}</span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; padding: 14px 20px 0">
+      <a href="A-Mirror.dc.html" aria-label="拍镜子照记录" style="flex: none; width: 52px; height: 52px; box-sizing: border-box; border: 1px solid #111111; color: #111111; display: flex; align-items: center; justify-content: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+      </a>
+      <button type="button" onClick="{{primary}}" style="flex: 1; height: 52px; border: 1px solid #111111; background: {{btnBg}}; color: {{btnFg}}; font: inherit; font-size: 15px; font-weight: 500; letter-spacing: 0.04em; cursor: pointer">{{btnLabel}}</button>
+    </div>
+    <a href="C5-Fitting.dc.html" style="margin: 6px 20px 0; min-height: 44px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6B6B6B; text-decoration: none">
+      没有合适的？去试衣间搭一套
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+    </a>
+
+    <section style="padding: 22px 20px 32px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">好久没穿了</h2>
+        <span style="font-size: 12px; color: #6B6B6B">给它们一次机会？</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <sc-for list="{{idle}}" as="it" hint-placeholder-count="3">
+          <a href="A-Detail.dc.html" style="display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #111111">
+            <span style="height: 104px; background: #F1F1F2; display: flex; align-items: center; justify-content: center"><span style="width: 70px"><dc-import name="Garment" kind="{{it.kind}}" color="{{it.color}}" hint-size="70px,84px"></dc-import></span></span>
+            <span style="font-size: 13px; font-weight: 500">{{it.name}}</span>
+            <span style="font-size: 11px; color: #6B6B6B">{{it.days}} 天没穿</span>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+  <nav aria-label="主导航" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #FFFFFF; border-top: 1px solid #E4E4E6; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="A-Today.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #111111; font-size: 11px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15"></rect><path d="M4 10h16M9 3v4M15 3v4"></path><rect x="10.5" y="13" width="3" height="3" fill="currentColor" stroke="none"></rect></svg>
+      今天
+    </a>
+    <a href="C5-Wardrobe.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6.5a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9V11"></path><path d="M12 11l-8.6 6.2a1 1 0 0 0 .6 1.8h16a1 1 0 0 0 .6-1.8z"></path></svg>
+      衣橱
+    </a>
+    <a href="C5-Fitting.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2"></circle><path d="M12 7.5v7M7.5 10.5h9M12 14.5l-3 6.5M12 14.5l3 6.5"></path></svg>
+      试衣间
+    </a>
+    <a href="A-Outfits.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3L3 8l9 5 9-5-9-5z"></path><path d="M3 13l9 5 9-5"></path></svg>
+      穿搭
+    </a>
+    <a href="A-Me.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>
+      我的
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = {
+      jacket: ['jacket', '#2E4466', '牛仔夹克'], harrington: ['harrington', '#D8C8A0', '哈灵顿夹克'], puffer: ['puffer', '#8B8279', '连帽羽绒服'], coat: ['coat', '#A9845A', '羊毛大衣'],
+      tee: ['tee', '#F5F4F0', '圆领T恤'], shirt: ['shirt', '#C3D5E8', '牛津衬衫'], knit: ['knit', '#41594A', '麻花针织衫'],
+      jeans: ['jeans', '#4C6C96', '直筒牛仔裤'], chinos: ['chinos', '#C4B697', '卡其休闲裤'], skirt: ['skirt', '#3A3A3C', '百褶半裙'],
+      sneakers: ['sneakers', '#F3F2EE', '白色运动鞋'], loafers: ['loafers', '#4A3426', '乐福鞋'], tote: ['tote', '#D6C9B0', '帆布托特包'], none: ['none', '#000000', '']
+    };
+    const fit = (outer, top, bottom, shoes, bag) => {
+      const keys = [outer, top, bottom, shoes, bag].filter((k) => k !== 'none');
+      return {
+        outer: P[outer][0], outerColor: P[outer][1], top: P[top][0], topColor: P[top][1],
+        bottom: P[bottom][0], bottomColor: P[bottom][1], shoes: P[shoes][0], shoesColor: P[shoes][1],
+        bag: P[bag][0], bagColor: P[bag][1],
+        pieces: keys.length + ' 件 · ' + keys.map((k) => P[k][2]).join('、')
+      };
+    };
+    const OUTFITS = [
+      { id: 'o2', name: '秋日通勤', badgeText: '18 天没穿了', ...fit('jacket', 'knit', 'chinos', 'loafers', 'tote') },
+      { id: 'o1', name: '周末出门', badgeText: '', ...fit('jacket', 'tee', 'jeans', 'sneakers', 'none') },
+      { id: 'o4', name: '正式晚餐', badgeText: '还没穿过', ...fit('coat', 'shirt', 'chinos', 'loafers', 'none') },
+      { id: 'o3', name: '冬日暖阳', badgeText: '', ...fit('puffer', 'knit', 'jeans', 'sneakers', 'none') }
+    ];
+    const st = this.state || {};
+    const idx = st.idx || 0;
+    const logged = st.logged || null;
+    const cards = OUTFITS.map((o, i) => ({
+      ...o,
+      meta: o.pieces,
+      badge: !!o.badgeText,
+      isLogged: logged === o.id,
+      opacity: i === idx ? 1 : 0.55,
+      pick: () => this.setState({ idx: i })
+    }));
+    const cur = OUTFITS[idx];
+    const isLogged = logged === cur.id;
+    const DAYS = ['一', '二', '三', '四', '五', '六', '日'];
+    const rec = [true, true, true, !!logged, false, false, false];
+    const week = DAYS.map((dow, i) => ({
+      dow,
+      bar: rec[i] ? '#111111' : (i === 3 ? '#8E8E93' : '#E4E4E6'),
+      fg: i === 3 ? '#111111' : '#6B6B6B',
+      weight: i === 3 ? 700 : 400
+    }));
+    const idle = [
+      { name: '哈灵顿夹克', kind: 'harrington', color: '#D8C8A0', days: 74 },
+      { name: '百褶半裙', kind: 'skirt', color: '#3A3A3C', days: 58 },
+      { name: '乐福鞋', kind: 'loafers', color: '#4A3426', days: 41 }
+    ];
+    return {
+      cards, week, idle,
+      shift: -idx * 262,
+      pos: idx + 1, count: OUTFITS.length,
+      loggedCount: rec.filter(Boolean).length,
+      heading: logged ? '今天穿了这套' : '今天穿哪套？',
+      btnLabel: isLogged ? '已记录 · 撤销' : '就穿这套',
+      btnBg: isLogged ? '#FFFFFF' : '#111111',
+      btnFg: isLogged ? '#111111' : '#FFFFFF',
+      primary: () => this.setState({ logged: isLogged ? null : cur.id })
+    };
+  }
+}
+</script>
+</body>
+</html>

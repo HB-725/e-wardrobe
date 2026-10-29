@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>A · 录入：拍照</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#FFFFFF}a:hover{color:#DDDDDD}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #111111; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #FFFFFF">
+  <header style="height: 60px; box-sizing: border-box; padding: 8px 8px 0; display: flex; align-items: center; justify-content: space-between">
+    <a href="C5-Wardrobe.dc.html" aria-label="关闭" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #FFFFFF">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+    <span style="font-size: 15px; font-weight: 500">录入新衣服</span>
+    <button type="button" aria-label="闪光灯" style="width: 44px; height: 44px; border: 0; background: none; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3L5 13h6l-1 8 8-10h-6z"></path></svg>
+    </button>
+  </header>
+  <div style="position: relative; height: 560px; overflow: hidden; background: repeating-linear-gradient(115deg, #B9AFA3 0px, #B9AFA3 26px, #B1A698 26px, #B1A698 30px)">
+    <sc-if value="{{isCloth}}" hint-placeholder-val="{{ true }}">
+      <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+        <div style="width: 250px; transform: rotate(-9deg) translate(-10px, 14px)"><dc-import name="Garment" kind="jacket" color="#34496B" hint-size="250px,300px"></dc-import></div>
+      </div>
+      <div style="position: absolute; left: 34px; top: 60px; width: 40px; height: 40px; border-left: 3px solid #FFFFFF; border-top: 3px solid #FFFFFF"></div>
+      <div style="position: absolute; right: 34px; top: 60px; width: 40px; height: 40px; border-right: 3px solid #FFFFFF; border-top: 3px solid #FFFFFF"></div>
+      <div style="position: absolute; left: 34px; bottom: 80px; width: 40px; height: 40px; border-left: 3px solid #FFFFFF; border-bottom: 3px solid #FFFFFF"></div>
+      <div style="position: absolute; right: 34px; bottom: 80px; width: 40px; height: 40px; border-right: 3px solid #FFFFFF; border-bottom: 3px solid #FFFFFF"></div>
+      <div style="position: absolute; left: 16px; right: 16px; bottom: 20px; padding: 10px 12px; background: rgba(17,17,17,0.72); font-size: 13px; line-height: 1.5; display: flex; gap: 8px; align-items: center">
+        <span style="flex: none; width: 8px; height: 8px; background: #7BD88F"></span>
+        已识别到一件外套。平铺、挂起都可以，不用在意背景和褶皱。
+      </div>
+    </sc-if>
+    <sc-if value="{{isTag}}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center">
+        <svg width="170" height="230" viewBox="0 0 170 230" style="transform: rotate(4deg)" aria-hidden="true">
+          <path d="M20 30 L85 6 L150 30 L150 224 L20 224 Z" fill="#F7F5F0" stroke="rgba(0,0,0,0.2)"></path>
+          <circle cx="85" cy="34" r="7" fill="#B1A698"></circle>
+          <path d="M44 70 H126 M44 92 H110 M44 128 H126 M44 146 H96 M44 164 H118 M44 196 H80" stroke="#6B6B6B" stroke-width="5" stroke-linecap="round"></path>
+        </svg>
+      </div>
+      <div style="position: absolute; left: 95px; right: 95px; top: 120px; height: 300px; border: 3px solid #FFFFFF"></div>
+      <div style="position: absolute; left: 16px; right: 16px; bottom: 20px; padding: 10px 12px; background: rgba(17,17,17,0.72); font-size: 13px; line-height: 1.5">对准吊牌或洗标，自动读出品牌、尺码、材质。这一步可以跳过。</div>
+    </sc-if>
+    <sc-if value="{{isBatch}}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; background: #111111; padding: 12px; box-sizing: border-box; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 112px; gap: 4px; align-content: start">
+        <sc-for list="{{album}}" as="p" hint-placeholder-count="12">
+          <div style="position: relative; overflow: hidden; background: {{p.bg}}; display: flex; align-items: center; justify-content: center">
+            <div style="width: 74px; transform: rotate({{p.rot}}deg)"><dc-import name="Garment" kind="{{p.kind}}" color="{{p.color}}" hint-size="74px,89px"></dc-import></div>
+            <sc-if value="{{p.sel}}" hint-placeholder-val="{{ false }}">
+              <span style="position: absolute; right: 6px; top: 6px; width: 22px; height: 22px; background: #FFFFFF; color: #111111; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{p.n}}</span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+  <div style="display: flex; justify-content: center; gap: 28px; padding: 16px 0 0">
+    <sc-for list="{{modes}}" as="m" hint-placeholder-count="3">
+      <button type="button" onClick="{{m.pick}}" style="min-height: 44px; padding: 0 4px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: {{m.weight}}; color: {{m.color}}; cursor: pointer">{{m.label}}</button>
+    </sc-for>
+  </div>
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 32px 0">
+    <div style="width: 52px; height: 52px; overflow: hidden; background: #B9AFA3; display: flex; align-items: center; justify-content: center">
+      <div style="width: 36px; transform: rotate(8deg)"><dc-import name="Garment" kind="tee" color="#F5F4F0" hint-size="36px,43px"></dc-import></div>
+    </div>
+    <a href="A-Review.dc.html" aria-label="{{shutterLabel}}" style="width: 76px; height: 76px; box-sizing: border-box; border-radius: 50%; border: 4px solid #FFFFFF; display: flex; align-items: center; justify-content: center">
+      <span style="width: 60px; height: 60px; border-radius: 50%; background: #FFFFFF"></span>
+    </a>
+    <a href="A-Review.dc.html" style="width: 52px; min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #FFFFFF">
+      <span style="font-size: 18px; font-weight: 700">{{count}}</span>
+      <span style="font-size: 11px">下一步</span>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const mode = (this.state && this.state.mode) || 'cloth';
+    const MODES = [{ id: 'cloth', label: '拍衣服' }, { id: 'tag', label: '拍吊牌' }, { id: 'batch', label: '相册批量' }];
+    const modes = MODES.map((m) => ({
+      ...m,
+      color: m.id === mode ? '#FFFFFF' : '#9A9A9A',
+      weight: m.id === mode ? 700 : 400,
+      pick: () => this.setState({ mode: m.id })
+    }));
+    const RAW = ['#B9AFA3', '#9FA7A0', '#C8BBAA', '#A9A2B4', '#BFB6A6', '#9E9890'];
+    const PICS = [
+      ['jacket', '#34496B', -8, 1], ['tee', '#F5F4F0', 6, 2], ['jeans', '#4C6C96', -4, 3],
+      ['knit', '#41594A', 10, 4], ['sneakers', '#F3F2EE', -12, 0], ['coat', '#A9845A', 5, 5],
+      ['shirt', '#C3D5E8', -6, 6], ['chinos', '#C4B697', 8, 0], ['skirt', '#3A3A3C', -3, 7],
+      ['tote', '#D6C9B0', 12, 8], ['puffer', '#8B8279', -9, 0], ['loafers', '#4A3426', 4, 9]
+    ];
+    const album = PICS.map(([kind, color, rot, n], i) => ({ kind, color, rot, n, sel: n > 0, bg: RAW[i % RAW.length] }));
+    const count = mode === 'batch' ? 9 : 2;
+    return {
+      modes, album, count,
+      isCloth: mode === 'cloth', isTag: mode === 'tag', isBatch: mode === 'batch',
+      shutterLabel: mode === 'batch' ? '导入所选照片' : '拍照'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>A · 建立个人形象</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111111}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFFFFF; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #111111">
+  <header style="height: 56px; box-sizing: border-box; padding: 0 8px; display: flex; align-items: center; justify-content: space-between">
+    <a href="A-Me.dc.html" aria-label="关闭" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #111111">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+    <span style="font-size: 15px; font-weight: 500">建立个人形象</span>
+    <span style="width: 44px"></span>
+  </header>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 0 20px">
+    <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="height: 3px; background: {{s.bar}}"></span>
+        <span style="font-size: 12px; color: {{s.color}}; font-weight: {{s.weight}}">{{s.label}}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="position: absolute; top: 112px; left: 0; right: 0; bottom: 76px; overflow-y: auto">
+    <sc-if value="{{is1}}" hint-placeholder-val="{{ true }}">
+      <section style="padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 700">拍 3 张全身照</h1>
+          <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6B6B6B">AI 会根据这些照片生成你的形象，以后所有衣服都穿在它身上。</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <div style="height: 200px; background: #E3DED7; display: flex; align-items: center; justify-content: center"><div style="width: 68px"><dc-import name="Avatar" top="tee" top-color="#CFCFD2" bottom="chinos" bottom-color="#9A9AA0" shoes="sneakers" shoes-color="#F3F2EE" outer="none" bag="none" hint-size="68px,150px"></dc-import></div></div>
+            <span style="font-size: 12px">正面 · 已拍</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <div style="height: 200px; background: #E3DED7; display: flex; align-items: center; justify-content: center"><div style="width: 68px; transform: scaleX(0.4)"><dc-import name="Avatar" top="tee" top-color="#CFCFD2" bottom="chinos" bottom-color="#9A9AA0" shoes="sneakers" shoes-color="#F3F2EE" outer="none" bag="none" hint-size="68px,150px"></dc-import></div></div>
+            <span style="font-size: 12px">侧面 · 已拍</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <button type="button" aria-label="拍背面" style="height: 200px; border: 1.5px dashed #111111; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font: inherit; color: #111111; cursor: pointer">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+              <span style="font-size: 12px">拍背面</span>
+            </button>
+            <span style="font-size: 12px; color: #6B6B6B">背面 · 待拍</span>
+          </div>
+        </div>
+        <div style="padding: 14px 16px; background: #F1F1F2; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5">
+          <span style="font-weight: 700">拍好的小技巧</span>
+          <span>· 穿贴身的衣服，AI 才看得清身材轮廓</span>
+          <span>· 从头到脚完整入镜，手臂微微张开</span>
+          <span>· 光线均匀，背景越简单越好</span>
+        </div>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6B6B6B">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          照片加密保存，只有你自己能看，可随时永久删除
+        </span>
+      </section>
+    </sc-if>
+    <sc-if value="{{is2}}" hint-placeholder-val="{{ false }}">
+      <section style="padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 700">身材数据</h1>
+          <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6B6B6B">让形象的比例更接近你。身高、体重必填，其他选填。</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6B6B6B">身高 (cm)<input type="number" placeholder="必填" style="height: 46px; box-sizing: border-box; padding: 0 12px; border: 1px solid #C9C9CC; font: inherit; font-size: 15px; color: #111111"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6B6B6B">体重 (kg)<input type="number" placeholder="必填" style="height: 46px; box-sizing: border-box; padding: 0 12px; border: 1px solid #C9C9CC; font: inherit; font-size: 15px; color: #111111"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6B6B6B">肩宽 (cm)<input type="number" placeholder="选填" style="height: 46px; box-sizing: border-box; padding: 0 12px; border: 1px solid #E4E4E6; font: inherit; font-size: 15px; color: #111111"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6B6B6B">胸围 (cm)<input type="number" placeholder="选填" style="height: 46px; box-sizing: border-box; padding: 0 12px; border: 1px solid #E4E4E6; font: inherit; font-size: 15px; color: #111111"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6B6B6B">腰围 (cm)<input type="number" placeholder="选填" style="height: 46px; box-sizing: border-box; padding: 0 12px; border: 1px solid #E4E4E6; font: inherit; font-size: 15px; color: #111111"></label>
+          <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #6B6B6B">臀围 (cm)<input type="number" placeholder="选填" style="height: 46px; box-sizing: border-box; padding: 0 12px; border: 1px solid #E4E4E6; font: inherit; font-size: 15px; color: #111111"></label>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 12px; color: #6B6B6B">整体体型</span>
+          <div style="display: flex; gap: 8px">
+            <sc-for list="{{builds}}" as="b" hint-placeholder-count="4">
+              <button type="button" onClick="{{b.pick}}" style="flex: 1; height: 44px; border: 1px solid {{b.border}}; background: {{b.bg}}; color: {{b.fg}}; font: inherit; font-size: 13px; cursor: pointer">{{b.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+    <sc-if value="{{is3}}" hint-placeholder-val="{{ false }}">
+      <section style="padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <h1 style="margin: 0; font-size: 22px; font-weight: 700">正在生成你的 8 个角度</h1>
+          <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6B6B6B">大约需要 1 分钟。完成后看看像不像你。</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{angles}}" as="g" hint-placeholder-count="8">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <div style="height: 132px; background: #F1F1F2; display: flex; align-items: center; justify-content: center; opacity: {{g.op}}">
+                <div style="width: 46px; transform: scaleX({{g.sx}})"><dc-import name="Avatar" top="tee" top-color="#CFCFD2" bottom="chinos" bottom-color="#9A9AA0" shoes="sneakers" shoes-color="#F3F2EE" outer="none" bag="none" hint-size="46px,101px"></dc-import></div>
+              </div>
+              <span style="font-size: 11px; color: {{g.color}}">{{g.label}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height: 4px; background: #E4E4E6"><div style="width: 62%; height: 100%; background: #111111"></div></div>
+      </section>
+    </sc-if>
+  </div>
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 76px; box-sizing: border-box; padding: 12px 20px 20px; background: #FFFFFF; border-top: 1px solid #E4E4E6; display: flex; gap: 10px">
+    <button type="button" onClick="{{back}}" style="flex: 1; border: 1px solid #111111; background: #FFFFFF; color: #111111; font: inherit; font-size: 14px; cursor: pointer">{{backLabel}}</button>
+    <sc-if value="{{notLast}}" hint-placeholder-val="{{ true }}">
+      <button type="button" onClick="{{next}}" style="flex: 2; border: 0; background: #111111; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer">下一步</button>
+    </sc-if>
+    <sc-if value="{{is3}}" hint-placeholder-val="{{ false }}">
+      <a href="A-Me.dc.html" style="flex: 2; display: flex; align-items: center; justify-content: center; background: #111111; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none">看起来像我，完成</a>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const step = st.step || 1;
+    const build = st.build || 'avg';
+    const steps = ['照片', '身材', '生成'].map((label, i) => ({
+      label: (i + 1) + ' · ' + label,
+      bar: i + 1 <= step ? '#111111' : '#E4E4E6',
+      color: i + 1 === step ? '#111111' : '#6B6B6B',
+      weight: i + 1 === step ? 700 : 400
+    }));
+    const BUILDS = [{ id: 'slim', label: '偏瘦' }, { id: 'avg', label: '匀称' }, { id: 'ath', label: '健壮' }, { id: 'full', label: '丰满' }];
+    const builds = BUILDS.map((b) => ({
+      ...b,
+      bg: b.id === build ? '#111111' : '#FFFFFF',
+      fg: b.id === build ? '#FFFFFF' : '#111111',
+      border: b.id === build ? '#111111' : '#C9C9CC',
+      pick: () => this.setState({ build: b.id })
+    }));
+    const LABELS = ['正面', '右前', '右侧', '右后', '背面', '左后', '左侧', '左前'];
+    const angles = LABELS.map((label, i) => {
+      const c = Math.cos((i * 45 * Math.PI) / 180);
+      const done = i < 5;
+      return {
+        label: done ? label : label + ' · 生成中',
+        sx: (Math.max(0.36, Math.abs(c)) * (c < -0.01 ? -1 : 1)).toFixed(3),
+        op: done ? 1 : 0.35,
+        color: done ? '#111111' : '#6B6B6B'
+      };
+    });
+    return {
+      steps, builds, angles,
+      is1: step === 1, is2: step === 2, is3: step === 3, notLast: step < 3,
+      backLabel: step === 1 ? '稍后再说' : '上一步',
+      back: () => this.setState({ step: Math.max(1, step - 1) }),
+      next: () => this.setState({ step: Math.min(3, step + 1) })
+    };
+  }
+}
+</script>
+</body>
+</html>

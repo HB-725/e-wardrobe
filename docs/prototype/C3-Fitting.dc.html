@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>C3 · 试衣间</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&amp;family=Noto+Sans+SC:wght@500;700;900&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1D3557}a:hover{color:#3A5A8C}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #8ED1FC; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #1D3557">
+  <div style="position: absolute; left: -30px; top: 120px; width: 150px; height: 48px; border-radius: 999px; background: #FFFFFF; opacity: 0.7"></div>
+  <div style="position: absolute; left: 110px; top: 210px; width: 90px; height: 30px; border-radius: 999px; background: #FFFFFF; opacity: 0.6"></div>
+  <div style="position: absolute; left: -60px; top: 432px; width: 330px; height: 120px; border-radius: 50%; background: #7EE0B5; border: 3px solid #1D3557"></div>
+  <header style="position: relative; padding: 20px 20px 0; display: flex; align-items: center; justify-content: space-between">
+    <h1 style="margin: 0; font-family: 'ZCOOL KuaiLe', 'Noto Sans SC', sans-serif; font-size: 32px; font-weight: 400; color: #FFFFFF; text-shadow: 3px 3px 0 #1D3557">换装间</h1>
+    <span style="padding: 6px 12px; border-radius: 999px; background: #FFFFFF; border: 3px solid #1D3557; font-size: 13px; font-weight: 900">{{angleLabel}}</span>
+  </header>
+  <div style="position: absolute; left: 14px; top: 100px; width: 200px; display: flex; flex-direction: column; align-items: center">
+    <div style="width: 170px; transform: {{fig}}; transition: transform 0.45s cubic-bezier(.3,1.5,.5,1)">
+      <dc-import name="Avatar" outer="{{av.outer}}" outer-color="{{av.outerColor}}" top="{{av.top}}" top-color="{{av.topColor}}" bottom="{{av.bottom}}" bottom-color="{{av.bottomColor}}" shoes="{{av.shoes}}" shoes-color="{{av.shoesColor}}" bag="{{av.bag}}" bag-color="{{av.bagColor}}" hint-size="170px,374px"></dc-import>
+    </div>
+    <div style="display: flex; gap: 12px; margin-top: 18px">
+      <button type="button" aria-label="向左转" onClick="{{turnLeft}}" style="width: 52px; height: 48px; border-radius: 16px; border: 3px solid #1D3557; background: #FFFFFF; color: #1D3557; display: flex; align-items: center; justify-content: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </button>
+      <button type="button" aria-label="向右转" onClick="{{turnRight}}" style="width: 52px; height: 48px; border-radius: 16px; border: 3px solid #1D3557; background: #FFFFFF; color: #1D3557; display: flex; align-items: center; justify-content: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </button>
+    </div>
+    <div style="display: flex; gap: 8px; margin-top: 14px">
+      <button type="button" style="height: 46px; padding: 0 14px; border-radius: 16px; border: 3px solid #1D3557; background: #FFD84D; color: #1D3557; font: inherit; font-size: 14px; font-weight: 900; cursor: pointer">保存</button>
+      <button type="button" style="height: 46px; padding: 0 14px; border-radius: 16px; border: 3px solid #1D3557; background: #FF8FB8; color: #1D3557; font: inherit; font-size: 14px; font-weight: 900; cursor: pointer">拍大片</button>
+    </div>
+  </div>
+  <div style="position: absolute; right: 14px; top: 84px; bottom: 112px; width: 154px; box-sizing: border-box; padding: 8px; border-radius: 24px; border: 3px solid #1D3557; background: #FFFFFF; display: flex; gap: 8px">
+    <div style="flex: none; width: 44px; display: flex; flex-direction: column; gap: 6px">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="5">
+        <button type="button" onClick="{{c.pick}}" style="width: 44px; height: 52px; padding: 0; border-radius: 14px; border: {{c.border}}; background: {{c.bg}}; color: #1D3557; font: inherit; font-size: 12px; font-weight: 900; cursor: pointer">{{c.label}}</button>
+      </sc-for>
+    </div>
+    <div style="flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{tray}}" as="t" hint-placeholder-count="4">
+        <button type="button" onClick="{{t.pick}}" aria-label="{{t.name}}" style="position: relative; flex: none; height: 92px; padding: 0; border-radius: 16px; border: {{t.border}}; background: {{t.bg}}; display: flex; align-items: center; justify-content: center; cursor: pointer">
+          <span style="width: 62px"><dc-import name="Garment" kind="{{t.kind}}" color="{{t.color}}" hint-size="62px,74px"></dc-import></span>
+          <sc-if value="{{t.on}}" hint-placeholder-val="{{ false }}">
+            <span style="position: absolute; left: 4px; top: 4px; padding: 1px 6px; border-radius: 999px; background: #1D3557; color: #FFFFFF; font-size: 10px; font-weight: 900">穿着</span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+  <nav aria-label="主导航" style="position: absolute; left: 20px; right: 20px; bottom: 20px; height: 72px; display: flex; gap: 10px">
+    <a href="C3-Wardrobe.dc.html" style="flex: 1; border-radius: 22px; border: 3px solid #1D3557; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #1D3557; font-size: 12px; font-weight: 900">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1 12H6z"></path><path d="M9 8V6a3 3 0 0 1 6 0v2"></path></svg>
+      背包
+    </a>
+    <a href="C3-Fitting.dc.html" style="flex: 1.3; border-radius: 22px; border: 3px solid #1D3557; background: #FF8FB8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; color: #1D3557; font-size: 12px; font-weight: 900">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2"></circle><path d="M12 7.5v7M7.5 10.5h9M12 14.5l-3 6.5M12 14.5l3 6.5"></path></svg>
+      换装
+    </a>
+    <button type="button" aria-label="录入新衣服" style="flex: 1; border-radius: 22px; border: 3px solid #1D3557; background: #7EE0B5; color: #1D3557; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 12px; font-weight: 900; cursor: pointer">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      收集
+    </button>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ITEMS = [
+      { id: 'g1', name: '牛仔夹克', cat: 'outer', kind: 'jacket', color: '#2E4466' },
+      { id: 'g2', name: '哈灵顿夹克', cat: 'outer', kind: 'harrington', color: '#D8C8A0' },
+      { id: 'g3', name: '连帽羽绒服', cat: 'outer', kind: 'puffer', color: '#8B8279' },
+      { id: 'g4', name: '羊毛大衣', cat: 'outer', kind: 'coat', color: '#A9845A' },
+      { id: 'g5', name: '圆领T恤', cat: 'top', kind: 'tee', color: '#F5F4F0' },
+      { id: 'g6', name: '牛津衬衫', cat: 'top', kind: 'shirt', color: '#C3D5E8' },
+      { id: 'g7', name: '麻花针织衫', cat: 'top', kind: 'knit', color: '#41594A' },
+      { id: 'g8', name: '直筒牛仔裤', cat: 'bottom', kind: 'jeans', color: '#4C6C96' },
+      { id: 'g9', name: '卡其休闲裤', cat: 'bottom', kind: 'chinos', color: '#C4B697' },
+      { id: 'g10', name: '百褶半裙', cat: 'bottom', kind: 'skirt', color: '#3A3A3C' },
+      { id: 'g11', name: '白色运动鞋', cat: 'shoes', kind: 'sneakers', color: '#F3F2EE' },
+      { id: 'g12', name: '乐福鞋', cat: 'shoes', kind: 'loafers', color: '#4A3426' },
+      { id: 'g13', name: '帆布托特包', cat: 'bag', kind: 'tote', color: '#D6C9B0' }
+    ];
+    const CATS = [
+      { id: 'outer', label: '外套', bg: '#FFD84D', soft: '#FFF3C4' }, { id: 'top', label: '上衣', bg: '#FF8FB8', soft: '#FFE0EC' },
+      { id: 'bottom', label: '下装', bg: '#7EE0B5', soft: '#DDF7EA' }, { id: 'shoes', label: '鞋', bg: '#FFA552', soft: '#FFE6CF' },
+      { id: 'bag', label: '包', bg: '#B9A5FF', soft: '#ECE6FF' }
+    ];
+    const LABELS = ['正面', '右前', '右侧', '右后', '背面', '左后', '左侧', '左前'];
+    const st = this.state || {};
+    const worn = st.worn || { outer: 'g1', top: 'g5', bottom: 'g8', shoes: 'g11', bag: null };
+    const cat = st.cat || 'outer';
+    const angle = st.angle || 0;
+    const curCat = CATS.find((c) => c.id === cat);
+    const byId = (id) => ITEMS.find((i) => i.id === id);
+    const av = {};
+    ['outer', 'top', 'bottom', 'shoes', 'bag'].forEach((k) => {
+      const it = worn[k] && byId(worn[k]);
+      av[k] = it ? it.kind : 'none';
+      av[k + 'Color'] = it ? it.color : '#000000';
+    });
+    const tray = ITEMS.filter((i) => i.cat === cat).map((i) => {
+      const on = worn[cat] === i.id;
+      return {
+        ...i, on,
+        bg: curCat.soft,
+        border: on ? '3px solid #1D3557' : '2px solid #CFE3F5',
+        pick: () => this.setState({ worn: { ...worn, [cat]: on ? null : i.id } })
+      };
+    });
+    const cats = CATS.map((c) => ({
+      ...c,
+      bg: c.id === cat ? c.bg : c.soft,
+      border: c.id === cat ? '3px solid #1D3557' : '2px solid transparent',
+      pick: () => this.setState({ cat: c.id })
+    }));
+    const cos = Math.cos((angle * Math.PI) / 180);
+    const sx = Math.max(0.36, Math.abs(cos)) * (cos < -0.01 ? -1 : 1);
+    const idx = (((angle / 45) % 8) + 8) % 8;
+    return {
+      av, tray, cats,
+      fig: 'scaleX(' + sx.toFixed(3) + ')',
+      angleLabel: LABELS[idx],
+      turnLeft: () => this.setState({ angle: angle - 45 }),
+      turnRight: () => this.setState({ angle: angle + 45 })
+    };
+  }
+}
+</script>
+</body>
+</html>

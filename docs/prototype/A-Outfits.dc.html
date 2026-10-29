@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>穿搭</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111111}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFFFFF; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #111111">
+  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 84px; overflow-y: auto">
+    <header style="padding: 28px 20px 0; display: flex; align-items: flex-end; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 11px; letter-spacing: 0.16em; color: #6B6B6B">OUTFITS</span>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.02em">穿搭</h1>
+      </div>
+      <div style="display: flex; background: #F1F1F2; padding: 3px">
+        <button type="button" onClick="{{showLib}}" style="height: 34px; padding: 0 14px; border: 0; background: {{libBg}}; color: {{libFg}}; font: inherit; font-size: 13px; cursor: pointer">搭配</button>
+        <button type="button" onClick="{{showCal}}" style="height: 34px; padding: 0 14px; border: 0; background: {{calBg}}; color: {{calFg}}; font: inherit; font-size: 13px; cursor: pointer">日历</button>
+      </div>
+    </header>
+
+    <sc-if value="{{isLib}}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; gap: 22px; padding: 14px 20px 0; border-bottom: 1px solid #E4E4E6">
+        <sc-for list="{{tags}}" as="c" hint-placeholder-count="5">
+          <button type="button" onClick="{{c.pick}}" style="flex: none; min-height: 44px; padding: 10px 0; margin-bottom: -1px; background: none; border: 0; border-bottom: 2px solid {{c.line}}; font: inherit; font-size: 14px; font-weight: {{c.weight}}; color: {{c.color}}; cursor: pointer">{{c.label}}</button>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 12px; padding: 18px 20px 28px">
+        <sc-for list="{{outfits}}" as="o" hint-placeholder-count="4">
+          <a href="C5-Fitting.dc.html" style="display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: #111111">
+            <div style="aspect-ratio: 4 / 5; background: #F1F1F2; display: flex; align-items: center; justify-content: center">
+              <div style="width: 40%"><dc-import name="Avatar" outer="{{o.outer}}" outer-color="{{o.outerColor}}" top="{{o.top}}" top-color="{{o.topColor}}" bottom="{{o.bottom}}" bottom-color="{{o.bottomColor}}" shoes="{{o.shoes}}" shoes-color="{{o.shoesColor}}" bag="{{o.bag}}" bag-color="{{o.bagColor}}" hint-size="100%,150px"></dc-import></div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 14px; font-weight: 500">{{o.name}}</span>
+              <span style="font-size: 12px; color: #6B6B6B">{{o.tagLabel}} · 穿过 {{o.wears}} 次</span>
+            </div>
+          </a>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isCal}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 8px 0 20px">
+        <span style="display: flex; align-items: baseline; gap: 10px">
+          <span style="font-size: 22px; font-weight: 700">十月</span>
+          <span style="font-size: 12px; color: #6B6B6B">2026 · 记录了 {{loggedDays}} 天</span>
+        </span>
+        <span style="display: flex">
+          <button type="button" aria-label="上个月" style="width: 44px; height: 44px; border: 0; background: none; color: #111111; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></button>
+          <button type="button" aria-label="下个月" style="width: 44px; height: 44px; border: 0; background: none; color: #B5B5B8; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+        </span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 10px 20px 6px">
+        <sc-for list="{{dows}}" as="w" hint-placeholder-count="7">
+          <span style="font-size: 11px; color: #6B6B6B; text-align: center">{{w}}</span>
+        </sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: 62px; gap: 4px; padding: 0 20px">
+        <sc-for list="{{cells}}" as="d" hint-placeholder-count="35">
+          <button type="button" onClick="{{d.pick}}" aria-label="{{d.aria}}" style="position: relative; padding: 0; border: 0; outline: 2px solid {{d.ring}}; outline-offset: -2px; background: {{d.bg}}; font: inherit; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; visibility: {{d.vis}}">
+            <span style="position: absolute; left: 4px; top: 3px; font-size: 10px; color: {{d.fg}}; font-weight: {{d.weight}}">{{d.day}}</span>
+            <sc-if value="{{d.has}}" hint-placeholder-val="{{ false }}">
+              <span style="width: 20px; margin-bottom: 3px"><dc-import name="Avatar" outer="{{d.o.outer}}" outer-color="{{d.o.outerColor}}" top="{{d.o.top}}" top-color="{{d.o.topColor}}" bottom="{{d.o.bottom}}" bottom-color="{{d.o.bottomColor}}" shoes="{{d.o.shoes}}" shoes-color="{{d.o.shoesColor}}" bag="{{d.o.bag}}" bag-color="{{d.o.bagColor}}" hint-size="20px,44px"></dc-import></span>
+            </sc-if>
+          </button>
+        </sc-for>
+      </div>
+      <section style="margin: 18px 20px 28px; padding: 16px; background: #F1F1F2; display: flex; gap: 16px; align-items: center; min-height: 124px; box-sizing: border-box">
+        <sc-if value="{{sel.has}}" hint-placeholder-val="{{ true }}">
+          <span style="flex: none; width: 44px"><dc-import name="Avatar" outer="{{sel.o.outer}}" outer-color="{{sel.o.outerColor}}" top="{{sel.o.top}}" top-color="{{sel.o.topColor}}" bottom="{{sel.o.bottom}}" bottom-color="{{sel.o.bottomColor}}" shoes="{{sel.o.shoes}}" shoes-color="{{sel.o.shoesColor}}" bag="{{sel.o.bag}}" bag-color="{{sel.o.bagColor}}" hint-size="44px,97px"></dc-import></span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 12px; color: #6B6B6B">{{sel.label}}</span>
+            <span style="font-size: 17px; font-weight: 700">{{sel.o.name}}</span>
+            <span style="font-size: 12px; color: #6B6B6B; line-height: 1.5">{{sel.o.pieces}}</span>
+          </span>
+        </sc-if>
+        <sc-if value="{{sel.none}}" hint-placeholder-val="{{ false }}">
+          <span style="font-size: 13px; color: #6B6B6B">{{sel.label}} · 这天没有记录</span>
+        </sc-if>
+      </section>
+    </sc-if>
+  </div>
+  <nav aria-label="主导航" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #FFFFFF; border-top: 1px solid #E4E4E6; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="A-Today.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15"></rect><path d="M4 10h16M9 3v4M15 3v4"></path><rect x="10.5" y="13" width="3" height="3" fill="currentColor" stroke="none"></rect></svg>
+      今天
+    </a>
+    <a href="C5-Wardrobe.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6.5a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9V11"></path><path d="M12 11l-8.6 6.2a1 1 0 0 0 .6 1.8h16a1 1 0 0 0 .6-1.8z"></path></svg>
+      衣橱
+    </a>
+    <a href="C5-Fitting.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2"></circle><path d="M12 7.5v7M7.5 10.5h9M12 14.5l-3 6.5M12 14.5l3 6.5"></path></svg>
+      试衣间
+    </a>
+    <a href="A-Outfits.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #111111; font-size: 11px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3L3 8l9 5 9-5-9-5z"></path><path d="M3 13l9 5 9-5"></path></svg>
+      穿搭
+    </a>
+    <a href="A-Me.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>
+      我的
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = {
+      jacket: ['jacket', '#2E4466', '牛仔夹克'], harrington: ['harrington', '#D8C8A0', '哈灵顿夹克'], puffer: ['puffer', '#8B8279', '连帽羽绒服'], coat: ['coat', '#A9845A', '羊毛大衣'],
+      tee: ['tee', '#F5F4F0', '圆领T恤'], shirt: ['shirt', '#C3D5E8', '牛津衬衫'], knit: ['knit', '#41594A', '麻花针织衫'],
+      jeans: ['jeans', '#4C6C96', '直筒牛仔裤'], chinos: ['chinos', '#C4B697', '卡其休闲裤'], skirt: ['skirt', '#3A3A3C', '百褶半裙'],
+      sneakers: ['sneakers', '#F3F2EE', '白色运动鞋'], loafers: ['loafers', '#4A3426', '乐福鞋'], tote: ['tote', '#D6C9B0', '帆布托特包'], none: ['none', '#000000', '']
+    };
+    const fit = (outer, top, bottom, shoes, bag) => {
+      const keys = [outer, top, bottom, shoes, bag].filter((k) => k !== 'none');
+      return {
+        outer: P[outer][0], outerColor: P[outer][1], top: P[top][0], topColor: P[top][1],
+        bottom: P[bottom][0], bottomColor: P[bottom][1], shoes: P[shoes][0], shoesColor: P[shoes][1],
+        bag: P[bag][0], bagColor: P[bag][1], pieces: keys.map((k) => P[k][2]).join('、')
+      };
+    };
+    const TAGL = { work: '通勤', weekend: '周末', date: '约会', travel: '旅行' };
+    const OUTFITS = [
+      { id: 'o1', name: '周末出门', tag: 'weekend', wears: 3, ...fit('jacket', 'tee', 'jeans', 'sneakers', 'none') },
+      { id: 'o2', name: '秋日通勤', tag: 'work', wears: 5, ...fit('jacket', 'knit', 'chinos', 'loafers', 'tote') },
+      { id: 'o3', name: '冬日暖阳', tag: 'weekend', wears: 2, ...fit('puffer', 'knit', 'jeans', 'sneakers', 'none') },
+      { id: 'o4', name: '正式晚餐', tag: 'date', wears: 1, ...fit('coat', 'shirt', 'chinos', 'loafers', 'none') },
+      { id: 'o5', name: '轻装旅行', tag: 'travel', wears: 2, ...fit('harrington', 'tee', 'chinos', 'sneakers', 'tote') },
+      { id: 'o6', name: '裙装通勤', tag: 'work', wears: 4, ...fit('coat', 'shirt', 'skirt', 'loafers', 'tote') }
+    ];
+    const byId = (id) => OUTFITS.find((o) => o.id === id);
+    const st = this.state || {};
+    const view = st.view || 'lib';
+    const tag = st.tag || 'all';
+    const TAGS = [{ id: 'all', label: '全部' }, { id: 'work', label: '通勤' }, { id: 'weekend', label: '周末' }, { id: 'date', label: '约会' }, { id: 'travel', label: '旅行' }];
+    const tags = TAGS.map((t) => ({
+      ...t,
+      color: t.id === tag ? '#111111' : '#6B6B6B',
+      weight: t.id === tag ? 700 : 400,
+      line: t.id === tag ? '#111111' : 'transparent',
+      pick: () => this.setState({ tag: t.id })
+    }));
+    const outfits = OUTFITS.filter((o) => tag === 'all' || o.tag === tag).map((o) => ({ ...o, tagLabel: TAGL[o.tag] }));
+    const LOG = { 2: 'o2', 3: 'o6', 4: 'o1', 7: 'o2', 9: 'o5', 10: 'o5', 11: 'o1', 14: 'o6', 16: 'o2', 18: 'o3', 21: 'o2', 23: 'o4', 26: 'o2', 27: 'o6', 28: 'o1' };
+    const TODAY = 29;
+    const selDay = st.day || 28;
+    const DOWS = ['一', '二', '三', '四', '五', '六', '日'];
+    const cells = [];
+    for (let k = 0; k < 3; k++) cells.push({ day: '', vis: 'hidden', bg: '#FFFFFF', ring: 'transparent', has: false, o: {}, fg: '#111111', weight: 400, aria: '', pick: () => {} });
+    for (let d = 1; d <= 31; d++) {
+      const id = LOG[d];
+      const future = d > TODAY;
+      cells.push({
+        day: d, vis: 'visible', has: !!id, o: id ? byId(id) : {},
+        bg: id ? '#F1F1F2' : '#FFFFFF',
+        ring: d === selDay ? '#111111' : (d === TODAY ? '#C9C9CC' : 'transparent'),
+        fg: future ? '#C9C9CC' : '#111111',
+        weight: d === TODAY ? 700 : 400,
+        aria: '10 月 ' + d + ' 日',
+        pick: () => this.setState({ day: d })
+      });
+    }
+    const selId = LOG[selDay];
+    const dow = DOWS[(selDay + 2) % 7];
+    const sel = {
+      has: !!selId, none: !selId,
+      o: selId ? byId(selId) : {},
+      label: '10 月 ' + selDay + ' 日 · 星期' + dow
+    };
+    const isLib = view === 'lib';
+    return {
+      isLib, isCal: !isLib, tags, outfits, dows: DOWS, cells, sel,
+      loggedDays: Object.keys(LOG).length,
+      libBg: isLib ? '#111111' : 'transparent', libFg: isLib ? '#FFFFFF' : '#111111',
+      calBg: isLib ? 'transparent' : '#111111', calFg: isLib ? '#111111' : '#FFFFFF',
+      showLib: () => this.setState({ view: 'lib' }),
+      showCal: () => this.setState({ view: 'cal' })
+    };
+  }
+}
+</script>
+</body>
+</html>

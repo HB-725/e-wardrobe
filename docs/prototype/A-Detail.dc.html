@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>A · 单品详情</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111111}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFFFFF; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #111111">
+  <header style="height: 56px; box-sizing: border-box; padding: 0 8px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E4E4E6">
+    <a href="C5-Wardrobe.dc.html" aria-label="返回衣橱" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #111111">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    </a>
+    <span style="font-size: 15px; font-weight: 500">单品详情</span>
+    <button type="button" style="min-width: 44px; height: 44px; border: 0; background: none; font: inherit; font-size: 14px; color: #111111; cursor: pointer">编辑</button>
+  </header>
+  <div style="position: absolute; top: 56px; left: 0; right: 0; bottom: 0; overflow-y: auto">
+    <div style="position: relative; height: 380px; background: #F1F1F2; display: flex; align-items: center; justify-content: center; overflow: hidden">
+      <sc-if value="{{isStd}}" hint-placeholder-val="{{ true }}">
+        <div style="width: 250px"><dc-import name="Garment" kind="jacket" color="#2E4466" hint-size="250px,300px"></dc-import></div>
+      </sc-if>
+      <sc-if value="{{isRaw}}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0; background: repeating-linear-gradient(115deg, #CFC5B8 0px, #CFC5B8 26px, #C6BBAD 26px, #C6BBAD 30px); display: flex; align-items: center; justify-content: center">
+          <div style="width: 220px; transform: rotate(-11deg) translate(-14px, 18px)"><dc-import name="Garment" kind="jacket" color="#34496B" hint-size="220px,264px"></dc-import></div>
+          <span style="position: absolute; left: 12px; top: 12px; padding: 4px 8px; background: rgba(17,17,17,0.72); color: #FFFFFF; font-size: 11px">原图 · 2025-09-14 床上随手拍</span>
+        </div>
+      </sc-if>
+      <div style="position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; background: #FFFFFF; padding: 3px">
+        <button type="button" onClick="{{showStd}}" style="height: 34px; padding: 0 16px; border: 0; background: {{stdBg}}; color: {{stdFg}}; font: inherit; font-size: 13px; cursor: pointer">标准图</button>
+        <button type="button" onClick="{{showRaw}}" style="height: 34px; padding: 0 16px; border: 0; background: {{rawBg}}; color: {{rawFg}}; font: inherit; font-size: 13px; cursor: pointer">原图</button>
+      </div>
+    </div>
+    <section style="padding: 20px 20px 8px; display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 12px; color: #6B6B6B">外套 · 夹克</span>
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700">牛仔夹克</h1>
+    </section>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 8px 20px 0; border-top: 1px solid #E4E4E6; border-bottom: 1px solid #E4E4E6">
+      <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 20px; font-weight: 700">14</span>
+        <span style="font-size: 11px; color: #6B6B6B">穿过次数</span>
+      </div>
+      <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 20px; font-weight: 700">¥28.5</span>
+        <span style="font-size: 11px; color: #6B6B6B">每次成本</span>
+      </div>
+      <div style="padding: 14px 0; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 20px; font-weight: 700">10 天前</span>
+        <span style="font-size: 11px; color: #6B6B6B">上次穿</span>
+      </div>
+    </div>
+    <dl style="margin: 0; padding: 8px 20px">
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 46px; border-bottom: 1px solid #F0F0F1">
+        <dt style="font-size: 14px; color: #6B6B6B">颜色</dt>
+        <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px"><span style="width: 14px; height: 14px; background: #2E4466"></span>靛蓝<span style="padding: 1px 6px; border: 1px solid #111111; font-size: 10px">AI</span></dd>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 46px; border-bottom: 1px solid #F0F0F1">
+        <dt style="font-size: 14px; color: #6B6B6B">季节</dt>
+        <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px">春 · 秋<span style="padding: 1px 6px; border: 1px solid #111111; font-size: 10px">AI</span></dd>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 46px; border-bottom: 1px solid #F0F0F1">
+        <dt style="font-size: 14px; color: #6B6B6B">尺码 / 材质</dt>
+        <dd style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px">M · 棉 100%<span style="padding: 1px 6px; border: 1px solid #111111; font-size: 10px">吊牌</span></dd>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 46px; border-bottom: 1px solid #F0F0F1">
+        <dt style="font-size: 14px; color: #6B6B6B">品牌</dt>
+        <dd style="margin: 0; font-size: 14px; color: #6B6B6B">未识别 · 点击填写</dd>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 46px; border-bottom: 1px solid #F0F0F1">
+        <dt style="font-size: 14px; color: #6B6B6B">价格 / 购买</dt>
+        <dd style="margin: 0; font-size: 14px">¥399 · 2025 年 9 月</dd>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 46px">
+        <dt style="font-size: 14px; color: #6B6B6B">存放位置</dt>
+        <dd style="margin: 0; font-size: 14px">卧室衣柜 · 左二层</dd>
+      </div>
+    </dl>
+    <section style="margin: 8px 20px 0; padding: 16px; background: #F1F1F2; display: flex; flex-direction: column; gap: 6px">
+      <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em">合身笔记</span>
+      <p style="margin: 0; font-size: 14px; line-height: 1.6">略宽松，落肩，衣长到胯部。袖长刚好盖住手腕。</p>
+      <span style="font-size: 11px; color: #6B6B6B">根据 10 月 12 日的镜子照片校准</span>
+    </section>
+    <section style="padding: 24px 20px 32px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">出现在 2 套穿搭里</h2>
+      <div style="display: flex; gap: 12px">
+        <div style="width: 110px; height: 170px; background: #F1F1F2; display: flex; align-items: center; justify-content: center">
+          <div style="width: 70px"><dc-import name="Avatar" outer="jacket" outer-color="#2E4466" top="tee" top-color="#F5F4F0" bottom="jeans" bottom-color="#4C6C96" shoes="sneakers" shoes-color="#F3F2EE" bag="none" hint-size="70px,154px"></dc-import></div>
+        </div>
+        <div style="width: 110px; height: 170px; background: #F1F1F2; display: flex; align-items: center; justify-content: center">
+          <div style="width: 70px"><dc-import name="Avatar" outer="jacket" outer-color="#2E4466" top="knit" top-color="#41594A" bottom="chinos" bottom-color="#C4B697" shoes="loafers" shoes-color="#4A3426" bag="tote" bag-color="#D6C9B0" hint-size="70px,154px"></dc-import></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = (this.state && this.state.view) || 'std';
+    const isStd = view === 'std';
+    return {
+      isStd, isRaw: !isStd,
+      stdBg: isStd ? '#111111' : '#FFFFFF', stdFg: isStd ? '#FFFFFF' : '#111111',
+      rawBg: isStd ? '#FFFFFF' : '#111111', rawFg: isStd ? '#111111' : '#FFFFFF',
+      showStd: () => this.setState({ view: 'std' }),
+      showRaw: () => this.setState({ view: 'raw' })
+    };
+  }
+}
+</script>
+</body>
+</html>

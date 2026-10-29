@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>A · 真人大片</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111111}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFFFFF; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #111111">
+  <header style="height: 56px; box-sizing: border-box; padding: 0 8px; display: flex; align-items: center; justify-content: space-between">
+    <a href="C5-Fitting.dc.html" aria-label="返回试衣间" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #111111">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    </a>
+    <div style="display: flex; background: #F1F1F2; padding: 3px">
+      <button type="button" onClick="{{showPhoto}}" style="height: 34px; padding: 0 16px; border: 0; background: {{photoBg}}; color: {{photoFg}}; font: inherit; font-size: 13px; cursor: pointer">照片</button>
+      <button type="button" onClick="{{showVideo}}" style="height: 34px; padding: 0 16px; border: 0; background: {{videoBg}}; color: {{videoFg}}; font: inherit; font-size: 13px; cursor: pointer">360° 视频</button>
+    </div>
+    <span style="width: 44px"></span>
+  </header>
+  <div style="position: relative; margin: 6px 20px 0; height: 486px; overflow: hidden; background: {{wall}}; display: flex; justify-content: center">
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: {{floor}}"></div>
+    <sc-if value="{{hasWindow}}" hint-placeholder-val="{{ true }}">
+      <div style="position: absolute; right: 26px; top: 40px; width: 92px; height: 200px; border: 6px solid #F4F1EC; box-sizing: border-box; background: rgba(255,255,255,0.35)"></div>
+    </sc-if>
+    <div style="position: relative; width: 190px; margin-top: 46px; transform: {{fig}}; transition: transform 0.5s ease">
+      <dc-import name="Avatar" outer="jacket" outer-color="#2E4466" top="tee" top-color="#F5F4F0" bottom="jeans" bottom-color="#4C6C96" shoes="sneakers" shoes-color="#F3F2EE" bag="none" hint-size="190px,418px"></dc-import>
+    </div>
+    <span style="position: absolute; left: 12px; top: 12px; padding: 4px 8px; background: rgba(17,17,17,0.72); color: #FFFFFF; font-size: 11px">占位 · 正式版为 AI 生成的写实照片</span>
+    <sc-if value="{{isVideo}}" hint-placeholder-val="{{ false }}">
+      <button type="button" aria-label="播放 360° 视频" onClick="{{spin}}" style="position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border: 0; border-radius: 50%; background: rgba(17,17,17,0.72); display: flex; align-items: center; justify-content: center; cursor: pointer">
+        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#FFFFFF"></path></svg>
+      </button>
+      <div style="position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 10px; color: #FFFFFF; font-size: 11px">
+        <span>0:0{{sec}}</span>
+        <div style="flex: 1; height: 3px; background: rgba(255,255,255,0.4)"><div style="width: {{pct}}%; height: 100%; background: #FFFFFF"></div></div>
+        <span>0:06</span>
+      </div>
+    </sc-if>
+  </div>
+  <div style="display: flex; gap: 8px; padding: 14px 20px 0; overflow-x: auto">
+    <sc-for list="{{scenes}}" as="s" hint-placeholder-count="4">
+      <button type="button" onClick="{{s.pick}}" style="flex: none; height: 40px; padding: 0 14px; border: 1px solid {{s.border}}; background: {{s.bg}}; color: {{s.fg}}; font: inherit; font-size: 13px; cursor: pointer">{{s.label}}</button>
+    </sc-for>
+  </div>
+  <p style="margin: 12px 20px 0; font-size: 12px; color: #6B6B6B">牛仔夹克 · 圆领T恤 · 直筒牛仔裤 · 白色运动鞋 — {{cost}}</p>
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 92px; box-sizing: border-box; padding: 12px 20px 28px; border-top: 1px solid #E4E4E6; display: flex; gap: 10px">
+    <button type="button" style="flex: 1; border: 1px solid #111111; background: #FFFFFF; color: #111111; font: inherit; font-size: 14px; cursor: pointer">再生成一张</button>
+    <button type="button" style="flex: 1; border: 1px solid #111111; background: #FFFFFF; color: #111111; font: inherit; font-size: 14px; cursor: pointer">分享</button>
+    <button type="button" style="flex: 1; border: 0; background: #111111; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer">保存到相册</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const mode = st.mode || 'photo';
+    const scene = st.scene || 'cafe';
+    const spins = st.spins || 0;
+    const SCENES = [
+      { id: 'cafe', label: '咖啡馆', wall: '#D8CDBE', floor: '#B59E84', win: true },
+      { id: 'street', label: '街头', wall: '#C9CDD1', floor: '#9EA3A8', win: false },
+      { id: 'office', label: '办公室', wall: '#E2E2DE', floor: '#C7C3BA', win: true },
+      { id: 'studio', label: '纯色棚拍', wall: '#F1F1F2', floor: '#E4E4E6', win: false }
+    ];
+    const cur = SCENES.find((s) => s.id === scene);
+    const scenes = SCENES.map((s) => ({
+      ...s,
+      bg: s.id === scene ? '#111111' : '#FFFFFF',
+      fg: s.id === scene ? '#FFFFFF' : '#111111',
+      border: s.id === scene ? '#111111' : '#C9C9CC',
+      pick: () => this.setState({ scene: s.id })
+    }));
+    const isVideo = mode === 'video';
+    const step = spins % 4;
+    const sx = [1, 0.4, -1, -0.4][step];
+    return {
+      scenes, isVideo,
+      wall: cur.wall, floor: cur.floor, hasWindow: cur.win,
+      fig: isVideo ? 'scaleX(' + sx + ')' : 'none',
+      sec: isVideo ? Math.min(6, step * 2) : 0,
+      pct: isVideo ? Math.round((step / 3) * 100) : 0,
+      cost: isVideo ? '本段视频约 $1.20' : '本张约 $0.10',
+      photoBg: isVideo ? 'transparent' : '#111111', photoFg: isVideo ? '#111111' : '#FFFFFF',
+      videoBg: isVideo ? '#111111' : 'transparent', videoFg: isVideo ? '#FFFFFF' : '#111111',
+      showPhoto: () => this.setState({ mode: 'photo' }),
+      showVideo: () => this.setState({ mode: 'video' }),
+      spin: () => this.setState({ spins: spins + 1 })
+    };
+  }
+}
+</script>
+</body>
+</html>

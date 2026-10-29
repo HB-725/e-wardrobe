@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>A · 我的</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111111}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFFFFF; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #111111">
+  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 84px; overflow-y: auto">
+    <header style="padding: 28px 20px 0; display: flex; flex-direction: column; gap: 4px">
+      <span style="font-size: 11px; letter-spacing: 0.16em; color: #6B6B6B">PROFILE</span>
+      <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.02em">我的</h1>
+    </header>
+    <section style="margin: 18px 20px 0; display: flex; gap: 16px; align-items: center">
+      <div style="flex: none; width: 96px; height: 132px; background: #F1F1F2; display: flex; align-items: center; justify-content: center">
+        <div style="width: 52px"><dc-import name="Avatar" top="tee" top-color="#F5F4F0" bottom="jeans" bottom-color="#4C6C96" shoes="sneakers" shoes-color="#F3F2EE" outer="none" bag="none" hint-size="52px,114px"></dc-import></div>
+      </div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 18px; font-weight: 700">[你的昵称]</span>
+        <span style="font-size: 12px; color: #6B6B6B">个人形象已建立 · 8 个角度</span>
+        <a href="A-AvatarSetup.dc.html" style="align-self: flex-start; min-height: 36px; padding: 0 12px; border: 1px solid #111111; font-size: 13px; text-decoration: none; color: #111111; display: flex; align-items: center">更新形象</a>
+      </div>
+    </section>
+    <section style="margin: 24px 20px 0">
+      <h2 style="margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: #6B6B6B">身材数据</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 50px; border-bottom: 1px solid #F0F0F1">
+        <span style="font-size: 14px">身高 · 体重 · 三围</span>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6B6B6B">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          已填写 · 仅自己可见
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 50px; border-bottom: 1px solid #F0F0F1">
+        <span style="font-size: 14px">合身笔记</span>
+        <span style="font-size: 13px; color: #6B6B6B">已校准 5 件</span>
+      </div>
+    </section>
+    <section style="margin: 24px 20px 0">
+      <h2 style="margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: #6B6B6B">AI 服务</h2>
+      <div style="padding: 16px; background: #F1F1F2; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline">
+          <span style="font-size: 14px">本月花费</span>
+          <span style="font-size: 22px; font-weight: 700">$3.42 <span style="font-size: 12px; font-weight: 400; color: #6B6B6B">/ 上限 $10</span></span>
+        </div>
+        <div style="height: 4px; background: #DADADD"><div style="width: 34%; height: 100%; background: #111111"></div></div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 700">$1.20</span><span style="font-size: 11px; color: #6B6B6B">商品图 24 张</span></div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 700">$1.80</span><span style="font-size: 11px; color: #6B6B6B">上身图层 6 件</span></div>
+          <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 700">$0.42</span><span style="font-size: 11px; color: #6B6B6B">大片 3 张</span></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 50px; border-bottom: 1px solid #F0F0F1">
+        <span style="font-size: 14px">我的 API Key</span>
+        <span style="font-size: 13px; color: #6B6B6B">已绑定 · ••••8F2A</span>
+      </div>
+    </section>
+    <section style="margin: 24px 20px 0">
+      <h2 style="margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: #6B6B6B">偏好</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 54px; border-bottom: 1px solid #F0F0F1">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 14px">镜子照片自动记一次穿着</span>
+          <span style="font-size: 11px; color: #6B6B6B">识别到的单品穿着次数 +1</span>
+        </div>
+        <button type="button" role="switch" aria-checked="{{autoOn}}" aria-label="镜子照片自动记一次穿着" onClick="{{toggleAuto}}" style="flex: none; width: 48px; height: 28px; padding: 2px; border: 0; background: {{autoBg}}; display: flex; justify-content: {{autoJustify}}; cursor: pointer">
+          <span style="width: 24px; height: 24px; background: #FFFFFF"></span>
+        </button>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 50px; border-bottom: 1px solid #F0F0F1">
+        <span style="font-size: 14px">闲置提醒</span>
+        <span style="font-size: 13px; color: #6B6B6B">超过 6 个月未穿</span>
+      </div>
+    </section>
+    <section style="margin: 24px 20px 0">
+      <h2 style="margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: #6B6B6B">数据</h2>
+      <button type="button" style="width: 100%; min-height: 50px; padding: 0; border: 0; border-bottom: 1px solid #F0F0F1; background: none; font: inherit; font-size: 14px; color: #111111; display: flex; align-items: center; justify-content: space-between; cursor: pointer">
+        导出衣橱到 Excel
+        <span style="font-size: 12px; color: #6B6B6B">.xlsx</span>
+      </button>
+      <button type="button" style="width: 100%; min-height: 50px; padding: 0; border: 0; border-bottom: 1px solid #F0F0F1; background: none; font: inherit; font-size: 14px; color: #111111; display: flex; align-items: center; justify-content: space-between; cursor: pointer">
+        从 Excel 导入
+        <span style="font-size: 12px; color: #6B6B6B">按模板列名</span>
+      </button>
+    </section>
+    <section style="margin: 24px 20px 32px">
+      <h2 style="margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: #6B6B6B">隐私</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 50px; border-bottom: 1px solid #F0F0F1">
+        <span style="font-size: 14px">照片与身材数据</span>
+        <span style="font-size: 13px; color: #6B6B6B">加密存储 · 仅自己可见</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; min-height: 50px; border-bottom: 1px solid #F0F0F1">
+        <span style="font-size: 14px">用于模型训练</span>
+        <span style="font-size: 13px; color: #6B6B6B">从不</span>
+      </div>
+      <button type="button" style="width: 100%; min-height: 50px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; color: #B3261E; text-align: left; cursor: pointer">永久删除我的全部数据</button>
+    </section>
+  </div>
+  <nav aria-label="主导航" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #FFFFFF; border-top: 1px solid #E4E4E6; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="A-Today.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15"></rect><path d="M4 10h16M9 3v4M15 3v4"></path><rect x="10.5" y="13" width="3" height="3" fill="currentColor" stroke="none"></rect></svg>
+      今天
+    </a>
+    <a href="C5-Wardrobe.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6.5a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9V11"></path><path d="M12 11l-8.6 6.2a1 1 0 0 0 .6 1.8h16a1 1 0 0 0 .6-1.8z"></path></svg>
+      衣橱
+    </a>
+    <a href="C5-Fitting.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2"></circle><path d="M12 7.5v7M7.5 10.5h9M12 14.5l-3 6.5M12 14.5l3 6.5"></path></svg>
+      试衣间
+    </a>
+    <a href="A-Outfits.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3L3 8l9 5 9-5-9-5z"></path><path d="M3 13l9 5 9-5"></path></svg>
+      穿搭
+    </a>
+    <a href="A-Me.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #111111; font-size: 11px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>
+      我的
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const on = !(this.state && this.state.autoOff);
+    return {
+      autoOn: on ? 'true' : 'false',
+      autoBg: on ? '#111111' : '#C9C9CC',
+      autoJustify: on ? 'flex-end' : 'flex-start',
+      toggleAuto: () => this.setState({ autoOff: on })
+    };
+  }
+}
+</script>
+</body>
+</html>

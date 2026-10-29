@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>占位单品插画</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 100%; aspect-ratio: 5 / 6">
+  <svg viewBox="0 0 200 240" style="display: block; width: 100%; height: 100%" aria-hidden="true">
+    <path d="{{p0.d}}" fill="{{p0.f}}" stroke="{{p0.s}}" style="stroke-width: {{p0.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p1.d}}" fill="{{p1.f}}" stroke="{{p1.s}}" style="stroke-width: {{p1.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p2.d}}" fill="{{p2.f}}" stroke="{{p2.s}}" style="stroke-width: {{p2.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p3.d}}" fill="{{p3.f}}" stroke="{{p3.s}}" style="stroke-width: {{p3.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p4.d}}" fill="{{p4.f}}" stroke="{{p4.s}}" style="stroke-width: {{p4.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p5.d}}" fill="{{p5.f}}" stroke="{{p5.s}}" style="stroke-width: {{p5.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p6.d}}" fill="{{p6.f}}" stroke="{{p6.s}}" style="stroke-width: {{p6.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p7.d}}" fill="{{p7.f}}" stroke="{{p7.s}}" style="stroke-width: {{p7.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p8.d}}" fill="{{p8.f}}" stroke="{{p8.s}}" style="stroke-width: {{p8.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+    <path d="{{p9.d}}" fill="{{p9.f}}" stroke="{{p9.s}}" style="stroke-width: {{p9.w}}px; stroke-linejoin: round; stroke-linecap: round"></path>
+  </svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","options":["jacket","harrington","puffer","coat","tee","shirt","knit","jeans","chinos","skirt","sneakers","loafers","tote"],"default":"jacket"},"color":{"editor":"color","default":"#2E4466"},"$preview":{"width":200,"height":240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const kind = this.props.kind ?? 'jacket';
+    const color = this.props.color ?? '#2E4466';
+    const T = {
+      base: color, shade: 'rgba(0,0,0,0.10)', dark: 'rgba(0,0,0,0.30)', light: 'rgba(255,255,255,0.30)',
+      line: 'rgba(0,0,0,0.22)', edge: 'rgba(0,0,0,0.16)', metal: '#C9A96A', sole: '#FBFBF9',
+      stitch: 'rgba(196,132,58,0.8)', none: 'none'
+    };
+    const S = {
+      tee: [
+        ['M64 52 L86 40 Q100 52 114 40 L136 52 L168 80 L152 104 L138 94 L138 202 Q100 208 62 202 L62 94 L48 104 L32 80 Z', 'base', 'edge', 1.2],
+        ['M126 94 L138 94 L138 202 Q132 203 126 204 Z', 'shade', 'none', 0],
+        ['M86 40 Q100 58 114 40', 'none', 'line', 2],
+        ['M62 94 L64 60 M138 94 L136 60', 'none', 'line', 1.4],
+        ['M62 194 Q100 200 138 194 M48 104 L44 96 M152 104 L156 96', 'none', 'line', 1.4]
+      ],
+      shirt: [
+        ['M66 50 L88 38 L112 38 L134 50 Q150 58 156 84 L170 196 L150 200 L138 108 L138 210 Q100 216 62 210 L62 108 L50 200 L30 196 L44 84 Q50 58 66 50 Z', 'base', 'edge', 1.2],
+        ['M126 108 L138 108 L138 210 Q132 211 126 212 Z', 'shade', 'none', 0],
+        ['M88 38 L100 54 L112 38 L120 46 L102 64 L100 58 L98 64 L80 46 Z', 'base', 'line', 1.4],
+        ['M100 62 L100 212 M51 188 L69 186 M131 186 L149 188', 'none', 'line', 1.4],
+        ['M98 84a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M98 112a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M98 140a2 2 0 1 0 4 0a2 2 0 1 0 -4 0 M98 168a2 2 0 1 0 4 0a2 2 0 1 0 -4 0', 'dark', 'none', 0],
+        ['M70 92 L90 92 L90 112 L70 112 Z', 'none', 'line', 1.3]
+      ],
+      knit: [
+        ['M66 50 L88 40 Q100 50 112 40 L134 50 Q150 58 156 84 L168 194 L150 198 L138 108 L138 206 Q100 212 62 206 L62 108 L50 198 L32 194 L44 84 Q50 58 66 50 Z', 'base', 'edge', 1.2],
+        ['M88 40 Q100 50 112 40 L116 44 Q100 58 84 44 Z', 'shade', 'none', 0],
+        ['M62 192 Q100 198 138 192 L138 206 Q100 212 62 206 Z M32 194 L50 198 L51 188 L34 184 Z M168 194 L150 198 L149 188 L166 184 Z', 'shade', 'none', 0],
+        ['M100 66 Q92 76 100 86 Q108 96 100 106 Q92 116 100 126 Q108 136 100 146 Q92 156 100 166 Q108 176 100 186', 'none', 'line', 2],
+        ['M82 70 L82 188 M118 70 L118 188', 'none', 'line', 1.2],
+        ['M126 108 L138 108 L138 192 L126 194 Z', 'shade', 'none', 0]
+      ],
+      jacket: [
+        ['M60 50 L86 36 L114 36 L140 50 Q158 58 162 86 L174 186 L152 190 L142 112 L142 190 L58 190 L58 112 L48 190 L26 186 L38 86 Q42 58 60 50 Z', 'base', 'edge', 1.2],
+        ['M86 36 L100 62 L114 36 L124 42 L104 74 L100 70 L96 74 L76 42 Z', 'shade', 'line', 1.2],
+        ['M100 72 L100 190 M60 80 Q100 88 140 80 M58 176 L142 176', 'none', 'line', 1.4],
+        ['M68 96 L90 96 L90 116 L68 116 Z M110 96 L132 96 L132 116 L110 116 Z', 'none', 'stitch', 1.3],
+        ['M98 92a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0 M98 118a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0 M98 144a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0 M98 168a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0 -4.8 0', 'metal', 'none', 0],
+        ['M128 112 L142 112 L142 190 L128 190 Z', 'shade', 'none', 0]
+      ],
+      harrington: [
+        ['M60 52 L88 40 L112 40 L140 52 Q158 60 162 88 L172 184 L152 188 L142 114 L142 194 L58 194 L58 114 L48 188 L28 184 L38 88 Q42 60 60 52 Z', 'base', 'edge', 1.2],
+        ['M88 40 Q100 46 112 40 L114 50 Q100 56 86 50 Z', 'shade', 'none', 0],
+        ['M58 180 L142 180 L142 194 L58 194 Z M28 184 L48 188 L49 176 L30 172 Z M172 184 L152 188 L151 176 L170 172 Z', 'shade', 'none', 0],
+        ['M100 52 L100 180', 'none', 'dark', 1.6],
+        ['M70 150 L86 136 M130 150 L114 136', 'none', 'line', 1.6],
+        ['M128 114 L142 114 L142 180 L128 180 Z', 'shade', 'none', 0]
+      ],
+      puffer: [
+        ['M56 58 L84 44 L116 44 L144 58 Q164 66 166 94 L176 196 L152 202 L144 120 L146 206 Q100 214 54 206 L56 120 L48 202 L24 196 L34 94 Q36 66 56 58 Z', 'base', 'edge', 1.2],
+        ['M76 52 Q78 18 100 16 Q122 18 124 52 Q112 44 100 44 Q88 44 76 52 Z', 'base', 'edge', 1.2],
+        ['M86 48 Q88 30 100 28 Q112 30 114 48 Q100 42 86 48 Z', 'dark', 'none', 0],
+        ['M56 90 Q100 96 144 90 M55 120 Q100 126 145 120 M55 150 Q100 156 145 150 M55 180 Q100 186 145 180', 'none', 'line', 1.6],
+        ['M36 120 L48 122 M40 150 L50 152 M164 120 L152 122 M160 150 L150 152', 'none', 'line', 1.4],
+        ['M100 50 L100 210', 'none', 'dark', 1.6],
+        ['M132 120 L145 120 L146 206 Q140 208 132 208 Z', 'shade', 'none', 0]
+      ],
+      coat: [
+        ['M62 46 L88 32 L112 32 L138 46 Q154 54 158 80 L168 208 L148 212 L140 110 L144 226 L56 226 L60 110 L52 212 L32 208 L42 80 Q46 54 62 46 Z', 'base', 'edge', 1.2],
+        ['M88 32 L100 88 L84 70 L78 46 Z M112 32 L100 88 L116 70 L122 46 Z', 'shade', 'line', 1.2],
+        ['M100 88 L104 226', 'none', 'line', 1.4],
+        ['M86 106a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0 M110 106a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0 M86 134a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0 M110 134a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0', 'dark', 'none', 0],
+        ['M66 162 L88 162 M114 162 L136 162', 'none', 'line', 2],
+        ['M130 110 L141 110 L144 226 L132 226 Z', 'shade', 'none', 0]
+      ],
+      jeans: [
+        ['M64 26 L136 26 L142 60 L150 222 L110 224 L102 90 L98 90 L90 224 L50 222 L58 60 Z', 'base', 'edge', 1.2],
+        ['M64 26 L136 26 L137 38 L63 38 Z', 'shade', 'none', 0],
+        ['M100 38 L100 90 M100 38 Q108 64 104 88', 'none', 'line', 1.4],
+        ['M66 42 Q78 60 92 46 M134 42 Q122 60 108 46 M58 62 L52 218 M142 62 L148 218', 'none', 'stitch', 1.3],
+        ['M50 214 L90 216 M110 216 L150 214', 'none', 'line', 1.4],
+        ['M66 118 L86 118 L84 152 L68 152 Z M114 118 L134 118 L132 152 L116 152 Z', 'light', 'none', 0]
+      ],
+      chinos: [
+        ['M66 26 L134 26 L140 60 L144 222 L108 224 L102 92 L98 92 L92 224 L56 222 L60 60 Z', 'base', 'edge', 1.2],
+        ['M66 26 L134 26 L135 38 L65 38 Z', 'shade', 'none', 0],
+        ['M100 38 L100 92 M68 40 L80 70 M132 40 L120 70', 'none', 'line', 1.4],
+        ['M78 100 L74 222 M122 100 L126 222', 'none', 'line', 1],
+        ['M56 210 L92 212 M108 212 L144 210', 'none', 'line', 1.4]
+      ],
+      skirt: [
+        ['M72 40 L128 40 L160 206 Q100 214 40 206 Z', 'base', 'edge', 1.2],
+        ['M72 40 L128 40 L129 52 L71 52 Z', 'shade', 'none', 0],
+        ['M86 52 L72 208 M100 52 L100 210 M114 52 L128 208 M79 52 L56 207 M121 52 L144 207', 'none', 'line', 1.3],
+        ['M114 52 L121 52 L144 207 L128 208 Z M86 52 L79 52 L56 207 L72 208 Z', 'shade', 'none', 0]
+      ],
+      sneakers: [
+        ['M48 136 Q52 108 78 106 L102 104 Q114 116 138 122 Q166 128 170 148 L170 156 L48 156 Z', 'base', 'edge', 1.2],
+        ['M48 136 Q52 108 78 106 L102 104 Q114 116 138 122 Q166 128 170 148 L170 156 L48 156 Z', 'shade', 'none', 0],
+        ['M30 160 Q34 130 62 128 L88 126 Q102 140 128 146 Q160 152 164 172 L164 180 L30 180 Z', 'base', 'edge', 1.2],
+        ['M28 176 L166 176 L166 188 Q100 192 28 188 Z', 'sole', 'line', 1.2],
+        ['M80 132 L92 146 M88 130 L100 144 M96 132 L108 146', 'none', 'line', 1.6],
+        ['M30 160 Q30 148 36 140 L44 142 Q40 152 40 166 Z', 'shade', 'none', 0]
+      ],
+      loafers: [
+        ['M46 140 Q52 122 76 120 L110 118 Q140 122 160 136 Q170 144 168 154 L46 154 Z', 'base', 'edge', 1.2],
+        ['M46 140 Q52 122 76 120 L110 118 Q140 122 160 136 Q170 144 168 154 L46 154 Z', 'shade', 'none', 0],
+        ['M32 166 Q38 146 62 144 L98 142 Q128 146 148 160 Q160 168 158 180 L32 180 Z', 'base', 'edge', 1.2],
+        ['M30 178 L160 178 L158 188 L30 188 Z', 'dark', 'none', 0],
+        ['M80 150 Q100 146 118 152 L116 160 Q100 154 82 158 Z', 'shade', 'line', 1],
+        ['M96 142 Q124 146 140 162', 'none', 'light', 1.6]
+      ],
+      tote: [
+        ['M74 98 Q78 44 100 44 Q122 44 126 98', 'none', 'base', 6],
+        ['M74 98 Q78 44 100 44 Q122 44 126 98', 'none', 'shade', 6],
+        ['M50 96 L150 96 L158 210 Q100 216 42 210 Z', 'base', 'edge', 1.2],
+        ['M50 96 L150 96 L151 108 L49 108 Z', 'shade', 'none', 0],
+        ['M70 108 L70 126 M130 108 L130 126', 'none', 'line', 1.6]
+      ]
+    };
+    const shapes = (S[kind] || S.jacket).map(([d, f, s, w]) => ({ d, f: T[f] || f, s: T[s] || s, w }));
+    while (shapes.length < 10) shapes.push({ d: 'M0 0', f: 'none', s: 'none', w: 0 });
+    const out = {};
+    shapes.slice(0, 10).forEach((p, i) => { out['p' + i] = p; });
+    return out;
+  }
+}
+</script>
+</body>
+</html>

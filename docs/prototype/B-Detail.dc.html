@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>B · 单品详情</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&amp;family=Noto+Sans+SC:wght@400;500&amp;family=Noto+Serif+SC:wght@500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2A241F}a:hover{color:#8A4B2F}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #F4EFE7; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #2A241F">
+  <div style="position: absolute; inset: 0; overflow-y: auto">
+    <div style="position: relative; height: 440px; background: #EAE3D7; display: flex; align-items: center; justify-content: center; overflow: hidden">
+      <sc-if value="{{isStd}}" hint-placeholder-val="{{ true }}">
+        <div style="width: 270px"><dc-import name="Garment" kind="jacket" color="#2E4466" hint-size="270px,324px"></dc-import></div>
+      </sc-if>
+      <sc-if value="{{isRaw}}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0; background: repeating-linear-gradient(115deg, #CFC5B8 0px, #CFC5B8 26px, #C6BBAD 26px, #C6BBAD 30px); display: flex; align-items: center; justify-content: center">
+          <div style="width: 230px; transform: rotate(-11deg) translate(-14px, 18px)"><dc-import name="Garment" kind="jacket" color="#34496B" hint-size="230px,276px"></dc-import></div>
+        </div>
+      </sc-if>
+      <a href="B-Wardrobe.dc.html" aria-label="返回衣橱" style="position: absolute; left: 12px; top: 12px; width: 44px; height: 44px; border-radius: 50%; background: #F4EFE7; display: flex; align-items: center; justify-content: center; color: #2A241F">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </a>
+      <div style="position: absolute; right: 16px; bottom: 12px; display: flex; gap: 14px">
+        <button type="button" onClick="{{showStd}}" style="min-height: 44px; padding: 0; border: 0; background: none; font-family: 'Noto Serif SC', serif; font-size: 13px; color: #2A241F; text-decoration: {{stdDeco}}; text-underline-offset: 5px; cursor: pointer">标准图</button>
+        <button type="button" onClick="{{showRaw}}" style="min-height: 44px; padding: 0; border: 0; background: none; font-family: 'Noto Serif SC', serif; font-size: 13px; color: #2A241F; text-decoration: {{rawDeco}}; text-underline-offset: 5px; cursor: pointer">原图</button>
+      </div>
+    </div>
+    <section style="padding: 22px 24px 0; display: flex; flex-direction: column; gap: 4px">
+      <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 18px; color: #8A4B2F">No. 01 — The denim jacket</span>
+      <h1 style="margin: 0; font-family: 'Noto Serif SC', serif; font-size: 30px; font-weight: 700; letter-spacing: 0.04em">牛仔夹克</h1>
+    </section>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 18px 24px 0; padding: 14px 0; border-top: 1px solid #2A241F; border-bottom: 1px solid #D9CFC0">
+      <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-family: 'Noto Serif SC', serif; font-size: 22px; font-weight: 700">14</span><span style="font-size: 11px; color: #6E6359">次穿着</span></div>
+      <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-family: 'Noto Serif SC', serif; font-size: 22px; font-weight: 700">¥28.5</span><span style="font-size: 11px; color: #6E6359">每次成本</span></div>
+      <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-family: 'Noto Serif SC', serif; font-size: 22px; font-weight: 700">10 天</span><span style="font-size: 11px; color: #6E6359">距上次穿</span></div>
+    </div>
+    <blockquote style="margin: 26px 24px 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 44px; line-height: 0.6; color: #8A4B2F">“</span>
+      <p style="margin: 0; font-family: 'Noto Serif SC', serif; font-size: 18px; line-height: 1.7">略宽松，落肩，衣长到胯部，袖长刚好盖住手腕。</p>
+      <span style="font-size: 12px; color: #6E6359">合身笔记 · 根据 10 月 12 日的镜子照片校准</span>
+    </blockquote>
+    <section style="margin: 28px 24px 0; display: flex; flex-direction: column">
+      <h2 style="margin: 0 0 8px; font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 500; font-size: 20px; color: #8A4B2F">Details</h2>
+      <div style="display: grid; grid-template-columns: 96px minmax(0, 1fr); row-gap: 0; border-top: 1px solid #D9CFC0">
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-size: 13px; color: #6E6359">颜色</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-family: 'Noto Serif SC', serif; font-size: 14px">靛蓝 <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; color: #8A4B2F">· AI 识别</span></span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-size: 13px; color: #6E6359">季节</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-family: 'Noto Serif SC', serif; font-size: 14px">春 · 秋 <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; color: #8A4B2F">· AI 识别</span></span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-size: 13px; color: #6E6359">尺码 / 材质</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-family: 'Noto Serif SC', serif; font-size: 14px">M · 棉 100% <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; color: #8A4B2F">· 吊牌</span></span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-size: 13px; color: #6E6359">品牌</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-family: 'Noto Serif SC', serif; font-size: 14px; color: #6E6359">未识别 · 点击填写</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-size: 13px; color: #6E6359">价格 / 购买</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-family: 'Noto Serif SC', serif; font-size: 14px">¥399 · 2025 年 9 月</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-size: 13px; color: #6E6359">存放位置</span>
+        <span style="padding: 12px 0; border-bottom: 1px solid #D9CFC0; font-family: 'Noto Serif SC', serif; font-size: 14px">卧室衣柜 · 左二层</span>
+      </div>
+    </section>
+    <section style="margin: 28px 24px 40px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 500; font-size: 20px; color: #8A4B2F">Seen in 2 looks</h2>
+      <div style="display: flex; gap: 14px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="width: 120px; height: 180px; background: #EAE3D7; display: flex; align-items: center; justify-content: center">
+            <div style="width: 74px"><dc-import name="Avatar" outer="jacket" outer-color="#2E4466" top="tee" top-color="#F5F4F0" bottom="jeans" bottom-color="#4C6C96" shoes="sneakers" shoes-color="#F3F2EE" bag="none" hint-size="74px,163px"></dc-import></div>
+          </div>
+          <span style="font-family: 'Noto Serif SC', serif; font-size: 13px">周末出门</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <div style="width: 120px; height: 180px; background: #EAE3D7; display: flex; align-items: center; justify-content: center">
+            <div style="width: 74px"><dc-import name="Avatar" outer="jacket" outer-color="#2E4466" top="knit" top-color="#41594A" bottom="chinos" bottom-color="#C4B697" shoes="loafers" shoes-color="#4A3426" bag="tote" bag-color="#D6C9B0" hint-size="74px,163px"></dc-import></div>
+          </div>
+          <span style="font-family: 'Noto Serif SC', serif; font-size: 13px">秋日通勤</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = (this.state && this.state.view) || 'std';
+    const isStd = view === 'std';
+    return {
+      isStd, isRaw: !isStd,
+      stdDeco: isStd ? 'underline' : 'none',
+      rawDeco: isStd ? 'none' : 'underline',
+      showStd: () => this.setState({ view: 'std' }),
+      showRaw: () => this.setState({ view: 'raw' })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>今天：刚安装</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111111}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFFFFF; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #111111">
+  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 84px; overflow-y: auto">
+    <section style="padding: 30px 20px 0; display: flex; align-items: flex-end; gap: 12px">
+      <span style="font-size: 76px; font-weight: 300; line-height: 0.82; letter-spacing: -0.04em">29</span>
+      <span style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 2px">
+        <span style="font-size: 11px; letter-spacing: 0.24em; color: #6B6B6B">OCTOBER</span>
+        <span style="font-size: 16px; font-weight: 500">十月 · 星期四</span>
+      </span>
+    </section>
+    <section style="padding: 28px 20px 0; display: flex; flex-direction: column; gap: 8px">
+      <h1 style="margin: 0; font-size: 24px; font-weight: 700; line-height: 1.35">欢迎。<br>先把衣柜搬进来吧。</h1>
+      <p style="margin: 0; font-size: 14px; line-height: 1.7; color: #6B6B6B">三步就能开始换装。每一步都可以随时暂停，下次打开会从这里继续。</p>
+    </section>
+
+    <ol style="list-style: none; margin: 22px 20px 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid #111111">
+      <li style="padding: 18px 0 20px; border-bottom: 1px solid #E4E4E6; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; gap: 14px">
+          <span style="font-size: 12px; font-weight: 700">01</span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 17px; font-weight: 700">录入衣服</span>
+            <span style="font-size: 13px; line-height: 1.6; color: #6B6B6B">建议先从相册批量导入，一次可以选几十张。AI 每件大约 20 秒，可以边录边做别的。</span>
+          </span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding-left: 30px">
+          <a href="A-Capture.dc.html" style="height: 48px; background: #111111; color: #FFFFFF; font-size: 14px; font-weight: 500; text-decoration: none; display: flex; align-items: center; justify-content: center">从相册批量导入</a>
+          <div style="display: flex; gap: 8px">
+            <a href="A-Capture.dc.html" style="flex: 1; height: 44px; box-sizing: border-box; border: 1px solid #111111; color: #111111; font-size: 13px; text-decoration: none; display: flex; align-items: center; justify-content: center">一件一件拍</a>
+            <a href="A-Me.dc.html" style="flex: 1; height: 44px; box-sizing: border-box; border: 1px solid #C9C9CC; color: #111111; font-size: 13px; text-decoration: none; display: flex; align-items: center; justify-content: center">从 Excel 导入</a>
+          </div>
+        </div>
+      </li>
+      <li>
+        <a href="A-AvatarSetup.dc.html" style="padding: 18px 0; border-bottom: 1px solid #E4E4E6; display: flex; align-items: baseline; gap: 14px; text-decoration: none; color: #111111">
+          <span style="font-size: 12px; color: #6B6B6B">02</span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 17px; font-weight: 500">建立你的形象</span>
+            <span style="font-size: 13px; color: #6B6B6B">3 张全身照 + 身高体重，大约 2 分钟</span>
+          </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="align-self: center"><path d="M9 6l6 6-6 6"></path></svg>
+        </a>
+      </li>
+      <li style="padding: 18px 0; border-bottom: 1px solid #E4E4E6; display: flex; align-items: baseline; gap: 14px; color: #8E8E93">
+        <span style="font-size: 12px">03</span>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 17px; font-weight: 500">开始换装</span>
+          <span style="font-size: 13px">前两步完成后，这里会变成你每天的穿搭页</span>
+        </span>
+      </li>
+    </ol>
+    <div style="height: 28px"></div>
+  </div>
+  <nav aria-label="主导航" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #FFFFFF; border-top: 1px solid #E4E4E6; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="A-TodayOnboard.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #111111; font-size: 11px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15"></rect><path d="M4 10h16M9 3v4M15 3v4"></path><rect x="10.5" y="13" width="3" height="3" fill="currentColor" stroke="none"></rect></svg>
+      今天
+    </a>
+    <a href="C5-Wardrobe.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6.5a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9V11"></path><path d="M12 11l-8.6 6.2a1 1 0 0 0 .6 1.8h16a1 1 0 0 0 .6-1.8z"></path></svg>
+      衣橱
+    </a>
+    <a href="C5-FittingNoAvatar.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2"></circle><path d="M12 7.5v7M7.5 10.5h9M12 14.5l-3 6.5M12 14.5l3 6.5"></path></svg>
+      试衣间
+    </a>
+    <a href="A-Outfits.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3L3 8l9 5 9-5-9-5z"></path><path d="M3 13l9 5 9-5"></path></svg>
+      穿搭
+    </a>
+    <a href="A-Me.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6B6B6B; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>
+      我的
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

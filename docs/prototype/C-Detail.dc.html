@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>C · 单品详情</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&amp;family=Noto+Sans+SC:wght@500;700;900&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#141414}a:hover{color:#5B3DF5}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #FFF6E5; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #141414">
+  <div style="position: absolute; inset: 0; overflow-y: auto">
+    <header style="padding: 16px 20px 0; display: flex; align-items: center; justify-content: space-between">
+      <a href="C-Wardrobe.dc.html" aria-label="返回衣橱" style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid #141414; background: #FFFFFF; box-shadow: 3px 3px 0 #141414; display: flex; align-items: center; justify-content: center; color: #141414">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+      </a>
+      <div style="display: flex; gap: 6px; padding: 4px; border: 2px solid #141414; border-radius: 999px; background: #FFFFFF">
+        <button type="button" onClick="{{showStd}}" style="height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: {{stdBg}}; color: {{stdFg}}; font: inherit; font-size: 13px; font-weight: 900; cursor: pointer">标准图</button>
+        <button type="button" onClick="{{showRaw}}" style="height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: {{rawBg}}; color: {{rawFg}}; font: inherit; font-size: 13px; font-weight: 900; cursor: pointer">原图</button>
+      </div>
+    </header>
+    <div style="position: relative; margin: 16px 20px 0; height: 340px; border: 2px solid #141414; border-radius: 24px; box-shadow: 5px 5px 0 #141414; background: #A9D8FF; overflow: hidden; display: flex; align-items: center; justify-content: center">
+      <sc-if value="{{isStd}}" hint-placeholder-val="{{ true }}">
+        <div style="width: 230px"><dc-import name="Garment" kind="jacket" color="#2E4466" hint-size="230px,276px"></dc-import></div>
+      </sc-if>
+      <sc-if value="{{isRaw}}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0; background: repeating-linear-gradient(115deg, #CFC5B8 0px, #CFC5B8 26px, #C6BBAD 26px, #C6BBAD 30px); display: flex; align-items: center; justify-content: center">
+          <div style="width: 210px; transform: rotate(-11deg) translate(-14px, 18px)"><dc-import name="Garment" kind="jacket" color="#34496B" hint-size="210px,252px"></dc-import></div>
+        </div>
+      </sc-if>
+      <span style="position: absolute; left: 14px; top: 14px; padding: 4px 10px; background: #141414; color: #D8F86B; border-radius: 999px; font-size: 12px; font-weight: 900">常穿 TOP 5</span>
+    </div>
+    <h1 style="margin: 22px 20px 0; font-family: 'ZCOOL KuaiLe', 'Noto Sans SC', sans-serif; font-size: 34px; font-weight: 400">牛仔夹克</h1>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 14px 20px 0">
+      <div style="padding: 10px 12px; border: 2px solid #141414; border-radius: 16px; background: #D8F86B; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; font-weight: 900">14</span><span style="font-size: 11px; font-weight: 700">穿过次数</span></div>
+      <div style="padding: 10px 12px; border: 2px solid #141414; border-radius: 16px; background: #FFB8D9; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; font-weight: 900">¥28.5</span><span style="font-size: 11px; font-weight: 700">每次成本</span></div>
+      <div style="padding: 10px 12px; border: 2px solid #141414; border-radius: 16px; background: #FFC9A3; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; font-weight: 900">10天</span><span style="font-size: 11px; font-weight: 700">没穿了</span></div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 20px 0">
+      <span style="display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 2px solid #141414; border-radius: 999px; background: #FFFFFF; font-size: 13px; font-weight: 700"><span style="width: 14px; height: 14px; border-radius: 50%; border: 2px solid #141414; background: #2E4466"></span>靛蓝<span style="padding: 0 5px; background: #5B3DF5; color: #FFFFFF; border-radius: 6px; font-size: 10px">AI</span></span>
+      <span style="display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 2px solid #141414; border-radius: 999px; background: #FFFFFF; font-size: 13px; font-weight: 700">春秋款<span style="padding: 0 5px; background: #5B3DF5; color: #FFFFFF; border-radius: 6px; font-size: 10px">AI</span></span>
+      <span style="display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 2px solid #141414; border-radius: 999px; background: #FFFFFF; font-size: 13px; font-weight: 700">M 码 · 纯棉<span style="padding: 0 5px; background: #141414; color: #FFFFFF; border-radius: 6px; font-size: 10px">吊牌</span></span>
+      <span style="display: flex; align-items: center; height: 36px; padding: 0 12px; border: 2px dashed #141414; border-radius: 999px; font-size: 13px; font-weight: 700">＋ 品牌</span>
+      <span style="display: flex; align-items: center; height: 36px; padding: 0 12px; border: 2px solid #141414; border-radius: 999px; background: #FFFFFF; font-size: 13px; font-weight: 700">¥399 · 2025.09</span>
+      <span style="display: flex; align-items: center; height: 36px; padding: 0 12px; border: 2px solid #141414; border-radius: 999px; background: #FFFFFF; font-size: 13px; font-weight: 700">卧室衣柜 左二层</span>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: flex-start; padding: 22px 20px 0">
+      <div style="flex: none; width: 44px; height: 44px; border-radius: 50%; border: 2px solid #141414; background: #C9B8FF; display: flex; align-items: center; justify-content: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#141414" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="6"></rect><path d="M10 8l3-2"></path></svg>
+      </div>
+      <div style="flex: 1; padding: 12px 14px; border: 2px solid #141414; border-radius: 4px 18px 18px 18px; background: #FFFFFF; box-shadow: 3px 3px 0 #141414; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; font-weight: 900; color: #5B3DF5">魔镜说</span>
+        <span style="font-size: 14px; font-weight: 500; line-height: 1.6">你穿是略宽松的落肩款，衣长到胯部，袖子刚好盖住手腕～</span>
+        <span style="font-size: 11px; font-weight: 700">来自 10 月 12 日的镜子照片</span>
+      </div>
+    </div>
+    <section style="padding: 24px 20px 40px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 900">用它搭过的 2 套</h2>
+      <div style="display: flex; gap: 12px">
+        <div style="width: 116px; height: 176px; border: 2px solid #141414; border-radius: 18px; background: #D8F86B; box-shadow: 3px 3px 0 #141414; display: flex; align-items: center; justify-content: center">
+          <div style="width: 70px"><dc-import name="Avatar" outer="jacket" outer-color="#2E4466" top="tee" top-color="#F5F4F0" bottom="jeans" bottom-color="#4C6C96" shoes="sneakers" shoes-color="#F3F2EE" bag="none" hint-size="70px,154px"></dc-import></div>
+        </div>
+        <div style="width: 116px; height: 176px; border: 2px solid #141414; border-radius: 18px; background: #FFB8D9; box-shadow: 3px 3px 0 #141414; display: flex; align-items: center; justify-content: center">
+          <div style="width: 70px"><dc-import name="Avatar" outer="jacket" outer-color="#2E4466" top="knit" top-color="#41594A" bottom="chinos" bottom-color="#C4B697" shoes="loafers" shoes-color="#4A3426" bag="tote" bag-color="#D6C9B0" hint-size="70px,154px"></dc-import></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const view = (this.state && this.state.view) || 'std';
+    const isStd = view === 'std';
+    return {
+      isStd, isRaw: !isStd,
+      stdBg: isStd ? '#141414' : '#FFFFFF', stdFg: isStd ? '#FFFFFF' : '#141414',
+      rawBg: isStd ? '#FFFFFF' : '#141414', rawFg: isStd ? '#141414' : '#FFFFFF',
+      showStd: () => this.setState({ view: 'std' }),
+      showRaw: () => this.setState({ view: 'raw' })
+    };
+  }
+}
+</script>
+</body>
+</html>

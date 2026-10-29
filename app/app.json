@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "衣橱",
+    "slug": "e-wardrobe",
+    "scheme": "ewardrobe",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.ewardrobe"
+    },
+    "android": {
+      "package": "app.ewardrobe",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "用于从相册导入衣服照片",
+          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

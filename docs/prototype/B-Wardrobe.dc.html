@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>B · 衣橱</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,500&amp;family=Noto+Sans+SC:wght@400;500&amp;family=Noto+Serif+SC:wght@500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2A241F}a:hover{color:#8A4B2F}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #F4EFE7; font-family: 'Noto Sans SC', system-ui, sans-serif; color: #2A241F">
+  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 84px; overflow-y: auto">
+    <header style="padding: 26px 24px 0; display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #2A241F; padding-bottom: 8px">
+        <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 16px">Vol. 01 — Autumn</span>
+        <span style="font-size: 11px; letter-spacing: 0.14em; color: #6E6359">2026 · 10</span>
+      </div>
+      <h1 style="margin: 12px 0 0; font-family: 'Noto Serif SC', serif; font-size: 36px; font-weight: 700; letter-spacing: 0.04em">我的衣橱</h1>
+      <p style="margin: 0; font-family: 'Noto Serif SC', serif; font-size: 14px; color: #6E6359">本季 {{total}} 件，本月穿着 46 次。</p>
+    </header>
+    <nav aria-label="分类" style="display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 16px 24px 0">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+        <button type="button" onClick="{{c.pick}}" style="min-height: 44px; padding: 0; background: none; border: 0; font-family: 'Noto Serif SC', serif; font-size: 15px; color: {{c.color}}; text-decoration: {{c.deco}}; text-underline-offset: 6px; cursor: pointer">{{c.label}}</button>
+      </sc-for>
+    </nav>
+    <sc-if value="{{showFeature}}" hint-placeholder-val="{{ true }}">
+      <a href="B-Detail.dc.html" style="display: block; margin: 12px 24px 0; text-decoration: none; color: #2A241F">
+        <div style="position: relative; height: 330px; background: #EAE3D7; display: flex; align-items: center; justify-content: center">
+          <div style="width: 230px"><dc-import name="Garment" kind="jacket" color="#2E4466" hint-size="230px,276px"></dc-import></div>
+          <span style="position: absolute; left: 16px; top: 14px; font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 18px; color: #8A4B2F">Cover piece</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0 0">
+          <span style="font-family: 'Noto Serif SC', serif; font-size: 20px; font-weight: 700">牛仔夹克</span>
+          <span style="font-size: 12px; color: #6E6359">本月最常穿 · 14 次</span>
+        </div>
+      </a>
+    </sc-if>
+    <div style="margin: 20px 24px 0; padding: 12px 0; border-top: 1px solid #D9CFC0; border-bottom: 1px solid #D9CFC0; display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: 'Noto Serif SC', serif; font-size: 14px">暗房里还有 1 件正在冲印</span>
+      <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 16px; color: #8A4B2F">约 20 秒</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; padding: 24px 24px 32px">
+      <sc-for list="{{items}}" as="it" hint-placeholder-count="6">
+        <a href="B-Detail.dc.html" style="display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: #2A241F">
+          <div style="aspect-ratio: 3 / 4; background: #EAE3D7; display: flex; align-items: center; justify-content: center">
+            <div style="width: 76%"><dc-import name="Garment" kind="{{it.kind}}" color="{{it.color}}" hint-size="100%,150px"></dc-import></div>
+          </div>
+          <span style="font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 15px; color: #8A4B2F">No. {{it.no}}</span>
+          <span style="font-family: 'Noto Serif SC', serif; font-size: 15px; font-weight: 500">{{it.name}}</span>
+          <span style="font-size: 12px; color: #6E6359">穿过 {{it.wears}} 次</span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+  <nav aria-label="主导航" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 0; background: #F4EFE7; border-top: 1px solid #2A241F; display: flex; justify-content: space-around; align-items: flex-start">
+    <a href="B-Wardrobe.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #2A241F; font-family: 'Noto Serif SC', serif; font-size: 11px; font-weight: 700">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6.5a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9V11"></path><path d="M12 11l-8.6 6.2a1 1 0 0 0 .6 1.8h16a1 1 0 0 0 .6-1.8z"></path></svg>
+      衣橱
+    </a>
+    <a href="B-Fitting.dc.html" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6E6359; font-family: 'Noto Serif SC', serif; font-size: 11px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2.2"></circle><path d="M12 7.5v7M7.5 10.5h9M12 14.5l-3 6.5M12 14.5l3 6.5"></path></svg>
+      试衣间
+    </a>
+    <button type="button" aria-label="录入新衣服" style="width: 48px; height: 48px; border-radius: 50%; border: 1px solid #8A4B2F; background: #8A4B2F; color: #F4EFE7; display: flex; align-items: center; justify-content: center; cursor: pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+    </button>
+    <button type="button" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: none; padding: 0; color: #6E6359; font-family: 'Noto Serif SC', serif; font-size: 11px; cursor: pointer">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3L3 8l9 5 9-5-9-5z"></path><path d="M3 13l9 5 9-5"></path></svg>
+      穿搭
+    </button>
+    <button type="button" style="width: 64px; min-height: 48px; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: none; padding: 0; color: #6E6359; font-family: 'Noto Serif SC', serif; font-size: 11px; cursor: pointer">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>
+      我的
+    </button>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ITEMS = [
+      { id: 'g1', name: '牛仔夹克', cat: 'outer', kind: 'jacket', color: '#2E4466', wears: 14 },
+      { id: 'g2', name: '哈灵顿夹克', cat: 'outer', kind: 'harrington', color: '#D8C8A0', wears: 6 },
+      { id: 'g3', name: '连帽羽绒服', cat: 'outer', kind: 'puffer', color: '#8B8279', wears: 22 },
+      { id: 'g4', name: '羊毛大衣', cat: 'outer', kind: 'coat', color: '#A9845A', wears: 9 },
+      { id: 'g5', name: '圆领T恤', cat: 'top', kind: 'tee', color: '#F5F4F0', wears: 31 },
+      { id: 'g6', name: '牛津衬衫', cat: 'top', kind: 'shirt', color: '#C3D5E8', wears: 12 },
+      { id: 'g7', name: '麻花针织衫', cat: 'top', kind: 'knit', color: '#41594A', wears: 8 },
+      { id: 'g8', name: '直筒牛仔裤', cat: 'bottom', kind: 'jeans', color: '#4C6C96', wears: 27 },
+      { id: 'g9', name: '卡其休闲裤', cat: 'bottom', kind: 'chinos', color: '#C4B697', wears: 11 },
+      { id: 'g10', name: '百褶半裙', cat: 'bottom', kind: 'skirt', color: '#3A3A3C', wears: 4 },
+      { id: 'g11', name: '白色运动鞋', cat: 'shoes', kind: 'sneakers', color: '#F3F2EE', wears: 40 },
+      { id: 'g12', name: '乐福鞋', cat: 'shoes', kind: 'loafers', color: '#4A3426', wears: 7 },
+      { id: 'g13', name: '帆布托特包', cat: 'bag', kind: 'tote', color: '#D6C9B0', wears: 15 }
+    ];
+    const CATS = [
+      { id: 'all', label: '全部' }, { id: 'outer', label: '外套' }, { id: 'top', label: '上衣' },
+      { id: 'bottom', label: '下装' }, { id: 'shoes', label: '鞋履' }, { id: 'bag', label: '包袋' }
+    ];
+    const cat = (this.state && this.state.cat) || 'all';
+    const cats = CATS.map((c) => ({
+      ...c,
+      color: c.id === cat ? '#8A4B2F' : '#2A241F',
+      deco: c.id === cat ? 'underline' : 'none',
+      pick: () => this.setState({ cat: c.id })
+    }));
+    const showFeature = cat === 'all';
+    const items = ITEMS
+      .map((i, n) => ({ ...i, no: String(n + 1).padStart(2, '0') }))
+      .filter((i) => (cat === 'all' ? i.id !== 'g1' : i.cat === cat));
+    return { cats, items, showFeature, total: ITEMS.length };
+  }
+}
+</script>
+</body>
+</html>
