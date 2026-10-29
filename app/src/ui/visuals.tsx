@@ -39,6 +39,8 @@ export function ItemImage({ item, style }: { item: Pick<Item, 'catalogUri' | 'or
   );
 }
 
+const MIN_TILE = 24;
+
 /** Flat-lay of an outfit's garments in a 2×2 grid; used when no AI try-on image exists yet. */
 export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]; tryonUri?: string | null; style?: ViewStyle; compact?: boolean }) {
   const [box, setBox] = useState({ width: 0, height: 0 });
@@ -66,9 +68,14 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
       {box.width > 0
         ? shown.map((it, i) => {
             // 3:4 tiles as large as fit both across and down (two columns unless there is a single garment).
-            const cols = shown.length === 1 ? 1 : 2;
-            const rows = Math.ceil(shown.length / cols);
-            const w = Math.max(0, Math.min((box.width - 2 * pad - gap * (cols - 1)) / cols, ((box.height - 2 * pad - gap * (rows - 1)) / rows) * 0.75));
+            const fit = (n: number) => {
+              const cols = n === 1 ? 1 : 2;
+              const rows = Math.ceil(n / cols);
+              return Math.max(0, Math.min((box.width - 2 * pad - gap * (cols - 1)) / cols, ((box.height - 2 * pad - gap * (rows - 1)) / rows) * 0.75));
+            };
+            // Too small to tell garments apart (calendar cells): show only the outermost one.
+            if (fit(shown.length) < MIN_TILE && i > 0) return null;
+            const w = fit(shown.length) < MIN_TILE ? fit(1) : fit(shown.length);
             return (
               <View key={it.id} style={{ width: w, height: w / 0.75 }}>
                 <ItemImage item={it} style={{ flex: 1 }} />

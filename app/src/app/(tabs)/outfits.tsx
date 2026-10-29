@@ -181,7 +181,7 @@ function Calendar({ s }: { s: Snapshot }) {
               style={{ width: '13.6%', height: 62, backgroundColor: log ? C.card : C.bg, borderWidth: 2, borderColor: ring }}
             >
               <T style={{ position: 'absolute', left: 3, top: 1, fontSize: 10, color: isFuture ? C.muted : C.ink, fontWeight: c.dateKey === s.todayKey ? '700' : '400', zIndex: 1 }}>{c.day}</T>
-              {log ? <OutfitBoard items={itemsOf(s, log.itemIds)} tryonUri={tryonFor(s, log.itemIds)} compact style={{ position: 'absolute', left: 6, right: 6, top: 14, bottom: 2, backgroundColor: 'transparent' }} /> : null}
+              {log ? <OutfitBoard items={itemsOf(s, log.itemIds)} tryonUri={log.photoUri ?? tryonFor(s, log.itemIds)} compact style={{ position: 'absolute', left: 4, right: 4, top: 15, bottom: 2, backgroundColor: 'transparent' }} /> : null}
             </Pressable>
           );
         })}
