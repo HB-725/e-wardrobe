@@ -39,15 +39,15 @@ export async function createOutfit(
 ): Promise<Outfit> {
   if (input.itemIds.length === 0) throw new Error('穿搭至少需要一件单品');
   const id = newId();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('INSERT INTO outfits (id, name, occasions, created_at) VALUES (?, ?, ?, ?)', [
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync('INSERT INTO outfits (id, name, occasions, created_at) VALUES (?, ?, ?, ?)', [
       id,
       input.name.trim() || '新穿搭',
       JSON.stringify(input.occasions),
       nowIso(),
     ]);
     for (const itemId of new Set(input.itemIds)) {
-      await db.runAsync('INSERT INTO outfit_items (outfit_id, item_id) VALUES (?, ?)', [id, itemId]);
+      await tx.runAsync('INSERT INTO outfit_items (outfit_id, item_id) VALUES (?, ?)', [id, itemId]);
     }
   });
   return (await getOutfit(db, id))!;

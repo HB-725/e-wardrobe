@@ -6,7 +6,11 @@ export interface Db {
   runAsync(sql: string, params?: SqlParam[]): Promise<{ changes: number }>;
   getAllAsync<T>(sql: string, params?: SqlParam[]): Promise<T[]>;
   getFirstAsync<T>(sql: string, params?: SqlParam[]): Promise<T | null>;
-  withTransactionAsync(task: () => Promise<void>): Promise<void>;
+  /**
+   * Runs `task` in a transaction. Statements inside must go through `tx`; the shared connection queues everything
+   * else until the transaction ends, so another flow's statement never lands inside it. Do not nest.
+   */
+  withTransactionAsync(task: (tx: Db) => Promise<void>): Promise<void>;
 }
 
 export function newId(): string {

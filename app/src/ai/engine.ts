@@ -2,6 +2,7 @@ import { LAYER_ORDER } from '@/domain/catalog';
 import type { FieldSource, Item, Job, Slot } from '@/domain/types';
 import type { Db } from '@/db/db';
 import { getItem, listItems, updateItem } from '@/db/items';
+import { updateJobPayload } from '@/db/jobs';
 import { addUsage, avatarUsable, avatarVersion, getAvatar, getTryon, monthSpend, pruneTryons, putTryon, saveAvatar } from '@/db/misc';
 import { AiError, type OpenAiClient } from './client';
 import { getAiSettings, getModelChoice, qualityFor, saveModelChoice } from './config';
@@ -57,8 +58,9 @@ export async function ensureModels(deps: AiDeps, client: OpenAiClient, force = f
   const fresh = choice.probedAt && now.getTime() - new Date(choice.probedAt).getTime() < PROBE_TTL_MS;
   if (!force && fresh && choice.image && choice.vision) return choice;
   const available = await client.listModels();
-  // Re-probing clears old blocks: a model may have been re-enabled for the account.
-  const blocked = force ? [] : choice.blocked.filter((m) => available.includes(m));
+  // Blocks expire with every re-probe (every few days): a model may have been re-enabled for the account, or the
+  // block came from a transient error. Within one probe period they stick.
+  const blocked = force || !fresh ? [] : choice.blocked.filter((m) => available.includes(m));
   const next = { ...pickModels(available, blocked), blocked, probedAt: now.toISOString() };
   await saveModelChoice(deps.db, next);
   return next;
@@ -97,6 +99,7 @@ async function generate(
   req: { prompt: string; images: string[]; quality: 'low' | 'medium' | 'high'; n?: number; transparent?: boolean },
 ): Promise<string[]> {
   return withModel(deps, client, 'image', async (model) => {
+    await assertBudget(deps);
     const r = await client.imageEdit({ model, prompt: req.prompt, images: req.images, quality: req.quality, n: req.n, size: '1024x1536', transparent: req.transparent });
     await addUsage(deps.db, { kind, model, costUsd: imageCost(model, r.usage) });
     return r.images;
@@ -110,6 +113,7 @@ async function vision<T>(
   req: { system: string; text: string; images: string[]; schemaName: string; schema: Record<string, unknown>; detail?: 'low' | 'high' | 'auto' },
 ): Promise<T> {
   return withModel(deps, client, 'vision', async (model) => {
+    await assertBudget(deps);
     const r = await client.visionJson<T>({ model, ...req });
     await addUsage(deps.db, { kind, model, costUsd: chatCost(model, r.usage) });
     return r.data;
@@ -163,16 +167,20 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
     item = (await updateItem(db, item.id, applyAutofill(now, r)))!;
   }
 
-  const b64s = await generate(deps, client, 'catalog', {
-    prompt: catalogPrompt(item.slot, item.name, { name: item.colorName, hex: item.colorHex }),
-    images: [original],
-    quality: qualityFor(settings.quality, 'catalog'),
-    n: Math.max(1, Math.min(3, settings.candidates)),
-    // Opaque on purpose: transparent cut-outs look perfect, but image models read transparent pixels as black,
-    // so dark garments vanish when they are fed back in for try-ons (verified with black jeans).
-  });
-  const uris: string[] = [];
-  for (const b64 of b64s) uris.push(await images.saveBase64(b64, 'catalog'));
+  // A retry after a crash reuses the candidates that were already paid for.
+  let uris = (job.payload.generated as string[] | undefined) ?? [];
+  if (uris.length === 0) {
+    const b64s = await generate(deps, client, 'catalog', {
+      prompt: catalogPrompt(item.slot, item.name, { name: item.colorName, hex: item.colorHex }),
+      images: [original],
+      quality: qualityFor(settings.quality, 'catalog'),
+      n: Math.max(1, Math.min(3, settings.candidates)),
+      // Opaque on purpose: transparent cut-outs look perfect, but image models read transparent pixels as black,
+      // so dark garments vanish when they are fed back in for try-ons (verified with black jeans).
+    });
+    for (const b64 of b64s) uris.push(await images.saveBase64(b64, 'catalog'));
+    await updateJobPayload(db, job.id, { ...job.payload, generated: uris });
+  }
 
   // The checklist helps the user choose; if it fails the candidates are still usable.
   let checks: Item['checks'] = [];
@@ -204,7 +212,7 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
   await updateItem(db, item.id, { candidates: uris, checks, status: inWardrobe(fresh.status) ? fresh.status : 'review', error: null });
 }
 
-async function runAvatar(deps: AiDeps): Promise<void> {
+async function runAvatar(deps: AiDeps, job: Job): Promise<void> {
   const { db, images } = deps;
   const avatar = await getAvatar(db);
   if (avatar.sourceUris.length === 0) throw new AiError('rejected', 'no body photos');
@@ -213,8 +221,13 @@ async function runAvatar(deps: AiDeps): Promise<void> {
   const quality = qualityFor(settings.quality, 'avatar');
   const sources = await Promise.all(avatar.sourceUris.map((u) => images.toDataUrl(u, 1024)));
 
-  const [front] = await generate(deps, client, 'avatar', { prompt: avatarFrontPrompt(avatar), images: sources, quality });
-  const frontUri = await images.saveBase64(front, 'avatar');
+  // The front costs most; if the back failed last time, continue from the front already generated.
+  let frontUri = job.payload.front as string | undefined;
+  if (!frontUri) {
+    const [front] = await generate(deps, client, 'avatar', { prompt: avatarFrontPrompt(avatar), images: sources, quality });
+    frontUri = await images.saveBase64(front, 'avatar');
+    await updateJobPayload(deps.db, job.id, { ...job.payload, front: frontUri });
+  }
   const frontRef = await images.toDataUrl(frontUri, 1024);
   // The third body photo is the back view when the user took all three.
   const backRef = sources.length >= 3 ? [sources[2]] : [];
@@ -268,7 +281,7 @@ export async function runJob(deps: AiDeps, job: Job): Promise<void> {
     case 'catalog':
       return runCatalog(deps, job);
     case 'avatar':
-      return runAvatar(deps);
+      return runAvatar(deps, job);
     case 'tryon':
       return runTryon(deps, job);
     default:
@@ -280,10 +293,16 @@ export async function runJob(deps: AiDeps, job: Job): Promise<void> {
 export async function markJobFailed(deps: AiDeps, job: Job, message: string): Promise<void> {
   if (job.type === 'catalog') {
     const item = await getItem(deps.db, job.refId);
-    // A regenerate of a wardrobe item that fails leaves the item as it was.
-    if (item && (item.status === 'processing' || item.status === 'review')) await updateItem(deps.db, job.refId, { status: 'failed', error: message });
+    for (const u of (job.payload.generated as string[] | undefined) ?? []) if (!item?.candidates.includes(u)) await deps.images.remove(u);
+    // A regenerate of a wardrobe item that fails leaves the item as it was; an item that still has candidates
+    // from an earlier run goes back to review so those paid images stay usable.
+    if (item && (item.status === 'processing' || item.status === 'review')) {
+      await updateItem(deps.db, job.refId, item.candidates.length ? { status: 'review', error: message } : { status: 'failed', error: message });
+    }
   } else if (job.type === 'avatar') {
     const a = await getAvatar(deps.db);
+    const front = job.payload.front as string | undefined;
+    if (front && front !== a.frontUri) await deps.images.remove(front);
     // Keep the previous avatar usable when only the regeneration failed; the error is shown on the setup page.
     await saveAvatar(deps.db, { status: a.frontUri && a.backUri ? 'ready' : 'failed', error: message });
   }

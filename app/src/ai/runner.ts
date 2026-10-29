@@ -47,7 +47,7 @@ export class JobRunner {
   }
 
   async start(): Promise<void> {
-    await recoverRunningJobs(this.deps.db);
+    for (const job of await recoverRunningJobs(this.deps.db)) await markJobFailed(this.deps, job, '多次中断，已停止重试');
     this.kick();
   }
 

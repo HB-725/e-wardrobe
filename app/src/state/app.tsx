@@ -135,12 +135,26 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
     if (!core) return;
     void core.runner.start();
     // Resume the queue when the app comes back to the foreground (network may be back).
-    const sub = AppState.addEventListener('change', (st) => st === 'active' && core.runner.kick());
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st !== 'active') return;
+      core.runner.kick();
+      refresh(); // the date may have changed while in the background
+    });
+    // Also roll over at midnight while the app stays open.
+    let day = new Date().toDateString();
+    const tick = setInterval(() => {
+      const now = new Date().toDateString();
+      if (now !== day) {
+        day = now;
+        refresh();
+      }
+    }, 60_000);
     return () => {
       sub.remove();
+      clearInterval(tick);
       core.runner.stop();
     };
-  }, [core]);
+  }, [core, refresh]);
 
   const value = useMemo<AppValue | null>(
     () =>

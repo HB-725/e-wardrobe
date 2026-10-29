@@ -157,9 +157,18 @@ describe('jobs', () => {
     await deferJob(db, job!, 'no key');
     const again = await claimNextJob(db, new Date(Date.now() + 1000));
     expect(again?.attempts).toBe(1);
-    expect(await recoverRunningJobs(db)).toBe(1);
+    expect(await recoverRunningJobs(db)).toEqual([]);
+    expect((await listJobs(db, ['queued'])).map((j) => j.id)).toEqual([again!.id]);
     await completeJob(db, again!.id);
     expect(await listJobs(db, ['queued', 'running'])).toEqual([]);
+  });
+
+  it('gives up on interrupted jobs that already used every attempt', async () => {
+    const job = await enqueueJob(db, 'catalog', 'x');
+    await db.runAsync("UPDATE jobs SET status = 'running', attempts = ? WHERE id = ?", [MAX_ATTEMPTS, job.id]);
+    const given = await recoverRunningJobs(db);
+    expect(given.map((j) => j.id)).toEqual([job.id]);
+    expect(await listJobs(db, ['failed'])).toHaveLength(1);
   });
 });
 

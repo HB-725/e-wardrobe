@@ -131,3 +131,8 @@ export function monthGrid(year: number, month0: number): MonthCell[] {
   for (let d = 1; d <= days; d++) cells.push({ dateKey: toDateKey(new Date(year, month0, d)), day: d });
   return cells;
 }
+
+/** Today's date key, computed at the moment of the call (never cache it across an app session). */
+export function currentDateKey(): string {
+  return toDateKey(new Date());
+}

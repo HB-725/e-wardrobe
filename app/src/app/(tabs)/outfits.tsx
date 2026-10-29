@@ -7,6 +7,7 @@ import { monthGrid, parseDateKey } from '@/domain/stats';
 import type { Outfit } from '@/domain/types';
 import { recordWear, removeOutfit, undoWear } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
+import { useRecordToday } from '@/state/recordToday';
 import { itemsOf, loadSnapshot, type Snapshot, tryonFor } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
 import { Btn, IconBtn, Loading, PageHeader, Screen, Segmented, Sheet, T, Tap } from '@/ui/kit';
@@ -23,6 +24,7 @@ function wearCount(s: Snapshot, o: Outfit): number {
 
 function OutfitSheet({ s, outfit, onClose }: { s: Snapshot; outfit: Outfit | null; onClose: () => void }) {
   const app = useApp();
+  const recordToday = useRecordToday();
   if (!outfit) return null;
   const items = itemsOf(s, outfit.itemIds);
   const missing = outfit.itemIds.length - items.filter((i) => i.status === 'active').length;
@@ -45,8 +47,7 @@ function OutfitSheet({ s, outfit, onClose }: { s: Snapshot; outfit: Outfit | nul
           label="今天穿这套"
           disabled={missing > 0}
           onPress={async () => {
-            await recordWear(app, { date: s.todayKey, itemIds: outfit.itemIds, outfitId: outfit.id, source: 'outfit' });
-            app.refresh();
+            if (!(await recordToday({ itemIds: outfit.itemIds, outfitId: outfit.id, source: 'outfit' }))) return;
             app.toast('已记录今天的穿搭');
             onClose();
           }}

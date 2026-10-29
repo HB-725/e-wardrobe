@@ -3,9 +3,11 @@ import { useMemo, useRef, useState } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
 import { todaySuggestions } from '@/domain/outfit';
-import { dateParts, idleItems, weekOf } from '@/domain/stats';
+import { currentDateKey, dateParts, idleItems, weekOf } from '@/domain/stats';
 import type { Item } from '@/domain/types';
-import { recordWear, undoWear } from '@/state/actions';
+import { undoWear } from '@/state/actions';
+import { useRecordToday } from '@/state/recordToday';
+import { confirmAsync } from '@/ui/dialogs';
 import { useApp, useData } from '@/state/app';
 import { itemsOf, loadSnapshot, type Snapshot, tryonFor } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
@@ -177,6 +179,7 @@ function Onboarding({ s }: { s: Snapshot }) {
 
 export default function TodayPage() {
   const app = useApp();
+  const recordToday = useRecordToday();
   const s = useData(loadSnapshot);
   const [idx, setIdx] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -200,10 +203,11 @@ export default function TodayPage() {
     setBusy(true);
     try {
       if (loggedThis) {
-        await undoWear(app, s.todayKey);
+        if (s.todayLog?.photoUri && !(await confirmAsync('撤销今天的记录？', '这条记录带有镜子照片，撤销后照片会删除。', '撤销'))) return;
+        await undoWear(app, currentDateKey());
         app.toast('已撤销今天的记录');
       } else {
-        await recordWear(app, { date: s.todayKey, itemIds: cur.items.map((i) => i.id), outfitId: cur.outfitId, source: 'outfit' });
+        if (!(await recordToday({ itemIds: cur.items.map((i) => i.id), outfitId: cur.outfitId, source: 'outfit' }))) return;
         app.toast(`已记录：${cur.name}，穿着次数 +1`);
       }
       // The logged card moves to the front; follow it so the button state matches what is on screen.

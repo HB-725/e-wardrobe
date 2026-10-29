@@ -55,13 +55,13 @@ export async function enqueueJob(
 /** Atomically claims the next due job, or returns null. */
 export async function claimNextJob(db: Db, now: Date = new Date()): Promise<Job | null> {
   let claimed: Job | null = null;
-  await db.withTransactionAsync(async () => {
-    const row = await db.getFirstAsync<JobRow>(
+  await db.withTransactionAsync(async (tx) => {
+    const row = await tx.getFirstAsync<JobRow>(
       "SELECT * FROM jobs WHERE status = 'queued' AND next_run_at <= ? ORDER BY created_at LIMIT 1",
       [now.toISOString()],
     );
     if (!row) return;
-    await db.runAsync("UPDATE jobs SET status = 'running', attempts = attempts + 1, updated_at = ? WHERE id = ?", [
+    await tx.runAsync("UPDATE jobs SET status = 'running', attempts = attempts + 1, updated_at = ? WHERE id = ?", [
       nowIso(),
       row.id,
     ]);
@@ -107,10 +107,24 @@ export async function deferJob(db: Db, job: Job, reason: string): Promise<void> 
   );
 }
 
-/** Jobs interrupted by an app kill are re-queued on next launch. */
-export async function recoverRunningJobs(db: Db): Promise<number> {
-  const res = await db.runAsync("UPDATE jobs SET status = 'queued', updated_at = ? WHERE status = 'running'", [nowIso()]);
-  return res.changes;
+/**
+ * Jobs interrupted by an app kill are re-queued on next launch, unless they already used all attempts (a job that
+ * crashes the app every time must not be paid for again and again). Returns the jobs given up on.
+ */
+export async function recoverRunningJobs(db: Db): Promise<Job[]> {
+  const exhausted = (await db.getAllAsync<JobRow>("SELECT * FROM jobs WHERE status = 'running' AND attempts >= ?", [MAX_ATTEMPTS])).map(fromRow);
+  await db.runAsync("UPDATE jobs SET status = 'failed', last_error = ?, updated_at = ? WHERE status = 'running' AND attempts >= ?", [
+    '多次中断，已停止重试',
+    nowIso(),
+    MAX_ATTEMPTS,
+  ]);
+  await db.runAsync("UPDATE jobs SET status = 'queued', updated_at = ? WHERE status = 'running'", [nowIso()]);
+  return exhausted;
+}
+
+/** Remember paid-for intermediate results (generated files) so a retry continues instead of paying again. */
+export async function updateJobPayload(db: Db, id: string, payload: Record<string, unknown>): Promise<void> {
+  await db.runAsync('UPDATE jobs SET payload = ?, updated_at = ? WHERE id = ?', [JSON.stringify(payload), nowIso(), id]);
 }
 
 export async function retryJob(db: Db, id: string): Promise<void> {

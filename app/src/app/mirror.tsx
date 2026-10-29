@@ -7,7 +7,8 @@ import { AiError, blockedRoute, describeAiError } from '@/ai/client';
 import { matchMirror, type MirrorMatch } from '@/ai/engine';
 import { SLOT_LABEL, SLOTS } from '@/domain/catalog';
 import type { Item } from '@/domain/types';
-import { addFitNote, recordWear } from '@/state/actions';
+import { addFitNote } from '@/state/actions';
+import { useRecordToday } from '@/state/recordToday';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
 import { Btn, Checkbox, Loading, NavHeader, Screen, Sheet, T, Tap } from '@/ui/kit';
@@ -20,6 +21,7 @@ type Phase = { k: 'pick' } | { k: 'matching'; photo: string } | { k: 'done'; pho
 
 export default function MirrorPage() {
   const app = useApp();
+  const recordToday = useRecordToday();
   const s = useData(loadSnapshot);
   const [phase, setPhase] = useState<Phase>({ k: 'pick' });
   const [matches, setMatches] = useState<MirrorMatch[]>([]);
@@ -93,7 +95,7 @@ export default function MirrorPage() {
     try {
       for (const m of matches) if (on.has(m.itemId) && m.note) await addFitNote(app, m.itemId, m.note, dateLabel);
       if (s.prefs.mirrorAutoLog && on.size > 0) {
-        await recordWear(app, { date: s.todayKey, itemIds: [...on], source: 'mirror', photoUri: phase.photo });
+        if (!(await recordToday({ itemIds: [...on], source: 'mirror', photoUri: phase.photo }))) return;
         pendingPhoto.current = null;
         app.toast(`已记录今天的 ${on.size} 件，穿着次数 +1`);
       } else {

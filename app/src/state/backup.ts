@@ -158,12 +158,12 @@ export async function restoreBackup(
       for (const c of Object.keys(URI_LIST_COLUMNS[t] ?? {})) oldUris.push(...parseJson<string[]>(r[c] as string, []));
     }
   }
-  await db.withTransactionAsync(async () => {
+  await db.withTransactionAsync(async (tx) => {
     for (const t of [...TABLES].reverse()) {
-      if (t === 'settings') await db.runAsync(`DELETE FROM settings WHERE key NOT IN (${DEVICE_SETTINGS.map(() => '?').join(', ')})`, DEVICE_SETTINGS);
-      else await db.execAsync(`DELETE FROM ${t}`);
+      if (t === 'settings') await tx.runAsync(`DELETE FROM settings WHERE key NOT IN (${DEVICE_SETTINGS.map(() => '?').join(', ')})`, DEVICE_SETTINGS);
+      else await tx.execAsync(`DELETE FROM ${t}`);
     }
-    await db.execAsync('DELETE FROM jobs');
+    await tx.execAsync('DELETE FROM jobs');
     for (const t of TABLES) {
       const single = Object.keys(URI_COLUMNS[t] ?? {});
       const lists = Object.keys(URI_LIST_COLUMNS[t] ?? {});
@@ -175,7 +175,7 @@ export async function restoreBackup(
         if (t === 'tryon_cache' && !row.uri) continue;
         if (t === 'tryon_cache' && !row.avatar_version) row.avatar_version = 'none';
         const cols = Object.keys(row);
-        await db.runAsync(`INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => row[c]));
+        await tx.runAsync(`INSERT INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => row[c]));
       }
     }
   });

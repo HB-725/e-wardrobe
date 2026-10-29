@@ -28,16 +28,16 @@ export class SqlJsDb implements Db {
     return (await this.getAllAsync<T>(sql, params))[0] ?? null;
   }
 
-  async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+  async withTransactionAsync(task: (tx: Db) => Promise<void>): Promise<void> {
     // Mirror expo-sqlite: nested calls join the outer transaction.
     if (this.depth > 0) {
-      await task();
+      await task(this);
       return;
     }
     this.depth += 1;
     this.db.exec('BEGIN');
     try {
-      await task();
+      await task(this);
       this.db.exec('COMMIT');
     } catch (e) {
       this.db.exec('ROLLBACK');

@@ -36,14 +36,14 @@ export async function logWear(
 ): Promise<WearLog> {
   if (input.itemIds.length === 0) throw new Error('至少选择一件单品');
   const id = newId();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM wear_logs WHERE date = ?', [input.date]);
-    await db.runAsync(
+  await db.withTransactionAsync(async (tx) => {
+    await tx.runAsync('DELETE FROM wear_logs WHERE date = ?', [input.date]);
+    await tx.runAsync(
       'INSERT INTO wear_logs (id, date, outfit_id, source, photo_uri, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       [id, input.date, input.outfitId ?? null, input.source, input.photoUri ?? null, nowIso()],
     );
     for (const itemId of new Set(input.itemIds)) {
-      await db.runAsync('INSERT INTO wear_log_items (log_id, item_id) VALUES (?, ?)', [id, itemId]);
+      await tx.runAsync('INSERT INTO wear_log_items (log_id, item_id) VALUES (?, ?)', [id, itemId]);
     }
   });
   return (await getLogByDate(db, input.date))!;

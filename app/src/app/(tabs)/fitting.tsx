@@ -7,7 +7,8 @@ import { estimateImageCost, formatUsd } from '@/ai/models';
 import { LAYER_ORDER, OCCASIONS, SLOTS } from '@/domain/catalog';
 import { defaultOutfitName, selectionIds, toggleInSelection } from '@/domain/outfit';
 import type { Item, Slot, TryonView } from '@/domain/types';
-import { recordWear, requestTryon, saveOutfit, tryonState } from '@/state/actions';
+import { requestTryon, saveOutfit, tryonState } from '@/state/actions';
+import { useRecordToday } from '@/state/recordToday';
 import { avatarUsable } from '@/db/misc';
 import { useApp, useData } from '@/state/app';
 import { itemsOf, loadSnapshot, type Snapshot } from '@/state/snapshot';
@@ -152,6 +153,7 @@ function Tray({ s, slot, worn, onPick }: { s: Snapshot; slot: Slot; worn: string
 
 export default function FittingPage() {
   const app = useApp();
+  const recordToday = useRecordToday();
   const s = useData(loadSnapshot);
   const settings = useData(getAiSettings);
   const [catChoice, setCat] = useState<Slot | null>(null);
@@ -183,8 +185,7 @@ export default function FittingPage() {
   const turn = () => setView((v) => (v === 'front' ? 'back' : 'front'));
 
   const wearToday = async () => {
-    await recordWear(app, { date: s.todayKey, itemIds: wornIds, source: 'manual' });
-    app.refresh();
+    if (!(await recordToday({ itemIds: wornIds, source: 'manual' }))) return;
     app.toast('已记录今天的穿搭，穿着次数 +1');
     router.navigate('/');
   };

@@ -149,9 +149,9 @@ export async function monthSpend(db: Db, ref: Date = new Date()): Promise<SpendS
 // ---------- wipe ----------
 
 export async function wipeAll(db: Db): Promise<void> {
-  await db.withTransactionAsync(async () => {
+  await db.withTransactionAsync(async (tx) => {
     for (const t of ['wear_log_items', 'wear_logs', 'outfit_items', 'outfits', 'tryon_cache', 'jobs', 'usage', 'avatar', 'items', 'settings']) {
-      await db.execAsync(`DELETE FROM ${t}`);
+      await tx.execAsync(`DELETE FROM ${t}`);
     }
   });
 }

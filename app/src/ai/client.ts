@@ -129,7 +129,9 @@ export function classify(status: number, body: string): AiError {
   }
   if (status === 429) return new AiError(code === 'insufficient_quota' || /quota|billing/i.test(msg) ? 'quota' : 'rate', msg, status);
   if (status >= 500) return new AiError('server', msg, status);
-  if (code === 'model_not_found' || /deprecated|does not exist|not supported|unsupported model/i.test(msg)) {
+  // Only errors about the model itself switch models; a rejected parameter ("x not supported") must not, or every
+  // later job would silently move to a pricier model.
+  if (code === 'model_not_found' || status === 404 || /\bmodel\b[^.]*\b(does not exist|has been deprecated|not found|is not available)/i.test(msg)) {
     return new AiError('model', msg, status);
   }
   if (code === 'moderation_blocked' || /safety|moderation/i.test(msg)) return new AiError('rejected', msg, status);

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { BackHandler, ScrollView, View } from 'react-native';
 import { SLOT_LABEL, seasonsLabel } from '@/domain/catalog';
 import { selectionFromItems } from '@/domain/outfit';
-import { computeItemStats, formatYuan } from '@/domain/stats';
+import { computeItemStats, currentDateKey, formatYuan } from '@/domain/stats';
 import type { Item } from '@/domain/types';
 import { updateItem } from '@/db/items';
 import { latestJobFor } from '@/db/jobs';
@@ -252,7 +252,7 @@ export default function ItemPage() {
               onPress={async () => {
                 const ids = new Set(s.todayLog?.itemIds ?? []);
                 ids.add(item.id);
-                await recordWear(app, { date: s.todayKey, itemIds: [...ids], source: 'manual' });
+                await recordWear(app, { date: currentDateKey(), itemIds: [...ids], source: 'manual' });
                 app.refresh();
                 app.toast('已加到今天的穿着记录');
               }}

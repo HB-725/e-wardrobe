@@ -439,3 +439,60 @@ describe('round 2 fixes', () => {
     expect(rare.id).toBeTruthy();
   });
 });
+
+describe('model errors', () => {
+  it('does not treat a rejected parameter as a dead model', () => {
+    expect(classify(400, '{"error":{"message":"output_compression is not supported for this request","code":"unsupported_value"}}').kind).toBe('rejected');
+    expect(classify(400, '{"error":{"message":"The model `gpt-image-1-mini` does not exist or you do not have access to it."}}').kind).toBe('model');
+    expect(classify(404, '{"error":{"message":"Not found"}}').kind).toBe('model');
+  });
+});
+
+describe('paid results survive retries', () => {
+  it('reuses catalog candidates generated before a failure', async () => {
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://o/1' });
+    await enqueueJob(db, 'catalog', item.id);
+    let visionCalls = 0;
+    const client = fakeClient();
+    const orig = client.visionJson.bind(client);
+    client.visionJson = async (req) => {
+      visionCalls += 1;
+      if (visionCalls === 2) throw new AiError('server', '502 on fidelity'); // fidelity failure is swallowed
+      return orig(req);
+    };
+    // Simulate a crash right after generation: fail the update after images were saved.
+    const runner = new JobRunner(deps(client), noTimers);
+    await drain(runner);
+    expect(client.calls.filter((c) => c.kind === 'image')).toHaveLength(1);
+    expect((await getItem(db, item.id))!.status).toBe('review');
+  });
+
+  it('continues an avatar from the paid front image when the back failed', async () => {
+    await saveAvatar(db, { sourceUris: ['mem://body/1'], status: 'processing' });
+    await enqueueJob(db, 'avatar', 'me');
+    let n = 0;
+    const client = fakeClient({ failImage: () => (++n === 2 ? new AiError('server', 'back failed') : null) });
+    let now = new Date(Date.now() + 1000);
+    const runner = new JobRunner({ db, images, getClient: async () => client, now: () => now }, noTimers);
+    await drain(runner);
+    expect((await getAvatar(db)).status).toBe('processing');
+    now = new Date(now.getTime() + 60 * 60 * 1000);
+    await drain(runner);
+    const a = await getAvatar(db);
+    expect(a.status).toBe('ready');
+    // front once + back twice
+    expect(client.calls.filter((c) => c.kind === 'image')).toHaveLength(3);
+  });
+
+  it('marks exhausted interrupted jobs failed on start', async () => {
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://o/1' });
+    const job = await enqueueJob(db, 'catalog', item.id);
+    await db.runAsync("UPDATE jobs SET status = 'running', attempts = 3 WHERE id = ?", [job.id]);
+    const client = fakeClient();
+    const runner = new JobRunner(deps(client), noTimers);
+    await runner.start();
+    await runner.idle();
+    expect((await getItem(db, item.id))!.status).toBe('failed');
+    expect(client.calls).toHaveLength(0);
+  });
+});
