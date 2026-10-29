@@ -108,6 +108,10 @@ export async function putTryon(db: Db, key: string, view: TryonView, version: st
   );
 }
 
+export async function deleteTryon(db: Db, key: string, view: TryonView): Promise<void> {
+  await db.runAsync('DELETE FROM tryon_cache WHERE key = ? AND view = ?', [key, view]);
+}
+
 export async function listTryonUris(db: Db): Promise<string[]> {
   return (await db.getAllAsync<{ uri: string }>('SELECT uri FROM tryon_cache')).map((r) => r.uri);
 }

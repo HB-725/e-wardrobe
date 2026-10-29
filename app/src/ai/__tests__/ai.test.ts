@@ -288,6 +288,11 @@ describe('runner', () => {
     await enqueueJob(db, 'tryon', tryonRef(key, 'back'), { itemIds: [a.id, b.id] }, { evenIfRunning: true });
     await drain(runner);
     expect(client.calls.at(-1)?.images).toBe(2); // regenerating the back reuses the cached front
+    // Regenerating the front drops the back that was turned from the old front.
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: [a.id, b.id] });
+    await drain(runner);
+    expect(await getTryon(db, key, 'front', avatarVersion(avatar))).toMatch(/^mem:\/\/tryon\//);
+    expect(await getTryon(db, key, 'back', avatarVersion(avatar))).toBeNull();
   });
 
   it('marks the avatar failed when generation is refused', async () => {

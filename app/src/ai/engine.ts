@@ -3,7 +3,7 @@ import type { FieldSource, Item, Job, Slot } from '@/domain/types';
 import type { Db } from '@/db/db';
 import { getItem, listItems, updateItem } from '@/db/items';
 import { hasNewerJob, updateJobPayload } from '@/db/jobs';
-import { addUsage, avatarUsable, avatarVersion, getAvatar, getTryon, monthSpend, pruneTryons, putTryon, saveAvatar } from '@/db/misc';
+import { addUsage, avatarUsable, avatarVersion, deleteTryon, getAvatar, getTryon, monthSpend, pruneTryons, putTryon, saveAvatar } from '@/db/misc';
 import { AiError, type OpenAiClient } from './client';
 import { getAiSettings, getModelChoice, hasPhotoConsent, qualityFor, saveModelChoice } from './config';
 import type { ImageStore } from './imageStore';
@@ -297,7 +297,17 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
     }
     const old = await getTryon(db, key, v, version);
     await putTryon(db, key, v, version, uri);
-    if (old && old !== uri) await images.remove(old);
+    if (old && old !== uri) {
+      await images.remove(old);
+      // The back was turned from the old front; it no longer matches.
+      if (v === 'front') {
+        const back = await getTryon(db, key, 'back', version);
+        if (back) {
+          await deleteTryon(db, key, 'back');
+          await images.remove(back);
+        }
+      }
+    }
     return uri;
   };
 

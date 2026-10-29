@@ -229,7 +229,7 @@ export default function FittingPage() {
                 busy
                   ? '生成中…'
                   : tryon?.uri
-                    ? `不满意？重新生成 · 约 ${formatUsd(cost)}`
+                    ? `重新生成 · 约 ${formatUsd(cost)}`
                     : tryon?.status === 'failed'
                       ? '重新生成上身效果'
                       : `生成上身效果 · 约 ${formatUsd(cost)}`
