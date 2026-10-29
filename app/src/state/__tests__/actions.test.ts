@@ -277,10 +277,10 @@ describe('spreadsheet import details', () => {
 
 describe('spreadsheet edge cases', () => {
   it('classifies tricky garment names', () => {
-    const csv = '名称,品类\n' + ['包臀裙', '面包服', '西装裤', '西装裙', '羽绒裤', '牛仔外套', '皮衣', '吊带', '袜子', '鞋包'].map((n) => `${n},${n}`).join('\n');
+    const csv = '名称,品类\n' + ['包臀裙', '面包服', '西装裤', '西装裙', '羽绒裤', '牛仔外套', '皮衣', '吊带', '袜子', '鞋包', '帽衫', '连帽外套', '开衫', '托特包', '棒球帽', '运动鞋'].map((n) => `${n},${n}`).join('\n');
     const r = parseWorkbook(Buffer.from(csv, 'utf8').toString('base64'), 'x.csv');
     expect(Object.fromEntries(r.items.map((i) => [i.name, i.slot]))).toEqual({
-      包臀裙: 'bottom', 面包服: 'outer', 西装裤: 'bottom', 西装裙: 'bottom', 羽绒裤: 'bottom', 牛仔外套: 'outer', 皮衣: 'outer', 吊带: 'top', 袜子: 'accessory', 鞋包: 'shoes',
+      包臀裙: 'bottom', 面包服: 'outer', 西装裤: 'bottom', 西装裙: 'bottom', 羽绒裤: 'bottom', 牛仔外套: 'outer', 皮衣: 'outer', 吊带: 'top', 袜子: 'accessory', 鞋包: 'shoes', 帽衫: 'top', 连帽外套: 'outer', 开衫: 'top', 托特包: 'bag', 棒球帽: 'accessory', 运动鞋: 'shoes',
     });
   });
 

@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { useState } from 'react';
 import { Linking, TextInput, View } from 'react-native';
@@ -21,12 +22,19 @@ import { ArchiveError } from '@/state/archive';
 import { PHOTO_NOTICE } from '@/state/consent';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
-import { confirmAsync, notify } from '@/ui/dialogs';
+import { askAsync, confirmAsync, notify } from '@/ui/dialogs';
 import { Btn, Chip, Loading, PageHeader, ProgressBar, Row, Screen, SectionTitle, Sheet, Switch, T, Tap } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
 import { Silhouette } from '@/ui/visuals';
 
 const CAPS = [1, 3, 5, 10, 20, 0];
+
+/** The installed package's version (what the store and the system show), falling back to the bundled config. */
+function appVersion(): string {
+  const v = Application.nativeApplicationVersion ?? Constants.expoConfig?.version;
+  if (!v) return '—';
+  return Application.nativeBuildVersion ? `v${v} (${Application.nativeBuildVersion})` : `v${v}`;
+}
 const QUALITY: { id: QualityLevel; label: string; sub: string }[] = [
   { id: 'economy', label: '省钱', sub: '全部用低画质，最便宜' },
   { id: 'standard', label: '标准', sub: '商品图低画质，形象和上身效果中画质' },
@@ -42,7 +50,6 @@ async function loadMe(db: Db) {
 type SheetKind = 'cap' | 'quality' | 'idle' | 'name' | 'licenses' | null;
 
 const FEEDBACK_URL = 'https://github.com/HB-725/e-wardrobe/issues';
-const PRIVACY_URL = 'https://github.com/HB-725/e-wardrobe/blob/main/PRIVACY.md';
 const REPORT_URL = 'https://github.com/HB-725/e-wardrobe/issues/new?title=%E4%B8%BE%E6%8A%A5+AI+%E7%94%9F%E6%88%90%E5%86%85%E5%AE%B9&labels=ai-content';
 const LICENSES: [string, string][] = [
   ['React · React Native', 'MIT'],
@@ -85,6 +92,16 @@ export default function MePage() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const report = async () => {
+    const go = await askAsync(
+      '举报 AI 生成的内容',
+      '请写明是哪张图（商品图、形象、上身效果或大片）以及问题，最好附上截图；不要附上你不想公开的照片。可以在 GitHub 提交（需要账号），也可以在应用商店的本应用页面留言。不满意的图片可以直接在 App 里删除或重新生成。',
+      '去 GitHub 提交',
+      '关闭',
+    );
+    if (go) Linking.openURL(REPORT_URL).catch(() => app.toast('无法打开浏览器'));
   };
 
   const importExcel = async () => {
@@ -316,10 +333,10 @@ export default function MePage() {
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>关于</SectionTitle>
-        <Row label="版本" value={`v${Constants.expoConfig?.version ?? '—'}`} />
-        <Row label="隐私政策" onPress={() => Linking.openURL(PRIVACY_URL).catch(() => app.toast('无法打开浏览器'))} />
+        <Row label="版本" value={appVersion()} />
+        <Row label="隐私政策" onPress={() => router.push('/privacy')} />
         <Row label="反馈问题" value="GitHub" onPress={() => Linking.openURL(FEEDBACK_URL).catch(() => app.toast('无法打开浏览器'))} />
-        <Row label="举报不当的 AI 生成内容" sub="附上截图说明是哪张图，我们会改进提示词" onPress={() => Linking.openURL(REPORT_URL).catch(() => app.toast('无法打开浏览器'))} />
+        <Row label="举报不当的 AI 生成内容" sub="生成的图片冒犯、不雅或明显不对时告诉我们" onPress={report} />
         <Row label="开源许可" onPress={() => setSheet('licenses')} last />
       </View>
       <T v="caption" style={{ textAlign: 'center', marginTop: 20 }}>
