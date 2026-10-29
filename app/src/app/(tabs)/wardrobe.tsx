@@ -127,7 +127,7 @@ export default function WardrobePage() {
                 style={{ width: '23.6%', aspectRatio: 0.75, borderWidth: 2, borderColor: on ? C.ink : C.card }}
               >
                 <ItemImage item={it} style={{ flex: 1 }} />
-                {it.status === 'active' ? <T style={{ position: 'absolute', right: 4, bottom: 2, fontSize: 10, color: C.sub }}>×{wears}</T> : null}
+                {it.status === 'active' ? <T style={{ position: 'absolute', right: 3, bottom: 3, fontSize: 10, color: C.sub, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 3 }}>×{wears}</T> : null}
                 {it.status === 'review' || it.status === 'failed' ? (
                   <View style={{ position: 'absolute', left: 0, top: 0, paddingHorizontal: 5, paddingVertical: 1, backgroundColor: it.status === 'failed' ? C.danger : C.ink }}>
                     <T style={{ color: '#FFFFFF', fontSize: 10 }}>{it.status === 'failed' ? '失败' : '待确认'}</T>

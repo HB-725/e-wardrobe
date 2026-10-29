@@ -47,12 +47,13 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
       </View>
     );
   }
-  // Read top to bottom like a person: outerwear, top, bottoms, shoes, bag, accessories.
+  // Read top to bottom like a person: outerwear, top, bottoms, shoes, bag, accessories. The garment pictures are
+  // laid out as separate tiles on white, so their slightly different backgrounds read as intended edges.
   const shown = [...items].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot)).slice(0, 4);
   const extra = items.length - shown.length;
   const gap = compact ? 2 : 6;
   return (
-    <View style={[{ backgroundColor: C.card, padding: compact ? 2 : 10, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center', gap }, style]}>
+    <View style={[{ backgroundColor: '#FFFFFF', padding: compact ? 2 : 10, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center', gap }, style]}>
       {shown.map((it, i) => (
         <View key={it.id} style={{ width: shown.length === 1 ? '90%' : `${(100 - 8) / 2}%`, aspectRatio: 0.75 }}>
           <ItemImage item={it} style={{ flex: 1 }} />
