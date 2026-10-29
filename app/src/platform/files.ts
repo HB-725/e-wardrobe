@@ -25,8 +25,10 @@ export async function saveImageToLibrary(uri: string): Promise<boolean> {
   return true;
 }
 
-/** Lets the user pick a spreadsheet; resolves to its base64 contents, or null if cancelled. */
-export async function pickSpreadsheet(): Promise<{ name: string; base64: string } | null> {
+export const MAX_SHEET_BYTES = 10 * 1024 * 1024;
+
+/** Lets the user pick a spreadsheet; resolves to its base64 contents (empty if over MAX_SHEET_BYTES), or null if cancelled. */
+export async function pickSpreadsheet(): Promise<{ name: string; base64: string; tooBig: boolean } | null> {
   const r = await DocumentPicker.getDocumentAsync({
     type: [XLSX_MIME, 'application/vnd.ms-excel', 'text/csv', '*/*'],
     copyToCacheDirectory: true,
@@ -34,5 +36,8 @@ export async function pickSpreadsheet(): Promise<{ name: string; base64: string 
   });
   if (r.canceled || !r.assets?.[0]) return null;
   const asset = r.assets[0];
-  return { name: asset.name, base64: await new File(asset.uri).base64() };
+  const file = new File(asset.uri);
+  // Checked before reading: the whole file is decoded in memory.
+  if ((asset.size ?? file.size ?? 0) > MAX_SHEET_BYTES) return { name: asset.name, base64: '', tooBig: true };
+  return { name: asset.name, base64: await file.base64(), tooBig: false };
 }

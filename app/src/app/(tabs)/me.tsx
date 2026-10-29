@@ -10,7 +10,7 @@ import { createItem, listItems } from '@/db/items';
 import { getSetting, monthSpend } from '@/db/misc';
 import { listOutfits } from '@/db/outfits';
 import { listLogs } from '@/db/wear';
-import { buildWorkbook, isDuplicate, parseWorkbook } from '@/domain/excel';
+import { buildWorkbook, isDuplicate, parseWorkbook, SpreadsheetError } from '@/domain/excel';
 import { toDateKey } from '@/domain/stats';
 import { pickSpreadsheet, shareBase64File, XLSX_MIME } from '@/platform/files';
 import { setApiKey } from '@/platform/secrets';
@@ -88,29 +88,36 @@ export default function MePage() {
   const importExcel = async () => {
     const file = await pickSpreadsheet();
     if (!file) return;
+    // Spreadsheets are parsed in JS: refuse anything far larger than a wardrobe list.
+    if (file.tooBig) return notify('文件太大', '只能导入 10 MB 以内的表格。');
     setBusy('import');
     try {
-      const r = parseWorkbook(file.base64);
+      const r = parseWorkbook(file.base64, file.name);
       const existing = await listItems(app.db);
       let added = 0;
       let dup = 0;
-      for (const it of r.items) {
-        if (isDuplicate(existing, it)) {
-          dup += 1;
-          continue;
+      await app.db.withTransactionAsync(async (tx) => {
+        for (const it of r.items) {
+          if (isDuplicate(existing, it)) {
+            dup += 1;
+            continue;
+          }
+          const { archived, ...fields } = it;
+          await createItem(tx, { ...fields, status: archived ? 'archived' : 'active', fieldSources: userSources(fields) });
+          added += 1;
         }
-        const { archived, ...fields } = it;
-        await createItem(app.db, { ...fields, status: archived ? 'archived' : 'active', fieldSources: userSources(fields) });
-        added += 1;
-      }
+      });
       app.refresh();
       const lines = [`新增 ${added} 件`];
       if (dup) lines.push(`${dup} 件已存在，跳过`);
-      if (r.skipped.length) lines.push(`${r.skipped.length} 行无法识别：${r.skipped.slice(0, 3).map((x) => `第 ${x.row} 行${x.reason}`).join('；')}`);
-      lines.push('导入的衣服没有照片，可以在单品详情里补拍。');
+      const list = (xs: { row: number; reason: string }[]) =>
+        xs.slice(0, 5).map((x) => `第 ${x.row} 行${x.reason}`).join('；') + (xs.length > 5 ? `；等 ${xs.length} 行` : '');
+      if (r.skipped.length) lines.push(`${r.skipped.length} 行没有导入：${list(r.skipped)}`);
+      if (r.warnings.length) lines.push(`注意：${list(r.warnings)}`);
+      if (added) lines.push('导入的衣服没有照片，可以在单品详情里补拍。');
       notify('导入完成', lines.join('\n'));
     } catch (e) {
-      notify('导入失败', `无法读取这个文件：${String(e)}`);
+      notify('导入失败', e instanceof SpreadsheetError ? e.message : `无法读取这个文件，请确认是 Excel（.xlsx）文件。\n${String(e)}`);
     } finally {
       setBusy(null);
     }

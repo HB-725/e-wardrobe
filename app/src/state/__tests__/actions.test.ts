@@ -145,9 +145,10 @@ describe('excel', () => {
     const r = parseWorkbook(XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }));
     expect(r.items.map((i) => [i.name, i.slot, i.seasons, i.priceCents, i.purchasedOn])).toEqual([
       ['白衬衫', 'top', ['spring', 'autumn'], 19900, '2024-05-01'],
+      ['帽子', 'accessory', [], null, null], // 帽类 is recognised by keyword
       ['皮鞋', 'shoes', ['winter'], 89900, '2023-03-15'],
     ]);
-    expect(r.skipped.map((s) => s.row)).toEqual([3, 5]);
+    expect(r.skipped.map((s) => s.row)).toEqual([5]);
   });
 
   it('marks imported fields as user-entered so the AI keeps them', () => {
@@ -253,5 +254,23 @@ describe('try-on state', () => {
     expect(await tryonState(db, [a.id], 'front')).toEqual({ uri: 'file:///t.jpg', status: 'none', error: null });
     await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: [a.id] });
     expect(await tryonState(db, [a.id], 'front')).toMatchObject({ uri: 'file:///t.jpg', status: 'queued' });
+  });
+});
+
+describe('spreadsheet import details', () => {
+  const b64 = (bytes: Buffer) => bytes.toString('base64');
+  it('reads a UTF-8 CSV (with or without BOM) and refuses other encodings with a clear message', () => {
+    const csv = '名称,品类,购买日期\n白衬衫,衬衫,2024-03-05\n牛仔裤,牛仔裤,2024-13-40\n帽子,棒球帽,\n';
+    for (const bom of ['', '﻿']) {
+      const r = parseWorkbook(b64(Buffer.from(bom + csv, 'utf8')), 'wardrobe.csv');
+      expect(r.items.map((i) => [i.name, i.slot, i.purchasedOn])).toEqual([
+        ['白衬衫', 'top', '2024-03-05'],
+        ['牛仔裤', 'bottom', null],
+        ['帽子', 'accessory', null],
+      ]);
+      expect(r.warnings).toEqual([{ row: 3, reason: '购买日期「2024-13-40」无法识别，已留空' }]);
+    }
+    const gbkLike = Buffer.from([0xc3, 0xfb, 0xb3, 0xc6, 0x2c, 0x0a]); // "名称," in GBK
+    expect(() => parseWorkbook(b64(gbkLike), 'old.csv')).toThrow(/UTF-8/);
   });
 });

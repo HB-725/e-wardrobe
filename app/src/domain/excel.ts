@@ -89,6 +89,7 @@ export function buildWorkbook(items: Item[], outfits: Outfit[], logs: WearLog[],
 const SLOT_ALIASES: Record<string, Slot> = {
   外套: 'outer',
   上衣: 'top',
+  上装: 'top',
   下装: 'bottom',
   裤子: 'bottom',
   裙子: 'bottom',
@@ -96,7 +97,22 @@ const SLOT_ALIASES: Record<string, Slot> = {
   鞋子: 'shoes',
   包: 'bag',
   配饰: 'accessory',
+  饰品: 'accessory',
 };
+
+/** Words people write in a 品类 column instead of the six category names, checked in this order. */
+const SLOT_KEYWORDS: [RegExp, Slot][] = [
+  [/外套|夹克|大衣|羽绒|风衣|西装|棉服|冲锋衣|马甲/, 'outer'],
+  [/鞋|靴/, 'shoes'],
+  [/包/, 'bag'],
+  [/裤|裙/, 'bottom'],
+  [/T恤|t恤|衬衫|毛衣|卫衣|针织|背心|上衣|打底|polo|POLO/, 'top'],
+  [/帽|围巾|领带|腰带|皮带|手表|眼镜|首饰|项链|手链|耳环|饰/, 'accessory'],
+];
+
+function slotOf(raw: string): Slot | undefined {
+  return SLOT_ALIASES[raw] ?? (SLOTS.find((s) => s.id === raw)?.id as Slot | undefined) ?? SLOT_KEYWORDS.find(([re]) => re.test(raw))?.[1];
+}
 
 const SEASON_ALIASES: Record<string, Season> = { 春: 'spring', 夏: 'summer', 秋: 'autumn', 冬: 'winter' };
 
@@ -116,7 +132,10 @@ function parseDate(v: unknown): string | null {
   if (!s) return null;
   const m = s.match(/^(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2}))?/);
   if (!m) return null;
-  return `${m[1]}-${m[2].padStart(2, '0')}${m[3] ? `-${m[3].padStart(2, '0')}` : '-01'}`;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), m[3] ? Number(m[3]) : 1];
+  // Reject impossible dates such as 2024-13-40 rather than storing them.
+  if (y < 1900 || mo < 1 || mo > 12 || d < 1 || d > new Date(y, mo, 0).getDate()) return null;
+  return `${m[1]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 export interface ImportedItem {
@@ -139,16 +158,63 @@ export interface ImportedItem {
 export interface ImportResult {
   items: ImportedItem[];
   skipped: { row: number; reason: string }[];
+  /** Rows imported with a value left out (e.g. a date that could not be read). */
+  warnings: { row: number; reason: string }[];
+}
+
+export class SpreadsheetError extends Error {}
+
+/** Excel workbooks are read as binary; CSV text must be UTF-8 (Excel's "CSV UTF-8"), older ANSI/GBK files are not. */
+function readBook(base64: string, fileName: string): XLSX.WorkBook {
+  if (!/\.csv$/i.test(fileName)) return XLSX.read(base64, { type: 'base64' });
+  const text = decodeUtf8(base64ToBinary(base64));
+  if (text === null) throw new SpreadsheetError('这个 CSV 不是 UTF-8 编码。请在 Excel 里另存为「Excel 工作簿 (.xlsx)」或「CSV UTF-8」后再导入。');
+  return XLSX.read(text.replace(/^\uFEFF/, ''), { type: 'string' });
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function base64ToBinary(b64: string): string {
+  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
+  let out = '';
+  for (let i = 0; i < clean.length; i += 4) {
+    const n = [0, 1, 2, 3].map((k) => (i + k < clean.length ? B64.indexOf(clean[i + k]) : 0));
+    const v = (n[0] << 18) | (n[1] << 12) | (n[2] << 6) | n[3];
+    out += String.fromCharCode((v >> 16) & 255);
+    if (i + 2 < clean.length) out += String.fromCharCode((v >> 8) & 255);
+    if (i + 3 < clean.length) out += String.fromCharCode(v & 255);
+  }
+  return out;
+}
+
+/** Strict UTF-8 decoding of a binary string; null if the bytes are not valid UTF-8. */
+export function decodeUtf8(bin: string): string | null {
+  let out = '';
+  for (let i = 0; i < bin.length; ) {
+    const b = bin.charCodeAt(i);
+    const need = b < 0x80 ? 0 : b >= 0xc2 && b < 0xe0 ? 1 : b >= 0xe0 && b < 0xf0 ? 2 : b >= 0xf0 && b < 0xf5 ? 3 : -1;
+    if (need < 0 || i + need >= bin.length + (need ? 0 : 1)) return null;
+    let cp = need === 0 ? b : b & (0x3f >> need);
+    for (let k = 1; k <= need; k++) {
+      const c = bin.charCodeAt(i + k);
+      if ((c & 0xc0) !== 0x80) return null;
+      cp = (cp << 6) | (c & 0x3f);
+    }
+    out += String.fromCodePoint(cp);
+    i += need + 1;
+  }
+  return out;
 }
 
 /** Reads the first sheet (or the one named 单品). Rows need at least 名称 and a recognisable 品类. */
-export function parseWorkbook(base64: string): ImportResult {
-  const wb = XLSX.read(base64, { type: 'base64' });
+export function parseWorkbook(base64: string, fileName = 'import.xlsx'): ImportResult {
+  const wb = readBook(base64, fileName);
   const sheet = wb.Sheets['单品'] ?? wb.Sheets[wb.SheetNames[0]];
-  if (!sheet) return { items: [], skipped: [] };
+  if (!sheet) return { items: [], skipped: [], warnings: [] };
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
   const items: ImportedItem[] = [];
   const skipped: ImportResult['skipped'] = [];
+  const warnings: ImportResult['warnings'] = [];
   rows.forEach((r, i) => {
     const rowNo = i + 2; // header is row 1
     const name = str(r['名称']);
@@ -157,7 +223,7 @@ export function parseWorkbook(base64: string): ImportResult {
       return;
     }
     const slotRaw = str(r['品类']) ?? '';
-    const slot = SLOT_ALIASES[slotRaw] ?? (SLOTS.find((s) => s.id === slotRaw)?.id as Slot | undefined);
+    const slot = slotOf(slotRaw);
     if (!slot) {
       skipped.push({ row: rowNo, reason: `品类「${slotRaw || '空'}」无法识别` });
       return;
@@ -166,6 +232,8 @@ export function parseWorkbook(base64: string): ImportResult {
       .split(/[、,，/·\s]+/)
       .map((x) => SEASON_ALIASES[x] ?? x)
       .filter(isSeason);
+    const purchasedOn = parseDate(r['购买日期']);
+    if (!purchasedOn && str(r['购买日期'])) warnings.push({ row: rowNo, reason: `购买日期「${str(r['购买日期'])}」无法识别，已留空` });
     const priceRaw = r['价格'];
     const price = typeof priceRaw === 'number' ? priceRaw : Number(String(priceRaw ?? '').replace(/[¥￥,\s元]/g, ''));
     items.push({
@@ -178,14 +246,14 @@ export function parseWorkbook(base64: string): ImportResult {
       size: str(r['尺码']),
       material: str(r['材质']),
       priceCents: Number.isFinite(price) && price > 0 ? Math.round(price * 100) : null,
-      purchasedOn: parseDate(r['购买日期']),
+      purchasedOn,
       channel: str(r['购买渠道']),
       location: str(r['存放位置']),
       fitNotes: str(r['合身笔记']),
       archived: str(r['状态']) === '已收起',
     });
   });
-  return { items, skipped };
+  return { items, skipped, warnings };
 }
 
 /** Same name, category, colour, size and brand counts as a duplicate, so importing an export twice is harmless. */
