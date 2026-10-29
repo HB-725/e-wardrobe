@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { useState } from 'react';
-import { Linking, TextInput, View } from 'react-native';
+import { Linking, Platform, TextInput, View } from 'react-native';
 import { getAiSettings, getModelChoice, type QualityLevel, saveAiSettings, savePrefs } from '@/ai/config';
 import { formatUsd } from '@/ai/models';
 import type { Db } from '@/db/db';
@@ -31,9 +31,11 @@ const CAPS = [1, 3, 5, 10, 20, 0];
 
 /** The installed package's version (what the store and the system show), falling back to the bundled config. */
 function appVersion(): string {
-  const v = Application.nativeApplicationVersion ?? Constants.expoConfig?.version;
+  // On the web expo-application reports its own placeholder, not this app's version.
+  const native = Platform.OS !== 'web';
+  const v = (native && Application.nativeApplicationVersion) || Constants.expoConfig?.version;
   if (!v) return '—';
-  return Application.nativeBuildVersion ? `v${v} (${Application.nativeBuildVersion})` : `v${v}`;
+  return native && Application.nativeBuildVersion ? `v${v} (${Application.nativeBuildVersion})` : `v${v}`;
 }
 const QUALITY: { id: QualityLevel; label: string; sub: string }[] = [
   { id: 'economy', label: '省钱', sub: '全部用低画质，最便宜' },
