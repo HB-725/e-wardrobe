@@ -164,7 +164,7 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
   }
 
   const b64s = await generate(deps, client, 'catalog', {
-    prompt: catalogPrompt(item.slot, item.name),
+    prompt: catalogPrompt(item.slot, item.name, { name: item.colorName, hex: item.colorHex }),
     images: [original],
     quality: qualityFor(settings.quality, 'catalog'),
     n: Math.max(1, Math.min(3, settings.candidates)),

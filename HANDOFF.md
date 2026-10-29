@@ -33,14 +33,19 @@
   `emulator -avd smoke -no-accel -no-window -no-audio -gpu swiftshader_indirect -no-snapshot`，再用 `-PreactNativeArchitectures=x86_64` 打一个包安装。
   uiautomator 在这么慢的模拟器上取不到界面树，用 `adb shell input tap x y` 按坐标点；系统 UI 会频繁 ANR，点 Wait 即可。
 - 已在模拟器上跑通（0.2.0 之前）：启动、五个页签、相机拍照、照片导入、无 Key 时队列暂停提示、只存原图、衣橱、试衣间、保存穿搭、今天穿这套、Excel 导出分享；没有 JS 错误或崩溃。
-- 模拟器连不上 OpenAI（流量走宿主代理），所以设备上的 AI 调用没有验证；同样的代码在 Node 里用真实 Key 跑通过。
+- 设备上的 AI：用 Android 13 镜像（`system-images;android-33;default;x86_64`，可 root），`emulator ... -writable-system`，
+  `adb root && adb remount && adb reboot`，把 `/root/.ccr/agent-proxy-ca.crt` 按 `openssl x509 -subject_hash_old` 命名成 `<hash>.0` 推到 `/system/etc/security/cacerts/`，
+  再 `adb shell settings put global http_proxy 10.0.2.2:41613`（不要用模拟器的 -http-proxy，它用 IP 发 CONNECT 会被代理拒绝）。
+  Key 页面随便填一个 `sk-` 开头的占位 Key，代理会注入真实 Key。
+- 0.3.0 前已在模拟器上用真实 AI 跑通：保存 Key、相册批量导入 4 件 → 自动填 + 2 个候选 + 保真检查 → 确认、建立形象（正 / 背面）、试衣间快速换装、生成上身效果、完整备份到 Documents、永久删除、从备份恢复。
 
 ## 进度
 - [x] 脚手架、domain、db、repositories + 测试
 - [x] AI 层 + 测试；真实 Key 跑通全流程（两轮）
 - [x] 全部页面；web 导出截图核对
 - [x] 两轮代码审视（共 26 个问题已修复并加测试，73 个测试）
-- [x] APK 0.2.0（arm64，versionCode 2）；软件模拟器冒烟测试通过
+- [x] APK 0.3.0（arm64，versionCode 3）；软件模拟器上完整跑通（含真实 AI、备份恢复）
+- [x] 完整备份 / 恢复（含照片），存到用户选的文件夹
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
-- [ ] 下一轮可做：完整备份 / 恢复（含照片，zip）；导入穿搭和穿着记录；商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
+- [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
 - 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。

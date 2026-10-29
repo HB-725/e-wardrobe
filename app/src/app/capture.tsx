@@ -2,6 +2,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -132,6 +133,7 @@ export default function CapturePage() {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.ink, paddingTop: insets.top }}>
+      <StatusBar style="light" />
       <View style={{ height: 60, paddingHorizontal: 8, paddingTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <IconBtn name="close" label="关闭" color="#FFFFFF" onPress={close} />
         <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '500' }}>录入新衣服</Text>

@@ -65,8 +65,11 @@ const SLOT_EN: Record<Slot, string> = {
   accessory: 'accessory',
 };
 
-export function catalogPrompt(slot: Slot, name: string | null): string {
+export function catalogPrompt(slot: Slot, name: string | null, color?: { name: string | null; hex: string | null }): string {
   const what = SLOT_EN[slot];
+  const colorLine = color?.hex
+    ? `The main colour measured from the photo is ${color.hex}${color.name ? ` (${color.name})` : ''}; reproduce exactly that colour, correcting only for the photo's lighting cast.`
+    : null;
   const framing =
     slot === 'shoes'
       ? 'Show the pair side by side at a slight three-quarter angle, as on an online shop product page.'
@@ -80,7 +83,10 @@ export function catalogPrompt(slot: Slot, name: string | null): string {
     'Centered with even margins, the item fills about 80% of the frame height. Soft diffused studio light, only a very faint contact shadow.',
     'Change only the photography: you may smooth wrinkles, straighten the angle, even out the lighting and complete parts that were hidden or folded.',
     'Never change the item itself: keep the exact colour, cut and silhouette, length, number and position of buttons, pockets and zips, prints, logos, stitching and fabric texture.',
-  ].join(' ');
+    colorLine,
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 // ---------- fidelity check ----------

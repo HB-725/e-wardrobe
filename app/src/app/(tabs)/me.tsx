@@ -123,7 +123,8 @@ export default function MePage() {
     if (!storage) return;
     try {
       const info = await readBackupInfo(storage);
-      const when = info.createdAt.slice(0, 16).replace('T', ' ');
+      const d = new Date(info.createdAt);
+      const when = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
       if (!(await confirmAsync('从备份恢复', `备份时间 ${when}，共 ${info.items} 件衣服、${info.outfits} 套穿搭。手机上现有的数据会被替换。`, '恢复'))) return;
     } catch (e) {
       notify('无法恢复', e instanceof BackupError ? e.message : String(e));

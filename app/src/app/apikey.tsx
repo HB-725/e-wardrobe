@@ -43,7 +43,13 @@ export default function ApiKeyPage() {
       app.toast(`Key 已保存，将使用 ${r.image} 和 ${r.vision}`);
       router.back();
     } catch (e) {
-      setError(e instanceof AiError && e.kind === 'model' ? '这个 Key 没有可用的图像模型。请确认账户已充值，部分模型需要在 OpenAI 后台完成组织验证。' : describeAiError(e));
+      setError(
+        e instanceof AiError && e.kind === 'model'
+          ? '这个 Key 没有可用的图像模型。请确认账户已充值，部分模型需要在 OpenAI 后台完成组织验证。'
+          : e instanceof AiError && e.kind === 'network'
+            ? '连不上 OpenAI，请检查网络后再试一次'
+            : describeAiError(e),
+      );
     } finally {
       setBusy(false);
     }
