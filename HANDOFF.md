@@ -27,11 +27,20 @@
 - 产物：`app/android/app/build/outputs/apk/release/app-release.apk`。目前用模板自带的 debug keystore 签名（每次构建签名一致，可以覆盖安装）；正式发布前要换成自己的 keystore。
 - 机器没有 KVM，跑不了模拟器；APK 需要用户真机安装验证。
 
+## 真机 / 模拟器验证
+- 这台机器没有 KVM，但可以用纯软件模拟器做冒烟测试（很慢：开机约 15 分钟，每步约 1 分钟）：
+  `sdkmanager "emulator" "system-images;android-34;default;x86_64"`，`avdmanager create avd -n smoke -k "system-images;android-34;default;x86_64" -d pixel_5`，
+  `emulator -avd smoke -no-accel -no-window -no-audio -gpu swiftshader_indirect -no-snapshot`，再用 `-PreactNativeArchitectures=x86_64` 打一个包安装。
+  uiautomator 在这么慢的模拟器上取不到界面树，用 `adb shell input tap x y` 按坐标点；系统 UI 会频繁 ANR，点 Wait 即可。
+- 已在模拟器上跑通（0.2.0 之前）：启动、五个页签、相机拍照、照片导入、无 Key 时队列暂停提示、只存原图、衣橱、试衣间、保存穿搭、今天穿这套、Excel 导出分享；没有 JS 错误或崩溃。
+- 模拟器连不上 OpenAI（流量走宿主代理），所以设备上的 AI 调用没有验证；同样的代码在 Node 里用真实 Key 跑通过。
+
 ## 进度
 - [x] 脚手架、domain、db、repositories + 测试
-- [x] AI 层 + 测试；真实 Key 跑通全流程
+- [x] AI 层 + 测试；真实 Key 跑通全流程（两轮）
 - [x] 全部页面；web 导出截图核对
-- [x] 第一轮代码审视（13 个问题已修复并加测试）
-- [ ] APK 构建（进行中，见上）
-- [ ] 用户真机验证：相机、相册多选、分享、保存到相册、Excel 导入导出、后台任务恢复
-- [ ] 下一轮：商品图背景和 #F1F1F2 不完全一致（详情页可见色差）；可考虑本机抠图；8 角度；iOS
+- [x] 两轮代码审视（共 26 个问题已修复并加测试，73 个测试）
+- [x] APK 0.2.0（arm64，versionCode 2）；软件模拟器冒烟测试通过
+- [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
+- [ ] 下一轮可做：完整备份 / 恢复（含照片，zip）；导入穿搭和穿着记录；商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
+- 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。
