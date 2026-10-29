@@ -186,15 +186,20 @@ export function tryonPrompt(slots: Slot[]): string {
  * The back view turns the front try-on around. Given flat product shots instead, the model kept copying chest
  * prints onto the back whatever the prompt said; from the dressed front it gets them right (7/7 in tests).
  */
-export function tryonBackPrompt(slots: Slot[]): string {
-  const list = slots.map((s) => SLOT_EN[s]).join(', ');
+export function tryonBackPrompt(garments: { slot: Slot; colorHex: string | null }[]): string {
+  const list = garments.map((g) => SLOT_EN[g.slot]).join(', ');
+  // Without the measured colours a second generation drifts (a cream tee came back beige).
+  const colours = garments.filter((g) => g.colorHex).map((g) => `${SLOT_EN[g.slot]} ${g.colorHex}`);
   return [
     'Image 1 shows a person from behind in plain base clothes, in a studio. Image 2 shows the same person from the front, wearing an outfit',
     `(${list}).`,
     'Show the person from behind exactly as in image 1 (same pose, framing, background and lighting), now wearing every garment of the outfit in image 2, shoes included, as that outfit really looks from behind. Shoes replace bare feet.',
     'Repeating all-over patterns continue across the back. Anything placed on the front of a garment (a chest print, logo, heart, emblem, text, buttons, front pockets) cannot be seen from behind and must not appear on the back.',
+    colours.length ? `Each garment keeps exactly its colour from image 2: ${colours.join(', ')}; do not darken, warm or tint them.` : null,
     "Keep each garment's colour, fabric, length and fit. Do not add any garment that is not in image 2. Photorealistic.",
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export interface Scene {

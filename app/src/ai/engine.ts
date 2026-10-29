@@ -320,7 +320,7 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
     if (!front || view === 'front') return;
   }
   const [b64] = await generate(deps, client, 'tryon', {
-    prompt: tryonBackPrompt(slots),
+    prompt: tryonBackPrompt(garments),
     images: [await images.toDataUrl(avatar.backUri!, 1024), await images.toDataUrl(front, 1024)],
     quality,
   });
