@@ -63,7 +63,7 @@ function OutfitSheet({ s, outfit, onClose }: { s: Snapshot; outfit: Outfit | nul
         />
         <Btn
           label="删除这套穿搭"
-          kind="ghost"
+          kind="dangerGhost"
           onPress={async () => {
             if (!(await confirmAsync('删除穿搭', `删除「${outfit.name}」？衣服本身和穿着记录不受影响。`))) return;
             await removeOutfit(app, outfit.id);

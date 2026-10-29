@@ -53,7 +53,7 @@ export function Btn({
 }: {
   label: string;
   onPress?: () => void;
-  kind?: 'primary' | 'outline' | 'ghost' | 'danger';
+  kind?: 'primary' | 'outline' | 'ghost' | 'danger' | 'dangerGhost';
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
@@ -62,7 +62,7 @@ export function Btn({
   testID?: string;
 }) {
   const primary = kind === 'primary';
-  const fg = primary ? '#FFFFFF' : kind === 'danger' ? C.danger : C.ink;
+  const fg = primary ? '#FFFFFF' : kind === 'danger' || kind === 'dangerGhost' ? C.danger : C.ink;
   return (
     <Pressable
       testID={testID}
@@ -79,7 +79,7 @@ export function Btn({
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: primary ? C.ink : C.bg,
-          borderWidth: kind === 'ghost' ? 0 : 1,
+          borderWidth: kind === 'ghost' || kind === 'dangerGhost' ? 0 : 1,
           borderColor: kind === 'danger' ? C.danger : C.ink,
           opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
         },

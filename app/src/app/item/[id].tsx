@@ -289,7 +289,7 @@ export default function ItemPage() {
         />
         <Btn
           label="删除这件衣服"
-          kind="ghost"
+          kind="dangerGhost"
           height={44}
           onPress={async () => {
             if (!(await confirmAsync('删除这件衣服？', '照片、标准图会一起删除；包含它的穿搭和穿着记录里也会去掉它。'))) return;
