@@ -8,7 +8,10 @@ import { listOutfits } from '@/db/outfits';
 import { getLogByDate, listLogs } from '@/db/wear';
 import { buildWorkbook, isDuplicate, parseWorkbook } from '@/domain/excel';
 import type { ImageStore } from '@/ai/imageStore';
-import { addFitNote, addGarments, confirmItem, keepCurrent, keepOriginal, recordWear, removeItem, saveOutfit, undoWear, userSources } from '../actions';
+import { addFitNote, addGarments, confirmItem, keepCurrent, keepOriginal, recordWear, removeItem, saveOutfit, tryonState, undoWear, userSources } from '../actions';
+import { avatarVersion, putTryon, saveAvatar } from '@/db/misc';
+import { outfitKey } from '@/domain/outfit';
+import { tryonRef } from '@/ai/engine';
 import { normalizeDate } from '@/ui/ItemForm';
 
 class Images implements ImageStore {
@@ -238,5 +241,17 @@ describe('round 5', () => {
     });
     expect(await cleanOrphanImages({ db, images: store, runner: { kick() {} } }, now)).toBe(1);
     expect(images.removed).toEqual(['orphan']);
+  });
+});
+
+describe('try-on state', () => {
+  it('keeps showing the cached image while a regeneration runs', async () => {
+    const avatar = await saveAvatar(db, { frontUri: 'file:///f.jpg', status: 'ready' });
+    const a = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'file:///a.jpg' });
+    const key = outfitKey([a.id]);
+    await putTryon(db, key, 'front', avatarVersion(avatar), 'file:///t.jpg');
+    expect(await tryonState(db, [a.id], 'front')).toEqual({ uri: 'file:///t.jpg', status: 'none', error: null });
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: [a.id] });
+    expect(await tryonState(db, [a.id], 'front')).toMatchObject({ uri: 'file:///t.jpg', status: 'queued' });
   });
 });
