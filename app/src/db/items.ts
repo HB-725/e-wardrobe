@@ -1,4 +1,4 @@
-import type { Fidelity, FieldSource, Item, ItemStatus, Season, Slot } from '@/domain/types';
+import type { FieldSource, Item, ItemStatus, Season, Slot } from '@/domain/types';
 import { type Db, newId, nowIso, parseJson, type SqlParam } from './db';
 
 interface ItemRow {
@@ -22,7 +22,6 @@ interface ItemRow {
   catalog_uri: string | null;
   tag_uri: string | null;
   field_sources: string;
-  fidelity: string | null;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -50,7 +49,6 @@ function fromRow(r: ItemRow): Item {
     catalogUri: r.catalog_uri,
     tagUri: r.tag_uri,
     fieldSources: parseJson<Partial<Record<keyof Item, FieldSource>>>(r.field_sources, {}),
-    fidelity: parseJson<Fidelity | null>(r.fidelity, null),
     error: r.error,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -78,13 +76,11 @@ const COLUMNS: Partial<Record<keyof Item, string>> = {
   catalogUri: 'catalog_uri',
   tagUri: 'tag_uri',
   fieldSources: 'field_sources',
-  fidelity: 'fidelity',
   error: 'error',
 };
 
 function toParam(key: keyof Item, value: unknown): SqlParam {
   if (key === 'seasons' || key === 'fieldSources') return JSON.stringify(value ?? (key === 'seasons' ? [] : {}));
-  if (key === 'fidelity') return value ? JSON.stringify(value) : null;
   if (value === undefined) return null;
   return value as SqlParam;
 }

@@ -6,11 +6,6 @@ export type FieldSource = 'ai' | 'tag' | 'user';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
-export interface Fidelity {
-  sameItem: boolean;
-  checks: { label: string; ok: boolean; note: string }[];
-}
-
 export interface Item {
   id: string;
   name: string;
@@ -32,8 +27,6 @@ export interface Item {
   catalogUri: string | null;
   tagUri: string | null;
   fieldSources: Partial<Record<keyof Item, FieldSource>>;
-  /** Result of comparing the generated catalog image with the original photo. */
-  fidelity: Fidelity | null;
   error: string | null;
   createdAt: string;
   updatedAt: string;

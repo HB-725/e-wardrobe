@@ -105,7 +105,6 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
-  `ALTER TABLE items ADD COLUMN fidelity TEXT;`,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
