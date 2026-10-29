@@ -2,7 +2,7 @@ import { getAiBlocked, getPrefs, type Prefs } from '@/ai/config';
 import type { Db } from '@/db/db';
 import { listItems } from '@/db/items';
 import { countActiveJobs } from '@/db/jobs';
-import { avatarVersion, frontTryons, getAvatar } from '@/db/misc';
+import { avatarVersion, frontTryons, getAvatar, getSetting } from '@/db/misc';
 import { listOutfits } from '@/db/outfits';
 import { listLogs } from '@/db/wear';
 import { outfitKey } from '@/domain/outfit';
@@ -28,13 +28,15 @@ export interface Snapshot {
   /** Front try-on image per outfit key for the current avatar. */
   tryons: Map<string, string>;
   blocked: string | null;
+  /** Whether an API key has been saved (its last 4 characters are kept in settings; the key itself is in secure storage). */
+  hasKey: boolean;
   jobs: Record<JobType, number>;
   prefs: Prefs;
 }
 
 export async function loadSnapshot(db: Db): Promise<Snapshot> {
   const today = new Date();
-  const [items, logs, outfits, avatar, blocked, jobs, prefs] = await Promise.all([
+  const [items, logs, outfits, avatar, blocked, jobs, prefs, last4] = await Promise.all([
     listItems(db),
     listLogs(db),
     listOutfits(db),
@@ -42,6 +44,7 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     getAiBlocked(db),
     countActiveJobs(db),
     getPrefs(db),
+    getSetting(db, 'ai.keyLast4'),
   ]);
   const active = items.filter((i) => i.status === 'active');
   const todayKey = toDateKey(today);
@@ -61,6 +64,7 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     avatar,
     tryons: await frontTryons(db, avatarVersion(avatar)),
     blocked,
+    hasKey: !!last4,
     jobs,
     prefs,
   };

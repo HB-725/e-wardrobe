@@ -121,6 +121,18 @@ function Onboarding({ s }: { s: Snapshot }) {
         </T>
       </View>
       <View style={{ marginTop: 22, marginHorizontal: PAD, borderTopWidth: 1, borderTopColor: C.ink }}>
+        {!s.hasKey ? (
+          <Tap onPress={() => router.push('/apikey')} style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: C.line, flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+            <T style={{ fontSize: 12, fontWeight: '700' }}>00</T>
+            <View style={{ flex: 1, gap: 4 }}>
+              <T style={{ fontSize: 17, fontWeight: '700' }}>填写 OpenAI API Key</T>
+              <T v="small" style={{ color: C.sub }}>
+                AI 生成商品图、形象和上身效果要用。费用由你的 OpenAI 账户按量支付，录入一件约 $0.01–0.02。
+              </T>
+            </View>
+            <Icon name="forward" size={18} />
+          </Tap>
+        ) : null}
         <View style={{ paddingTop: 18, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: C.line, gap: 14 }}>
           <View style={{ flexDirection: 'row', gap: 14 }}>
             <T style={{ fontSize: 12, fontWeight: '700', paddingTop: 3 }}>01</T>
