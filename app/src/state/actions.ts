@@ -203,9 +203,10 @@ export async function tryonState(db: Db, itemIds: string[], view: TryonView): Pr
   const avatar = await getAvatar(db);
   const key = outfitKey(itemIds);
   const uri = await getTryon(db, key, view, avatarVersion(avatar));
-  if (uri) return { uri, status: 'none', error: null };
   const job = await latestJobFor(db, 'tryon', tryonRef(key, view));
-  if (job && (job.status === 'queued' || job.status === 'running')) return { uri: null, status: 'queued', error: job.lastError };
+  // A cached image stays on screen while a regeneration runs.
+  if (job && (job.status === 'queued' || job.status === 'running')) return { uri, status: 'queued', error: job.lastError };
+  if (uri) return { uri, status: 'none', error: null };
   if (job && job.status === 'failed') return { uri: null, status: 'failed', error: job.lastError };
   return { uri: null, status: 'none', error: null };
 }

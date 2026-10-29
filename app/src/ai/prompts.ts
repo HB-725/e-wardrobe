@@ -166,18 +166,25 @@ export function avatarBackPrompt(): string {
 // ---------- try-on ----------
 
 export function tryonPrompt(slots: Slot[], view: 'front' | 'back'): string {
-  const list = slots.map((s, i) => `image ${i + 2}: ${SLOT_EN[s]} (${SLOT_LABEL[s]})`).join('; ');
+  // Seen from behind, the model copies any print it can see; saying each picture is the front helps.
+  const side = view === 'back' ? ', photographed from the front' : '';
+  const list = slots.map((s, i) => `image ${i + 2}: ${SLOT_EN[s]} (${SLOT_LABEL[s]})${side}`).join('; ');
+  // Worded like photoPrompt on purpose: "dress this person ... layer naturally" made the model turn a plain tee
+  // into an open overshirt worn over a tee (verified with gpt-image-1-mini).
   return [
-    'Image 1 is a person in a studio. Dress this person in the garments shown in the other images',
-    `(${list}).`,
+    `Image 1 is a person in plain base clothes in a studio. The other images are the garments to put on: ${list}.`,
+    `Show this exact person wearing exactly these garments, all ${slots.length} of them (none left out), with the same pose, framing, background and lighting as image 1.`,
     view === 'back'
-      ? 'The person is seen from behind: show the back side of each garment as it would naturally look. Prints, logos, buttons and pockets that are on the front of a garment must not appear on its back; an inner top is only visible where it shows below or above the outer layer.'
+      ? 'The person is seen from behind, so only the back of each garment is visible. The garment images show only their fronts, and every back is completely plain: same fabric and colour, with no print, logo, heart, emblem, text, buttons or front pockets anywhere on it, even when the front has one. An inner top shows only at the neck or hem if at all, plain.'
       : 'Keep the front view.',
-    'Replace the plain base clothes; layer naturally (outerwear over top, top tucked or untucked as fits the style). Shoes replace bare feet.',
-    'Keep the person exactly the same: face, hair, body shape, pose, framing, background and lighting must not change.',
-    'Keep each garment exactly as shown: colour, pattern, logos, buttons, pockets, length and fit.',
-    'Photorealistic.',
-  ].join(' ');
+    'The garments replace the matching base clothes; for any category without an image, keep what the person wears in image 1. Shoes replace bare feet.',
+    slots.includes('outer') ? 'The outerwear is worn over the top.' : null,
+    'Do not add any garment, layer, jacket, overshirt, cardigan or accessory that is not shown in the images.',
+    'Keep each garment exactly as shown: colour, pattern, logos and prints (same position and size), buttons, pockets, length and fit.',
+    'Keep the face, hair and body shape exactly the same. Photorealistic.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export interface Scene {
@@ -194,11 +201,19 @@ export const SCENES: Scene[] = [
   { id: 'studio', label: '纯色棚拍', prompt: `in a fashion photo studio with a plain ${CATALOG_BG} backdrop, editorial lighting` },
 ];
 
-export function photoPrompt(scene: Scene): string {
+/**
+ * One instruction for dressing the avatar and placing them in a scene. (Chaining the try-on prompt with a
+ * "fashion photo" one made the model invent extra layers, e.g. an overshirt over a plain tee.)
+ */
+export function photoPrompt(slots: Slot[], scene: Scene): string {
+  const list = slots.map((s, i) => `image ${i + 2}: ${SLOT_EN[s]} (${SLOT_LABEL[s]})`).join('; ');
   return [
-    'Image 1 is a person wearing an outfit. Create a realistic, high-quality fashion photo of the same person in the same outfit,',
-    `${scene.prompt}.`,
-    'Keep the face, hair, body shape and every garment (colour, pattern, details) exactly the same. Natural relaxed pose, full body visible.',
+    `Image 1 is a person in plain base clothes. The other images are the garments to put on: ${list}.`,
+    `Create a realistic, high-quality full-body fashion photo of this exact person ${scene.prompt}, wearing exactly these garments.`,
+    'The garments replace the matching base clothes; for any category without an image, keep what the person wears in image 1. Shoes replace bare feet.',
+    'Do not add any garment, layer, jacket, overshirt, cardigan or accessory that is not shown in the images.',
+    'Keep each garment exactly as shown: colour, pattern, logos and prints (same position and size), buttons, pockets, length and fit.',
+    'Keep the face, hair and body shape exactly the same. Natural relaxed pose, full body visible from head to shoes.',
   ].join(' ');
 }
 

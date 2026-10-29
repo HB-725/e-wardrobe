@@ -390,7 +390,7 @@ export async function generatePhoto(deps: AiDeps, itemIds: string[], sceneId: st
   const settings = await getAiSettings(deps.db);
   const refs = await Promise.all(garments.map((g) => deps.images.toDataUrl((g.catalogUri ?? g.originalUri)!, 768)));
   const [b64] = await generate(deps, client, 'photo', {
-    prompt: `${tryonPrompt(garments.map((g) => g.slot), 'front')} Then: ${photoPrompt(scene)}`,
+    prompt: photoPrompt(garments.map((g) => g.slot), scene),
     images: [await deps.images.toDataUrl(avatar.frontUri, 1024), ...refs],
     quality: qualityFor(settings.quality, 'photo'),
   });
