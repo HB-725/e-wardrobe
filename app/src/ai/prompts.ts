@@ -165,18 +165,13 @@ export function avatarBackPrompt(): string {
 
 // ---------- try-on ----------
 
-export function tryonPrompt(slots: Slot[], view: 'front' | 'back'): string {
-  // Seen from behind, the model copies any print it can see; saying each picture is the front helps.
-  const side = view === 'back' ? ', photographed from the front' : '';
-  const list = slots.map((s, i) => `image ${i + 2}: ${SLOT_EN[s]} (${SLOT_LABEL[s]})${side}`).join('; ');
+export function tryonPrompt(slots: Slot[]): string {
+  const list = slots.map((s, i) => `image ${i + 2}: ${SLOT_EN[s]} (${SLOT_LABEL[s]})`).join('; ');
   // Worded like photoPrompt on purpose: "dress this person ... layer naturally" made the model turn a plain tee
   // into an open overshirt worn over a tee (verified with gpt-image-1-mini).
   return [
     `Image 1 is a person in plain base clothes in a studio. The other images are the garments to put on: ${list}.`,
-    `Show this exact person wearing exactly these garments, all ${slots.length} of them (none left out), with the same pose, framing, background and lighting as image 1.`,
-    view === 'back'
-      ? 'The person is seen from behind, so only the back of each garment is visible; the garment images show their fronts. Repeating all-over patterns (stripes, checks, plaid, florals, camouflage, denim wash) continue across the back exactly as on the front. Placed graphics (a single print, logo, heart, emblem or text) and buttons and front pockets are on the front only and must not appear anywhere on the back. An inner top shows only at the neck or hem if at all.'
-      : 'Keep the front view.',
+    `Show this exact person wearing exactly these garments, all ${slots.length} of them (none left out), with the same front view, pose, framing, background and lighting as image 1.`,
     'The garments replace the matching base clothes; for any category without an image, keep what the person wears in image 1. Shoes replace bare feet.',
     slots.includes('outer') ? 'The outerwear is worn over the top.' : null,
     'Do not add any garment, layer, jacket, overshirt, cardigan or accessory that is not shown in the images.',
@@ -185,6 +180,21 @@ export function tryonPrompt(slots: Slot[], view: 'front' | 'back'): string {
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/**
+ * The back view turns the front try-on around. Given flat product shots instead, the model kept copying chest
+ * prints onto the back whatever the prompt said; from the dressed front it gets them right (7/7 in tests).
+ */
+export function tryonBackPrompt(slots: Slot[]): string {
+  const list = slots.map((s) => SLOT_EN[s]).join(', ');
+  return [
+    'Image 1 shows a person from behind in plain base clothes, in a studio. Image 2 shows the same person from the front, wearing an outfit',
+    `(${list}).`,
+    'Show the person from behind exactly as in image 1 (same pose, framing, background and lighting), now wearing every garment of the outfit in image 2, shoes included, as that outfit really looks from behind. Shoes replace bare feet.',
+    'Repeating all-over patterns continue across the back. Anything placed on the front of a garment (a chest print, logo, heart, emblem, text, buttons, front pockets) cannot be seen from behind and must not appear on the back.',
+    "Keep each garment's colour, fabric, length and fit. Do not add any garment that is not in image 2. Photorealistic.",
+  ].join(' ');
 }
 
 export interface Scene {

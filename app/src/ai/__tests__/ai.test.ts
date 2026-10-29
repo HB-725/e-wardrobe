@@ -282,7 +282,12 @@ describe('runner', () => {
     await drain(runner);
     const uri = await getTryon(db, key, 'back', avatarVersion(avatar));
     expect(uri).toMatch(/^mem:\/\/tryon\//);
-    expect(client.calls.at(-1)?.images).toBe(3);
+    // The back is drawn from the front try-on, generated first: front = avatar + 2 garments, back = avatar + front.
+    expect(client.calls.slice(-2).map((c) => c.images)).toEqual([3, 2]);
+    expect(await getTryon(db, key, 'front', avatarVersion(avatar))).toMatch(/^mem:\/\/tryon\//);
+    await enqueueJob(db, 'tryon', tryonRef(key, 'back'), { itemIds: [a.id, b.id] }, { evenIfRunning: true });
+    await drain(runner);
+    expect(client.calls.at(-1)?.images).toBe(2); // regenerating the back reuses the cached front
   });
 
   it('marks the avatar failed when generation is refused', async () => {

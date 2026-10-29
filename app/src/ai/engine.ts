@@ -26,6 +26,7 @@ import {
   type MirrorResult,
   photoPrompt,
   SCENES,
+  tryonBackPrompt,
   tryonPrompt,
 } from './prompts';
 
@@ -277,30 +278,43 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
   const [key, view] = job.refId.split('|') as [string, 'front' | 'back'];
   const itemIds = (job.payload.itemIds as string[] | undefined) ?? key.split('+');
   const avatar = await getAvatar(db);
-  const base = view === 'back' ? avatar.backUri : avatar.frontUri;
-  if (!avatarUsable(avatar) || !base) throw new AiError('rejected', 'avatar not ready');
+  if (!avatarUsable(avatar) || !avatar.frontUri || (view === 'back' && !avatar.backUri)) throw new AiError('rejected', 'avatar not ready');
   const garments = await orderedGarments(db, itemIds);
   if (garments.length === 0) return;
   const look = (gs: Item[]) => gs.map((g) => `${g.id}:${g.slot}:${g.catalogUri ?? g.originalUri}`).join('|');
   const startLook = look(garments);
-  const client = await requireClient(deps);
-  const settings = await getAiSettings(db);
-  const refs = await Promise.all(garments.map((g) => images.toDataUrl((g.catalogUri ?? g.originalUri)!, 768)));
-  const [b64] = await generate(deps, client, 'tryon', {
-    prompt: tryonPrompt(garments.map((g) => g.slot), view),
-    images: [await images.toDataUrl(base, 1024), ...refs],
-    quality: qualityFor(settings.quality, 'tryon'),
-  });
-  const uri = await images.saveBase64(b64, 'tryon');
-  // A garment was deleted, re-pictured or moved to another slot meanwhile: this image no longer shows the outfit.
-  if (look(await orderedGarments(db, itemIds)) !== startLook) {
-    await images.remove(uri);
-    return;
-  }
+  const slots = garments.map((g) => g.slot);
   const version = avatarVersion(avatar);
-  const old = await getTryon(db, key, view, version);
-  await putTryon(db, key, view, version, uri);
-  if (old && old !== uri) await images.remove(old);
+  const client = await requireClient(deps);
+  const quality = qualityFor((await getAiSettings(db)).quality, 'tryon');
+
+  /** Caches a result, unless a garment was deleted, re-pictured or moved to another slot meanwhile. */
+  const store = async (v: 'front' | 'back', b64: string): Promise<string | null> => {
+    const uri = await images.saveBase64(b64, 'tryon');
+    if (look(await orderedGarments(db, itemIds)) !== startLook) {
+      await images.remove(uri);
+      return null;
+    }
+    const old = await getTryon(db, key, v, version);
+    await putTryon(db, key, v, version, uri);
+    if (old && old !== uri) await images.remove(old);
+    return uri;
+  };
+
+  // The back is drawn from the front try-on, so a back view first needs (and caches) the front one.
+  let front = view === 'back' ? await getTryon(db, key, 'front', version) : null;
+  if (!front) {
+    const refs = await Promise.all(garments.map((g) => images.toDataUrl((g.catalogUri ?? g.originalUri)!, 768)));
+    const [b64] = await generate(deps, client, 'tryon', { prompt: tryonPrompt(slots), images: [await images.toDataUrl(avatar.frontUri, 1024), ...refs], quality });
+    front = await store('front', b64);
+    if (!front || view === 'front') return;
+  }
+  const [b64] = await generate(deps, client, 'tryon', {
+    prompt: tryonBackPrompt(slots),
+    images: [await images.toDataUrl(avatar.backUri!, 1024), await images.toDataUrl(front, 1024)],
+    quality,
+  });
+  await store('back', b64);
 }
 
 export async function runJob(deps: AiDeps, job: Job): Promise<void> {

@@ -12,7 +12,7 @@ import { useRecordToday } from '@/state/recordToday';
 import { avatarUsable } from '@/db/misc';
 import { useApp, useData } from '@/state/app';
 import { usePhotoConsent } from '@/state/consent';
-import { itemsOf, loadSnapshot, type Snapshot } from '@/state/snapshot';
+import { itemsOf, loadSnapshot, type Snapshot, tryonFor } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
 import { Btn, Chip, IconBtn, Loading, PageHeader, PrivacyNote, Screen, Sheet, T, Tap } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
@@ -179,7 +179,10 @@ export default function FittingPage() {
   const avatarReady = avatarUsable(s.avatar);
   const avatarUri = view === 'back' ? s.avatar.backUri : s.avatar.frontUri;
   const busy = tryon?.status === 'queued';
-  const cost = estimateImageCost(null, { inputImages: drawable.length + 1, quality: qualityFor(settings?.quality ?? 'standard', 'tryon') });
+  const tq = qualityFor(settings?.quality ?? 'standard', 'tryon');
+  const frontCost = estimateImageCost(null, { inputImages: drawable.length + 1, quality: tq });
+  // The back view is drawn from the front one, which is generated first if it does not exist yet.
+  const cost = view === 'front' ? frontCost : estimateImageCost(null, { inputImages: 2, quality: tq }) + (tryonFor(s, drawableIds) ? 0 : frontCost);
   const usedSlots = new Set(s.active.map((i) => i.slot));
   const cats = SLOTS.filter((x) => x.id !== 'accessory' || usedSlots.has('accessory'));
   // Open on the category of what was just put on, else the first one that has clothes.
