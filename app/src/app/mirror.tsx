@@ -18,7 +18,7 @@ import { ItemImage } from '@/ui/visuals';
 
 const CONF: Record<MirrorMatch['confidence'], string> = { high: '匹配度高', medium: '匹配度中', low: '匹配度低，请确认' };
 
-type Phase = { k: 'pick' } | { k: 'matching'; photo: string } | { k: 'done'; photo: string; error: string | null; needsKey: string | null };
+type Phase = { k: 'pick' } | { k: 'matching'; photo: string } | { k: 'done'; photo: string; error: string | null; needsKey: string | null; retryable: boolean };
 
 export default function MirrorPage() {
   const app = useApp();
@@ -75,9 +75,9 @@ export default function MirrorPage() {
       setMatches(res.matches);
       setUnmatched(res.unmatched);
       setOn(new Set(res.matches.filter((m) => m.confidence !== 'low').map((m) => m.itemId)));
-      setPhase({ k: 'done', photo, error: null, needsKey: null });
+      setPhase({ k: 'done', photo, error: null, needsKey: null, retryable: false });
     } catch (e) {
-      setPhase({ k: 'done', photo, error: describeAiError(e, true), needsKey: e instanceof AiError && e.needsUser ? e.kind : null });
+      setPhase({ k: 'done', photo, error: describeAiError(e, true), needsKey: e instanceof AiError && e.needsUser ? e.kind : null, retryable: !(e instanceof AiError) || e.retryable });
     } finally {
       app.refresh();
     }
@@ -103,9 +103,10 @@ export default function MirrorPage() {
       const logging = s.prefs.mirrorAutoLog && on.size > 0;
       // Ask about replacing today's record first: cancelling there must not leave fit notes behind.
       if (logging && !(await recordToday({ itemIds: [...on], source: 'mirror', photoUri: phase.photo }))) return;
+      // Today's record now points at the photo: it must survive leaving the screen, whatever happens next.
+      if (logging) pendingPhoto.current = null;
       for (const m of notes) await addFitNote(app, m.itemId, m.note, dateLabel);
       if (logging) {
-        pendingPhoto.current = null;
         app.toast(`已记录今天的 ${on.size} 件，穿着次数 +1`);
       } else {
         await app.images.remove(phase.photo);
@@ -176,9 +177,9 @@ export default function MirrorPage() {
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {phase.needsKey ? (
                   <Btn label="去处理" kind="outline" height={36} onPress={() => router.push(blockedRoute(phase.needsKey))} />
-                ) : (
+                ) : phase.retryable ? (
                   <Btn label="重试" kind="outline" height={36} onPress={() => void match(phase.photo)} />
-                )}
+                ) : null}
                 <Btn label="手动选择" kind="outline" height={36} onPress={() => setManual(true)} />
               </View>
             </View>

@@ -109,11 +109,11 @@ export class JobRunner {
       // Another worker may have just paused the queue (e.g. spend cap); keep its message.
       if (!this.paused) await setAiBlocked(db, null);
     } catch (e) {
-      const message = describeAiError(e);
-      if (e instanceof AiError && e.kind === 'network') {
-        // Nothing reached OpenAI, so nothing was paid: wait for the connection instead of giving up after 3 tries.
-        await waitForNetwork(db, job, message, this.deps.now?.());
-      } else if (e instanceof AiError && e.needsUser) {
+      const offline = e instanceof AiError && e.kind === 'network';
+      // Could not connect, so nothing was paid: wait for the connection instead of giving up after 3 tries.
+      if (offline && (await waitForNetwork(db, job, this.deps.now?.()))) return;
+      const message = offline ? '一直连不上 OpenAI，请检查网络（部分地区无法直接访问）后点重试' : describeAiError(e);
+      if (e instanceof AiError && e.needsUser) {
         await deferJob(db, job, message);
         await setAiBlocked(db, e.kind);
         this.paused = true;

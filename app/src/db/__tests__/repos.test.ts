@@ -4,7 +4,7 @@ import { migrate, SCHEMA_VERSION } from '../schema';
 import { countByStatus, createItem, deleteItem, getItem, listItems, setUserField, updateItem } from '../items';
 import { createOutfit, deleteOutfit, findOutfitByItems, listOutfits, outfitsContaining } from '../outfits';
 import { deleteLogByDate, getLogByDate, listLogs, logWear } from '../wear';
-import { claimNextJob, completeJob, deferJob, enqueueJob, failJob, listJobs, MAX_ATTEMPTS, recoverRunningJobs, retryJob } from '../jobs';
+import { claimNextJob, completeJob, deferJob, enqueueJob, failJob, listJobs, MAX_ATTEMPTS, MAX_NETWORK_WAITS, recoverRunningJobs, retryJob, waitForNetwork, wakeWaitingJobs } from '../jobs';
 import { addUsage, avatarVersion, dropTryonsWithItem, getAvatar, getSetting, getTryon, monthSpend, putTryon, saveAvatar, setSetting, wipeAll } from '../misc';
 
 let db: Db;
@@ -161,6 +161,22 @@ describe('jobs', () => {
     expect((await listJobs(db, ['queued'])).map((j) => j.id)).toEqual([again!.id]);
     await completeJob(db, again!.id);
     expect(await listJobs(db, ['queued', 'running'])).toEqual([]);
+  });
+
+  it('waits for the network a bounded number of times, and waking only touches those jobs', async () => {
+    const now = new Date('2030-01-01T00:00:00Z');
+    await enqueueJob(db, 'catalog', 'net');
+    let job = (await claimNextJob(db, now))!;
+    expect(await waitForNetwork(db, job, now)).toBe(true);
+    await enqueueJob(db, 'catalog', 'server');
+    const other = (await claimNextJob(db, now))!;
+    await failJob(db, other, '502', { retryable: true, now });
+    await wakeWaitingJobs(db, now);
+    const queued = await listJobs(db, ['queued']);
+    expect(queued.find((j) => j.refId === 'net')!.nextRunAt).toBe(now.toISOString());
+    expect(queued.find((j) => j.refId === 'server')!.nextRunAt > now.toISOString()).toBe(true); // its backoff is kept
+    job = { ...queued.find((j) => j.refId === 'net')!, payload: { netWaits: MAX_NETWORK_WAITS } };
+    expect(await waitForNetwork(db, job, now)).toBe(false);
   });
 
   it('gives up on interrupted jobs that already used every attempt', async () => {

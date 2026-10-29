@@ -102,12 +102,13 @@ const SLOT_ALIASES: Record<string, Slot> = {
 
 /** Words people write in a 品类 column instead of the six category names, checked in this order. */
 const SLOT_KEYWORDS: [RegExp, Slot][] = [
-  [/外套|夹克|大衣|羽绒|风衣|西装|棉服|冲锋衣|马甲/, 'outer'],
-  [/鞋|靴/, 'shoes'],
-  [/包/, 'bag'],
+  // Trousers and skirts first: 西装裤, 羽绒裤 and 包臀裙 also contain outerwear or bag words.
   [/裤|裙/, 'bottom'],
-  [/T恤|t恤|衬衫|毛衣|卫衣|针织|背心|上衣|打底|polo|POLO/, 'top'],
-  [/帽|围巾|领带|腰带|皮带|手表|眼镜|首饰|项链|手链|耳环|饰/, 'accessory'],
+  [/外套|夹克|大衣|羽绒|风衣|西装|棉服|冲锋衣|马甲|面包服|皮衣/, 'outer'],
+  [/鞋|靴/, 'shoes'],
+  [/T恤|t恤|衬衫|毛衣|卫衣|针织|背心|吊带|上衣|打底|polo|POLO/, 'top'],
+  [/包/, 'bag'],
+  [/帽|围巾|领带|腰带|皮带|手表|眼镜|首饰|项链|手链|耳环|袜|饰/, 'accessory'],
 ];
 
 function slotOf(raw: string): Slot | undefined {
@@ -174,22 +175,31 @@ function readBook(base64: string, fileName: string): XLSX.WorkBook {
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
+const B64_INDEX = new Map([...B64].map((c, i) => [c.charCodeAt(0), i]));
+
 function base64ToBinary(b64: string): string {
   const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
-  let out = '';
+  const at = (i: number) => (i < clean.length ? B64_INDEX.get(clean.charCodeAt(i))! : 0);
+  const parts: string[] = [];
+  let chunk: number[] = [];
   for (let i = 0; i < clean.length; i += 4) {
-    const n = [0, 1, 2, 3].map((k) => (i + k < clean.length ? B64.indexOf(clean[i + k]) : 0));
-    const v = (n[0] << 18) | (n[1] << 12) | (n[2] << 6) | n[3];
-    out += String.fromCharCode((v >> 16) & 255);
-    if (i + 2 < clean.length) out += String.fromCharCode((v >> 8) & 255);
-    if (i + 3 < clean.length) out += String.fromCharCode(v & 255);
+    const v = (at(i) << 18) | (at(i + 1) << 12) | (at(i + 2) << 6) | at(i + 3);
+    chunk.push((v >> 16) & 255);
+    if (i + 2 < clean.length) chunk.push((v >> 8) & 255);
+    if (i + 3 < clean.length) chunk.push(v & 255);
+    if (chunk.length >= 8190) {
+      parts.push(String.fromCharCode(...chunk));
+      chunk = [];
+    }
   }
-  return out;
+  parts.push(String.fromCharCode(...chunk));
+  return parts.join('');
 }
 
 /** Strict UTF-8 decoding of a binary string; null if the bytes are not valid UTF-8. */
 export function decodeUtf8(bin: string): string | null {
-  let out = '';
+  const parts: string[] = [];
+  let chunk: number[] = [];
   for (let i = 0; i < bin.length; ) {
     const b = bin.charCodeAt(i);
     const need = b < 0x80 ? 0 : b >= 0xc2 && b < 0xe0 ? 1 : b >= 0xe0 && b < 0xf0 ? 2 : b >= 0xf0 && b < 0xf5 ? 3 : -1;
@@ -200,10 +210,17 @@ export function decodeUtf8(bin: string): string | null {
       if ((c & 0xc0) !== 0x80) return null;
       cp = (cp << 6) | (c & 0x3f);
     }
-    out += String.fromCodePoint(cp);
+    // Overlong forms, UTF-16 surrogates and code points past U+10FFFF are not valid UTF-8.
+    if (cp < [0, 0x80, 0x800, 0x10000][need] || (cp >= 0xd800 && cp <= 0xdfff) || cp > 0x10ffff) return null;
+    chunk.push(cp);
+    if (chunk.length >= 8190) {
+      parts.push(String.fromCodePoint(...chunk));
+      chunk = [];
+    }
     i += need + 1;
   }
-  return out;
+  parts.push(String.fromCodePoint(...chunk));
+  return parts.join('');
 }
 
 /** Reads the first sheet (or the one named 单品). Rows need at least 名称 and a recognisable 品类. */

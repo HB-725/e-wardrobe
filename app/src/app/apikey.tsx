@@ -48,7 +48,7 @@ export default function ApiKeyPage() {
           ? '这个 Key 没有可用的图像模型。请确认账户已充值，部分模型需要在 OpenAI 后台完成组织验证。'
           : e instanceof AiError && e.kind === 'network'
             ? '连不上 OpenAI，请检查网络后再试一次'
-            : describeAiError(e),
+            : describeAiError(e, true),
       );
     } finally {
       setBusy(false);

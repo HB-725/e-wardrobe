@@ -109,17 +109,28 @@ export async function deferJob(db: Db, job: Job, reason: string): Promise<void> 
   );
 }
 
-/** Offline: try again in a minute (or when the app comes back to the foreground) without using up an attempt. */
-export async function waitForNetwork(db: Db, job: Job, reason: string, now = new Date()): Promise<void> {
+/** Recorded as last_error of jobs waiting for a connection (so only those are woken on returning to the app). */
+export const OFFLINE_REASON = '网络连接失败，联网后会自动继续';
+/** About an hour of tries while the app is open; after that (e.g. OpenAI blocked in the user's region) the job fails as usual. */
+export const MAX_NETWORK_WAITS = 60;
+
+/**
+ * Offline: try again in a minute (or on returning to the app) without using up an attempt. Returns false once the
+ * job has waited MAX_NETWORK_WAITS times; the caller then fails it the normal way.
+ */
+export async function waitForNetwork(db: Db, job: Job, now = new Date()): Promise<boolean> {
+  const waits = Number(job.payload.netWaits ?? 0) + 1;
+  if (waits > MAX_NETWORK_WAITS) return false;
   await db.runAsync(
-    "UPDATE jobs SET status = 'queued', attempts = MAX(0, attempts - 1), last_error = ?, next_run_at = ?, updated_at = ? WHERE id = ?",
-    [reason, new Date(now.getTime() + 60_000).toISOString(), nowIso(), job.id],
+    "UPDATE jobs SET status = 'queued', attempts = MAX(0, attempts - 1), payload = ?, last_error = ?, next_run_at = ?, updated_at = ? WHERE id = ?",
+    [JSON.stringify({ ...job.payload, netWaits: waits }), OFFLINE_REASON, new Date(now.getTime() + 60_000).toISOString(), nowIso(), job.id],
   );
+  return true;
 }
 
-/** Makes waiting jobs due now (the app came back to the foreground, possibly online again). */
+/** Jobs waiting for a connection become due now (the app came back to the foreground, possibly online again). Other backoffs are kept. */
 export async function wakeWaitingJobs(db: Db, now = new Date()): Promise<void> {
-  await db.runAsync("UPDATE jobs SET next_run_at = ? WHERE status = 'queued' AND next_run_at > ?", [now.toISOString(), now.toISOString()]);
+  await db.runAsync("UPDATE jobs SET next_run_at = ? WHERE status = 'queued' AND last_error = ? AND next_run_at > ?", [now.toISOString(), OFFLINE_REASON, now.toISOString()]);
 }
 
 /**

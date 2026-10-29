@@ -157,6 +157,8 @@ export function reasoningEffort(model: string): string | null {
   return null;
 }
 
+const FAST_FAIL_MS = 5000;
+
 export function createOpenAiClient(opts: {
   apiKey: string;
   fetch?: FetchLike;
@@ -172,6 +174,7 @@ export function createOpenAiClient(opts: {
     const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
     let res: Awaited<ReturnType<FetchLike>>;
+    const started = Date.now();
     try {
       res = await doFetch(`${base}${path}`, {
         method,
@@ -181,6 +184,9 @@ export function createOpenAiClient(opts: {
       });
     } catch (e) {
       if (ctrl?.signal.aborted) throw new AiError('timeout', `no response in ${timeoutMs / 1000}s`);
+      // A connection that fails at once never reached OpenAI. One dropped later (e.g. the screen turned off
+      // while an image was generating) may already be billed, so it is treated like a timeout.
+      if (Date.now() - started > FAST_FAIL_MS) throw new AiError('timeout', `connection lost: ${e instanceof Error ? e.message : String(e)}`);
       throw new AiError('network', e instanceof Error ? e.message : String(e));
     } finally {
       if (timer) clearTimeout(timer);

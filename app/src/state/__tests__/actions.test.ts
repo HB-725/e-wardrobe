@@ -6,7 +6,7 @@ import { createItem, getItem, listItems } from '@/db/items';
 import { enqueueJob, listJobs } from '@/db/jobs';
 import { listOutfits } from '@/db/outfits';
 import { getLogByDate, listLogs } from '@/db/wear';
-import { buildWorkbook, isDuplicate, parseWorkbook } from '@/domain/excel';
+import { buildWorkbook, decodeUtf8, isDuplicate, parseWorkbook } from '@/domain/excel';
 import type { ImageStore } from '@/ai/imageStore';
 import { addFitNote, addGarments, confirmItem, keepCurrent, keepOriginal, recordWear, removeItem, saveOutfit, tryonState, undoWear, userSources } from '../actions';
 import { avatarVersion, putTryon, saveAvatar } from '@/db/misc';
@@ -272,5 +272,21 @@ describe('spreadsheet import details', () => {
     }
     const gbkLike = Buffer.from([0xc3, 0xfb, 0xb3, 0xc6, 0x2c, 0x0a]); // "名称," in GBK
     expect(() => parseWorkbook(b64(gbkLike), 'old.csv')).toThrow(/UTF-8/);
+  });
+});
+
+describe('spreadsheet edge cases', () => {
+  it('classifies tricky garment names', () => {
+    const csv = '名称,品类\n' + ['包臀裙', '面包服', '西装裤', '西装裙', '羽绒裤', '牛仔外套', '皮衣', '吊带', '袜子', '鞋包'].map((n) => `${n},${n}`).join('\n');
+    const r = parseWorkbook(Buffer.from(csv, 'utf8').toString('base64'), 'x.csv');
+    expect(Object.fromEntries(r.items.map((i) => [i.name, i.slot]))).toEqual({
+      包臀裙: 'bottom', 面包服: 'outer', 西装裤: 'bottom', 西装裙: 'bottom', 羽绒裤: 'bottom', 牛仔外套: 'outer', 皮衣: 'outer', 吊带: 'top', 袜子: 'accessory', 鞋包: 'shoes',
+    });
+  });
+
+  it('rejects invalid UTF-8 and keeps valid 4-byte characters', () => {
+    const bin = (bytes: number[]) => String.fromCharCode(...bytes);
+    expect(decodeUtf8(bin([0xf0, 0x9f, 0x98, 0x80]))).toBe('😀');
+    for (const bad of [[0xe0, 0x80, 0x80], [0xed, 0xa0, 0x80], [0xf4, 0x90, 0x80, 0x80], [0xc3], [0xc0, 0x80]]) expect(decodeUtf8(bin(bad))).toBeNull();
   });
 });
