@@ -124,7 +124,8 @@ export function Screen({ children, scroll = true, footer, style }: { children: R
     // Edge-to-edge Android does not resize the window for the keyboard, so pad for it here.
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       {scroll ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ paddingBottom: 28 }, style]} keyboardShouldPersistTaps="handled">
+        // Without a footer the end of the page must clear the system navigation bar (edge-to-edge).
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ paddingBottom: 28 + (footer ? 0 : insets.bottom) }, style]} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
       ) : (
