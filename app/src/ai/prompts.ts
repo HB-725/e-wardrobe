@@ -175,7 +175,7 @@ export function tryonPrompt(slots: Slot[], view: 'front' | 'back'): string {
     `Image 1 is a person in plain base clothes in a studio. The other images are the garments to put on: ${list}.`,
     `Show this exact person wearing exactly these garments, all ${slots.length} of them (none left out), with the same pose, framing, background and lighting as image 1.`,
     view === 'back'
-      ? 'The person is seen from behind, so only the back of each garment is visible. The garment images show only their fronts, and every back is completely plain: same fabric and colour, with no print, logo, heart, emblem, text, buttons or front pockets anywhere on it, even when the front has one. An inner top shows only at the neck or hem if at all, plain.'
+      ? 'The person is seen from behind, so only the back of each garment is visible; the garment images show their fronts. Repeating all-over patterns (stripes, checks, plaid, florals, camouflage, denim wash) continue across the back exactly as on the front. Placed graphics (a single print, logo, heart, emblem or text) and buttons and front pockets are on the front only and must not appear anywhere on the back. An inner top shows only at the neck or hem if at all.'
       : 'Keep the front view.',
     'The garments replace the matching base clothes; for any category without an image, keep what the person wears in image 1. Shoes replace bare feet.',
     slots.includes('outer') ? 'The outerwear is worn over the top.' : null,
