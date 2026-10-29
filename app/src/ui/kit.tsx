@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   type PressableProps,
@@ -116,7 +117,8 @@ export function Tap({ style, ...rest }: PressableProps & { style?: ViewStyle | V
 export function Screen({ children, scroll = true, footer, style }: { children: ReactNode; scroll?: boolean; footer?: ReactNode; style?: ViewStyle }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
+    // Edge-to-edge Android does not resize the window for the keyboard, so pad for it here.
+    <KeyboardAvoidingView behavior="padding" style={{ flex: 1, backgroundColor: C.bg, paddingTop: insets.top }}>
       {scroll ? (
         <ScrollView style={{ flex: 1 }} contentContainerStyle={[{ paddingBottom: 28 }, style]} keyboardShouldPersistTaps="handled">
           {children}
@@ -129,7 +131,7 @@ export function Screen({ children, scroll = true, footer, style }: { children: R
           {footer}
         </View>
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -279,15 +281,15 @@ export function Banner({ title, sub, onPress, tone = 'card', left }: { title: st
 export function Sheet({ visible, onClose, children, title }: { visible: boolean; onClose: () => void; children: ReactNode; title?: string }) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable accessibilityLabel="关闭" style={[StyleSheet.absoluteFill, { backgroundColor: C.overlay }]} onPress={onClose} />
         <View style={{ backgroundColor: C.bg, paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 20 + insets.bottom, gap: 18, maxHeight: '90%' }}>
           <View style={{ alignSelf: 'center', width: 40, height: 4, backgroundColor: '#D4D4D7' }} />
           {title ? <T v="h2">{title}</T> : null}
           {children}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

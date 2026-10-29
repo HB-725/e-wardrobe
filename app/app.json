@@ -19,7 +19,7 @@
     "android": {
       "package": "app.ewardrobe",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#111111",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -27,6 +27,13 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA"
+      ],
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "plugins": [
@@ -38,14 +45,17 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片"
+          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "用于从相册导入衣服照片",
-          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片"
+          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片",
+          "microphonePermission": false
         }
       ],
       [
