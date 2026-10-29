@@ -6,7 +6,7 @@ function item(id: string, extra: Partial<Item> = {}): Item {
   return {
     id, name: id, slot: 'top', subcategory: null, colorName: null, colorHex: null, seasons: [], brand: null,
     size: null, material: null, priceCents: null, purchasedOn: null, channel: null, location: null, fitNotes: null,
-    status: 'active', originalUri: null, catalogUri: null, tagUri: null, fieldSources: {}, error: null,
+    status: 'active', originalUri: null, catalogUri: null, tagUri: null, candidates: [], checks: [], fieldSources: {}, error: null,
     createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z', ...extra,
   };
 }

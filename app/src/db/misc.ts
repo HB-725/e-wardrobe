@@ -150,3 +150,10 @@ export async function wipeAll(db: Db): Promise<void> {
     }
   });
 }
+
+/** Drops cached try-on images that belong to an older avatar; returns their uris so the files can be deleted. */
+export async function pruneTryons(db: Db, currentVersion: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ uri: string }>('SELECT uri FROM tryon_cache WHERE avatar_version != ?', [currentVersion]);
+  await db.runAsync('DELETE FROM tryon_cache WHERE avatar_version != ?', [currentVersion]);
+  return rows.map((r) => r.uri);
+}

@@ -139,3 +139,18 @@ export async function latestJobFor(db: Db, type: JobType, refId: string): Promis
 export async function deleteJobsFor(db: Db, refId: string): Promise<void> {
   await db.runAsync("DELETE FROM jobs WHERE ref_id = ? AND status != 'running'", [refId]);
 }
+
+/** When the earliest waiting job becomes due, so the runner can sleep until then. */
+export async function nextDueAt(db: Db): Promise<string | null> {
+  const row = await db.getFirstAsync<{ t: string | null }>("SELECT MIN(next_run_at) AS t FROM jobs WHERE status = 'queued'");
+  return row?.t ?? null;
+}
+
+export async function countActiveJobs(db: Db): Promise<Record<JobType, number>> {
+  const rows = await db.getAllAsync<{ type: string; n: number }>(
+    "SELECT type, COUNT(*) AS n FROM jobs WHERE status IN ('queued', 'running') GROUP BY type",
+  );
+  const out: Record<JobType, number> = { catalog: 0, autofill: 0, avatar: 0, tryon: 0, mirror: 0 };
+  for (const r of rows) out[r.type as JobType] = r.n;
+  return out;
+}

@@ -1,4 +1,4 @@
-import type { FieldSource, Item, ItemStatus, Season, Slot } from '@/domain/types';
+import type { FidelityCheck, FieldSource, Item, ItemStatus, Season, Slot } from '@/domain/types';
 import { type Db, newId, nowIso, parseJson, type SqlParam } from './db';
 
 interface ItemRow {
@@ -21,6 +21,8 @@ interface ItemRow {
   original_uri: string | null;
   catalog_uri: string | null;
   tag_uri: string | null;
+  candidates: string;
+  checks: string;
   field_sources: string;
   error: string | null;
   created_at: string;
@@ -48,6 +50,8 @@ function fromRow(r: ItemRow): Item {
     originalUri: r.original_uri,
     catalogUri: r.catalog_uri,
     tagUri: r.tag_uri,
+    candidates: parseJson<string[]>(r.candidates, []),
+    checks: parseJson<FidelityCheck[][]>(r.checks, []),
     fieldSources: parseJson<Partial<Record<keyof Item, FieldSource>>>(r.field_sources, {}),
     error: r.error,
     createdAt: r.created_at,
@@ -75,12 +79,17 @@ const COLUMNS: Partial<Record<keyof Item, string>> = {
   originalUri: 'original_uri',
   catalogUri: 'catalog_uri',
   tagUri: 'tag_uri',
+  candidates: 'candidates',
+  checks: 'checks',
   fieldSources: 'field_sources',
   error: 'error',
 };
 
+const JSON_ARRAYS: (keyof Item)[] = ['seasons', 'candidates', 'checks'];
+
 function toParam(key: keyof Item, value: unknown): SqlParam {
-  if (key === 'seasons' || key === 'fieldSources') return JSON.stringify(value ?? (key === 'seasons' ? [] : {}));
+  if (JSON_ARRAYS.includes(key)) return JSON.stringify(value ?? []);
+  if (key === 'fieldSources') return JSON.stringify(value ?? {});
   if (value === undefined) return null;
   return value as SqlParam;
 }
@@ -108,10 +117,10 @@ export async function getItem(db: Db, id: string): Promise<Item | null> {
 export async function listItems(db: Db, statuses?: ItemStatus[]): Promise<Item[]> {
   const rows = statuses?.length
     ? await db.getAllAsync<ItemRow>(
-        `SELECT * FROM items WHERE status IN (${statuses.map(() => '?').join(', ')}) ORDER BY created_at DESC`,
+        `SELECT * FROM items WHERE status IN (${statuses.map(() => '?').join(', ')}) ORDER BY created_at DESC, rowid DESC`,
         statuses,
       )
-    : await db.getAllAsync<ItemRow>('SELECT * FROM items ORDER BY created_at DESC');
+    : await db.getAllAsync<ItemRow>('SELECT * FROM items ORDER BY created_at DESC, rowid DESC');
   return rows.map(fromRow);
 }
 

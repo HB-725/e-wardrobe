@@ -105,6 +105,10 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  `
+  ALTER TABLE items ADD COLUMN candidates TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE items ADD COLUMN checks TEXT NOT NULL DEFAULT '[]';
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
