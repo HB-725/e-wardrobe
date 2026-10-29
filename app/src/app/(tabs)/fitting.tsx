@@ -154,7 +154,7 @@ export default function FittingPage() {
   const app = useApp();
   const s = useData(loadSnapshot);
   const settings = useData(getAiSettings);
-  const [cat, setCat] = useState<Slot>('outer');
+  const [catChoice, setCat] = useState<Slot | null>(null);
   const [view, setView] = useState<TryonView>('front');
   const [skipIntro, setSkipIntro] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
@@ -168,7 +168,8 @@ export default function FittingPage() {
   const tryon = useData((db) => tryonState(db, drawableIds, view), [key, view]);
 
   if (!s) return <Loading />;
-  if (s.avatar.status === 'none' && !skipIntro) return <NoAvatar onSkip={() => setSkipIntro(true)} />;
+  // Someone arriving with garments already chosen ("去试穿") goes straight to the room.
+  if (s.avatar.status === 'none' && !skipIntro && worn.length === 0) return <NoAvatar onSkip={() => setSkipIntro(true)} />;
 
   const avatarReady = avatarUsable(s.avatar);
   const avatarUri = view === 'back' ? s.avatar.backUri : s.avatar.frontUri;
@@ -176,6 +177,8 @@ export default function FittingPage() {
   const cost = estimateImageCost(null, { inputImages: drawable.length + 1, quality: qualityFor(settings?.quality ?? 'standard', 'tryon') });
   const usedSlots = new Set(s.active.map((i) => i.slot));
   const cats = SLOTS.filter((x) => x.id !== 'accessory' || usedSlots.has('accessory'));
+  // Open on the category of what was just put on, else the first one that has clothes.
+  const cat: Slot = catChoice ?? worn[worn.length - 1]?.slot ?? cats.find((c) => usedSlots.has(c.id))?.id ?? 'outer';
 
   const turn = () => setView((v) => (v === 'front' ? 'back' : 'front'));
 

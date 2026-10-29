@@ -63,7 +63,8 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     outfits,
     avatar,
     tryons: await frontTryons(db, avatarVersion(avatar)),
-    blocked,
+    // A pause only matters while there is AI work waiting (e.g. not after the user kept the original photos).
+    blocked: Object.values(jobs).some((n) => n > 0) ? blocked : null,
     hasKey: !!last4,
     jobs,
     prefs,
