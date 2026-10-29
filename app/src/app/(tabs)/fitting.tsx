@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { blockedRoute } from '@/ai/client';
 import { getAiSettings, qualityFor } from '@/ai/config';
 import { estimateImageCost, formatUsd } from '@/ai/models';
 import { LAYER_ORDER, OCCASIONS, SLOTS } from '@/domain/catalog';
@@ -210,7 +211,9 @@ export default function FittingPage() {
               </View>
             </View>
           </View>
-          {avatarReady && drawable.length > 0 && !tryon?.uri ? (
+          {avatarReady && busy && s.blocked ? (
+            <Btn label="AI 已暂停 · 去处理" kind="outline" height={40} onPress={() => router.push(blockedRoute(s.blocked))} />
+          ) : avatarReady && drawable.length > 0 && !tryon?.uri ? (
             <Btn
               label={busy ? '生成中…' : tryon?.status === 'failed' ? '重新生成上身效果' : `生成上身效果 · 约 ${formatUsd(cost)}`}
               kind="outline"

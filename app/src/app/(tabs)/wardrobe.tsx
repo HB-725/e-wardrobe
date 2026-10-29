@@ -21,6 +21,11 @@ function visibleItems(s: Snapshot, cat: Cat): Item[] {
   return list.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
 }
 
+/** Unfinished items open in review (where they can be kept as a plain photo); finished ones open their detail page. */
+function pageFor(it: Item): string {
+  return it.status === 'review' || it.status === 'processing' || it.status === 'failed' ? `/review?id=${it.id}` : `/item/${it.id}`;
+}
+
 function subtitle(s: Snapshot, it: Item): string {
   switch (it.status) {
     case 'review':
@@ -54,14 +59,14 @@ export default function WardrobePage() {
 
   const cta = () => {
     if (!sel) return;
-    if (sel.status === 'review') router.push(`/review?id=${sel.id}`);
-    else if (sel.status === 'failed') void retryItem(app, sel.id).then(app.refresh);
+    if (sel.status === 'review' || sel.status === 'processing') router.push(`/review?id=${sel.id}`);
+    else if (sel.status === 'failed') void retryItem(app, sel.id).then(app.refresh, (e) => app.toast(String(e)));
     else if (sel.status === 'active') {
       app.setFitting({ ...app.fitting, [sel.slot]: sel.id });
       router.push('/fitting');
     } else if (sel.status === 'archived') router.push(`/item/${sel.id}`);
   };
-  const ctaLabel = sel ? { review: '去确认', failed: '重试', active: '去试穿', processing: '生成中', archived: '查看' }[sel.status] : '';
+  const ctaLabel = sel ? { review: '去确认', failed: '重试', active: '去试穿', processing: '查看', archived: '查看' }[sel.status] : '';
 
   return (
     <Screen scroll={false}>
@@ -118,7 +123,7 @@ export default function WardrobePage() {
                 accessibilityRole="button"
                 accessibilityLabel={`${it.name}${it.status === 'review' ? '（待确认）' : ''}`}
                 accessibilityState={{ selected: on }}
-                onPress={() => (on ? router.push(it.status === 'review' ? `/review?id=${it.id}` : `/item/${it.id}`) : setSelId(it.id))}
+                onPress={() => (on ? router.push(pageFor(it)) : setSelId(it.id))}
                 style={{ width: '23.6%', height: 80, borderWidth: 2, borderColor: on ? C.ink : C.card }}
               >
                 <ItemImage item={it} style={{ flex: 1 }} inset={0.06} />
@@ -150,7 +155,7 @@ export default function WardrobePage() {
         {sel ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line }}>
             <ItemImage item={sel} style={{ width: 64, height: 72 }} />
-            <Tap onPress={() => router.push(sel.status === 'review' ? `/review?id=${sel.id}` : `/item/${sel.id}`)} style={{ flex: 1, gap: 2 }}>
+            <Tap onPress={() => router.push(pageFor(sel))} style={{ flex: 1, gap: 2 }}>
               <T style={{ fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
                 {sel.name}
               </T>
@@ -158,7 +163,7 @@ export default function WardrobePage() {
                 {subtitle(s, sel)}
               </T>
             </Tap>
-            <Btn label={ctaLabel} height={44} disabled={sel.status === 'processing'} onPress={cta} />
+            <Btn label={ctaLabel} height={44} onPress={cta} />
           </View>
         ) : (
           <View style={{ paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line, gap: 4 }}>

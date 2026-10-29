@@ -102,18 +102,24 @@ export default function MePage() {
 
   const wipe = async () => {
     if (!(await confirmAsync('永久删除全部数据', '衣服、照片、穿搭、穿着记录、个人形象和 API Key 都会从这台手机上删除，无法恢复。'))) return;
-    if (!(await confirmAsync('再确认一次', '真的要删除吗？建议先导出 Excel 备份。', '永久删除'))) return;
+    if (!(await confirmAsync('再确认一次', '真的要删除吗？可以先导出 Excel 留一份清单（只有文字信息，不含照片和穿搭）。', '永久删除'))) return;
     // A job still running would write the avatar / images back after the wipe, so let it finish first.
     setBusy('wipe');
-    app.runner.stop();
-    await app.runner.idle();
-    await wipeEverything(app);
-    setBusy(null);
-    await setApiKey(null);
-    app.setFitting({});
-    await app.reloadKey();
-    app.toast('已删除全部数据');
-    router.navigate('/');
+    app.runner.hold();
+    try {
+      await app.runner.idle();
+      await wipeEverything(app);
+      await setApiKey(null);
+      app.setFitting({});
+      app.toast('已删除全部数据');
+      router.navigate('/');
+    } catch (e) {
+      notify('删除没有完成', String(e));
+    } finally {
+      app.runner.release();
+      await app.reloadKey();
+      setBusy(null);
+    }
   };
 
   return (

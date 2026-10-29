@@ -34,6 +34,8 @@ export class JobRunner {
   private readonly claim = new Mutex();
   private active = 0;
   private paused = false;
+  /** Set by hold(); kick() does nothing until release() (e.g. during a data wipe). */
+  private held = false;
   private timer: unknown = null;
   private readonly concurrency: number;
 
@@ -51,6 +53,7 @@ export class JobRunner {
 
   /** Start workers if there is capacity; safe to call any time. */
   kick(): void {
+    if (this.held) return;
     this.paused = false;
     while (this.active < this.concurrency) {
       this.active += 1;
@@ -64,6 +67,17 @@ export class JobRunner {
   /** Resolves when all workers are idle (used by tests). */
   async idle(): Promise<void> {
     while (this.active > 0) await new Promise((r) => setTimeout(r, 5));
+  }
+
+  /** Stop and keep stopped (app foregrounding, key changes) until release(). Await idle() after it. */
+  hold(): void {
+    this.held = true;
+    this.stop();
+  }
+
+  release(): void {
+    this.held = false;
+    this.kick();
   }
 
   stop(): void {

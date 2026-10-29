@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
-import { AiError, type AiErrorKind, describeAiError } from '@/ai/client';
+import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
 import { todaySuggestions } from '@/domain/outfit';
 import { dateParts, idleItems, weekOf } from '@/domain/stats';
 import type { Item } from '@/domain/types';
@@ -77,7 +77,7 @@ function StatusBanners({ s }: { s: Snapshot }) {
   const banners = [];
   if (s.blocked) {
     banners.push(
-      <Banner key="blocked" tone="warn" title="AI 已暂停" sub={describeAiError(new AiError(s.blocked as AiErrorKind, ''))} onPress={() => router.push('/apikey')} />,
+      <Banner key="blocked" tone="warn" title="AI 已暂停" sub={describeAiError(new AiError(s.blocked as AiErrorKind, ''))} onPress={() => router.push(blockedRoute(s.blocked))} />,
     );
   }
   if (s.review.length > 0) {
@@ -98,7 +98,7 @@ function StatusBanners({ s }: { s: Snapshot }) {
     );
   }
   if (s.processing.length > 0 && !s.blocked) {
-    banners.push(<Banner key="proc" title={`${s.processing.length} 件衣服正在生成标准图`} sub="每件大约 20 秒，可以先去做别的" />);
+    banners.push(<Banner key="proc" title={`${s.processing.length} 件衣服正在生成标准图`} sub="每件大约 20 秒，可以先去做别的" onPress={() => router.push('/review')} />);
   }
   if (s.failed.length > 0) {
     banners.push(<Banner key="failed" tone="warn" title={`${s.failed.length} 件衣服生成失败`} sub="去衣橱里重试，或只保存原图" onPress={() => router.push('/wardrobe')} />);

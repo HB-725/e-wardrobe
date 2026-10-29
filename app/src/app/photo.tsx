@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
-import { AiError, describeAiError } from '@/ai/client';
+import { AiError, blockedRoute, describeAiError } from '@/ai/client';
 import { getAiSettings, qualityFor } from '@/ai/config';
 import { generatePhoto } from '@/ai/engine';
 import { estimateImageCost, formatUsd } from '@/ai/models';
@@ -10,6 +10,7 @@ import { SCENES } from '@/ai/prompts';
 import { avatarUsable } from '@/db/misc';
 import { saveImageToLibrary, shareImage } from '@/platform/files';
 import { useApp, useData } from '@/state/app';
+import { useSafe } from '@/state/useSafe';
 import { itemsOf, loadSnapshot } from '@/state/snapshot';
 import { Btn, Chip, Loading, NavHeader, Screen, T } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
@@ -17,15 +18,23 @@ import { OutfitBoard } from '@/ui/visuals';
 
 export default function PhotoPage() {
   const app = useApp();
+  const safe = useSafe();
   const { items: param } = useLocalSearchParams<{ items?: string }>();
   const s = useData(loadSnapshot);
   const settings = useData(getAiSettings);
   const [scene, setScene] = useState(SCENES[0].id);
   const [shots, setShots] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ text: string; needsUser: boolean } | null>(null);
+  const [error, setError] = useState<{ text: string; kind: string | null } | null>(null);
   // Generated photos are only kept until the user leaves; saving copies them into the photo library.
   const shotsRef = useRef<string[]>([]);
+  const mounted = useRef(true);
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
   useEffect(() => {
     shotsRef.current = shots;
   }, [shots]);
@@ -42,9 +51,10 @@ export default function PhotoPage() {
     setError(null);
     try {
       const uri = await generatePhoto(app.ai, ids, scene);
+      if (!mounted.current) return void app.images.remove(uri);
       setShots((x) => [...x, uri]);
     } catch (e) {
-      setError({ text: describeAiError(e), needsUser: e instanceof AiError && e.needsUser });
+      setError({ text: describeAiError(e), kind: e instanceof AiError && e.needsUser ? e.kind : null });
     } finally {
       setBusy(false);
       app.refresh();
@@ -57,11 +67,11 @@ export default function PhotoPage() {
         current ? (
           <>
             <Btn label="再生成一张" kind="outline" style={{ flex: 1, paddingHorizontal: 4 }} loading={busy} onPress={run} />
-            <Btn label="分享" kind="outline" style={{ flex: 1 }} onPress={() => shareImage(current)} />
+            <Btn label="分享" kind="outline" style={{ flex: 1 }} onPress={safe(() => shareImage(current))} />
             <Btn
               label="保存到相册"
               style={{ flex: 1, paddingHorizontal: 4 }}
-              onPress={async () => app.toast((await saveImageToLibrary(current)) ? '已保存到相册' : '没有相册权限，可以用「分享」保存')}
+              onPress={safe(async () => app.toast((await saveImageToLibrary(current)) ? '已保存到相册' : '没有相册权限，可以用「分享」保存'))}
             />
           </>
         ) : (
@@ -120,7 +130,7 @@ export default function PhotoPage() {
       {error ? (
         <View style={{ margin: PAD, padding: 12, backgroundColor: '#FBF1E3', gap: 8 }}>
           <T style={{ fontSize: 13 }}>{error.text}</T>
-          {error.needsUser ? <Btn label="去处理" kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push('/apikey')} /> : null}
+          {error.kind ? <Btn label="去处理" kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(error.kind))} /> : null}
         </View>
       ) : null}
     </Screen>

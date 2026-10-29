@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addGarments } from '@/state/actions';
 import { useApp } from '@/state/app';
@@ -89,15 +89,22 @@ export default function CapturePage() {
     }
   };
 
+  // One photo at a time: whatever was saved leaves the pending list, so a retry never duplicates items.
   const finish = async () => {
     if (pending.length === 0) return;
     setSaving(true);
+    let left = [...pending];
     try {
-      await addGarments(app, pending);
+      while (left.length) {
+        await addGarments(app, [left[0]]);
+        left = left.slice(1);
+        setPending(left);
+      }
       app.refresh();
       router.replace('/review');
     } catch (e) {
-      app.toast(`保存失败：${String(e)}`);
+      app.refresh();
+      app.toast(`有 ${left.length} 张没有保存：${String(e)}`);
       setSaving(false);
     }
   };
@@ -106,6 +113,15 @@ export default function CapturePage() {
     if (pending.length > 0 && !(await confirmAsync('放弃这些照片？', `已拍的 ${pending.length} 张还没有保存。`, '放弃'))) return;
     router.back();
   };
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (pending.length === 0 || saving) return false;
+      void close();
+      return true;
+    });
+    return () => sub.remove();
+  });
 
   const hint =
     mode === 'tag'

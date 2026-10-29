@@ -186,7 +186,7 @@ export function parseWorkbook(base64: string): ImportResult {
   return { items, skipped };
 }
 
-/** Same name + category already in the wardrobe counts as a duplicate, so importing an export twice is harmless. */
-export function isDuplicate(existing: Pick<Item, 'name' | 'slot'>[], it: ImportedItem): boolean {
-  return existing.some((e) => e.name === it.name && e.slot === it.slot);
+/** Same name, category, colour, size and brand counts as a duplicate, so importing an export twice is harmless. */
+export function isDuplicate(existing: Pick<Item, 'name' | 'slot' | 'colorName' | 'size' | 'brand'>[], it: ImportedItem): boolean {
+  return existing.some((e) => e.name === it.name && e.slot === it.slot && (e.colorName ?? null) === it.colorName && (e.size ?? null) === it.size && (e.brand ?? null) === it.brand);
 }

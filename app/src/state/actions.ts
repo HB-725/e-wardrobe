@@ -204,7 +204,10 @@ export async function setItemPhoto(ctx: Ctx, id: string, uri: string): Promise<v
   if (!item) return;
   const originalUri = await ctx.images.importPhoto(uri, 'original');
   await ctx.images.remove(item.originalUri);
-  await updateItem(ctx.db, id, { originalUri, status: 'processing', error: null });
+  // A wardrobe item stays usable; the new standard image waits in review. Others go back to generating.
+  const keep = item.status === 'active' || item.status === 'archived';
+  await updateItem(ctx.db, id, { originalUri, ...(keep ? {} : { status: 'processing' as const }), error: null });
+  await deleteJobsFor(ctx.db, id);
   await enqueueJob(ctx.db, 'catalog', id);
   ctx.runner.kick();
 }

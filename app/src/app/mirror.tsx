@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, ScrollView, View } from 'react-native';
-import { AiError, describeAiError } from '@/ai/client';
+import { AiError, blockedRoute, describeAiError } from '@/ai/client';
 import { matchMirror, type MirrorMatch } from '@/ai/engine';
 import { SLOT_LABEL, SLOTS } from '@/domain/catalog';
 import type { Item } from '@/domain/types';
@@ -16,7 +16,7 @@ import { ItemImage } from '@/ui/visuals';
 
 const CONF: Record<MirrorMatch['confidence'], string> = { high: '匹配度高', medium: '匹配度中', low: '匹配度低，请确认' };
 
-type Phase = { k: 'pick' } | { k: 'matching'; photo: string } | { k: 'done'; photo: string; error: string | null; needsKey: boolean };
+type Phase = { k: 'pick' } | { k: 'matching'; photo: string } | { k: 'done'; photo: string; error: string | null; needsKey: string | null };
 
 export default function MirrorPage() {
   const app = useApp();
@@ -51,18 +51,24 @@ export default function MirrorPage() {
         return;
       }
     }
-    const r = camera && Platform.OS !== 'web' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-    if (r.canceled) return;
-    const photo = await app.images.importPhoto(r.assets[0].uri, 'mirror');
+    let photo: string;
+    try {
+      const r = camera && Platform.OS !== 'web' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
+      if (r.canceled) return;
+      photo = await app.images.importPhoto(r.assets[0].uri, 'mirror');
+    } catch (e) {
+      app.toast(`照片读取失败：${String(e)}`);
+      return;
+    }
     setPhase({ k: 'matching', photo });
     try {
       const res = await matchMirror(app.ai, photo);
       setMatches(res.matches);
       setUnmatched(res.unmatched);
       setOn(new Set(res.matches.filter((m) => m.confidence !== 'low').map((m) => m.itemId)));
-      setPhase({ k: 'done', photo, error: null, needsKey: false });
+      setPhase({ k: 'done', photo, error: null, needsKey: null });
     } catch (e) {
-      setPhase({ k: 'done', photo, error: describeAiError(e), needsKey: e instanceof AiError && e.needsUser });
+      setPhase({ k: 'done', photo, error: describeAiError(e), needsKey: e instanceof AiError && e.needsUser ? e.kind : null });
     } finally {
       app.refresh();
     }
@@ -157,7 +163,7 @@ export default function MirrorPage() {
             <View style={{ backgroundColor: '#FBF1E3', padding: 12, gap: 8, marginBottom: 12 }}>
               <T style={{ fontSize: 13 }}>识别失败：{phase.error}</T>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {phase.needsKey ? <Btn label="去处理" kind="outline" height={36} onPress={() => router.push('/apikey')} /> : null}
+                {phase.needsKey ? <Btn label="去处理" kind="outline" height={36} onPress={() => router.push(blockedRoute(phase.needsKey))} /> : null}
                 <Btn label="手动选择" kind="outline" height={36} onPress={() => setManual(true)} />
               </View>
             </View>

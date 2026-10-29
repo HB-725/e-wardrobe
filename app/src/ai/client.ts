@@ -247,3 +247,8 @@ export function createOpenAiClient(opts: {
     },
   };
 }
+
+/** Where the user fixes a paused queue: the spend cap lives on the Me page, everything else on the key page. */
+export function blockedRoute(kind: string | null): '/me' | '/apikey' {
+  return kind === 'cap' ? '/me' : '/apikey';
+}

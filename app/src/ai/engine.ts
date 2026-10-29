@@ -146,6 +146,7 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
   const settings = await getAiSettings(db);
   const original = await images.toDataUrl(item.originalUri, 1024);
 
+  const startStatus = item.status;
   if (!job.payload.regenerate) {
     const tag = item.tagUri ? await images.toDataUrl(item.tagUri, 1024) : null;
     const r = await vision<AutofillResult>(deps, client, 'catalog', {
@@ -158,7 +159,7 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
     });
     // Re-read: the user may have typed fields, settled or deleted the item while the model was thinking.
     const now = await getItem(db, item.id);
-    if (!now || now.status !== 'processing') return;
+    if (!now || now.status !== startStatus) return;
     item = (await updateItem(db, item.id, applyAutofill(now, r)))!;
   }
 
@@ -192,15 +193,15 @@ async function runCatalog(deps: AiDeps, job: Job): Promise<void> {
 
   const fresh = await getItem(db, item.id);
   // A first-time item the user deleted or settled ("只存原图") meanwhile: drop the results.
-  const settled = !fresh || (!job.payload.regenerate && (fresh.status === 'active' || fresh.status === 'archived'));
+  const inWardrobe = (st: Item['status']) => st === 'active' || st === 'archived';
+  const settled = !fresh || (!inWardrobe(startStatus) && inWardrobe(fresh.status));
   if (settled) {
     for (const u of uris) await images.remove(u);
     return;
   }
   for (const old of fresh.candidates) if (old !== fresh.catalogUri) await images.remove(old);
   // Regenerating a garment already in the wardrobe keeps it usable; the new candidates wait for review.
-  const keep = fresh.status === 'active' || fresh.status === 'archived';
-  await updateItem(db, item.id, { candidates: uris, checks, status: keep ? fresh.status : 'review', error: null });
+  await updateItem(db, item.id, { candidates: uris, checks, status: inWardrobe(fresh.status) ? fresh.status : 'review', error: null });
 }
 
 async function runAvatar(deps: AiDeps): Promise<void> {
@@ -296,15 +297,22 @@ export interface MirrorMatch {
   note: string;
 }
 
-/** Most mirror photos show 3–5 items; cap the reference images to keep the call cheap. */
-const MIRROR_MAX_ITEMS = 40;
+/** Reference images per mirror call; most-worn first so the usual suspects are always included. */
+const MIRROR_MAX_ITEMS = 60;
 
 export async function matchMirror(deps: AiDeps, photoUri: string): Promise<{ matches: MirrorMatch[]; unmatched: string[] }> {
   await assertBudget(deps);
   const client = await requireClient(deps);
-  const items = (await listItems(deps.db, ['active'])).filter((i) => i.catalogUri || i.originalUri).slice(0, MIRROR_MAX_ITEMS);
+  const wears = new Map(
+    (await deps.db.getAllAsync<{ item_id: string; n: number }>('SELECT item_id, COUNT(*) AS n FROM wear_log_items GROUP BY item_id')).map((r) => [r.item_id, r.n]),
+  );
+  const items = (await listItems(deps.db, ['active']))
+    .filter((i) => i.catalogUri || i.originalUri)
+    .sort((a, b) => (wears.get(b.id) ?? 0) - (wears.get(a.id) ?? 0))
+    .slice(0, MIRROR_MAX_ITEMS);
   if (items.length === 0) return { matches: [], unmatched: [] };
-  const refs = await Promise.all(items.map((i) => deps.images.toDataUrl((i.catalogUri ?? i.originalUri)!, 384)));
+  const refs: string[] = [];
+  for (const i of items) refs.push(await deps.images.toDataUrl((i.catalogUri ?? i.originalUri)!, 256));
   const r = await vision<MirrorResult>(deps, client, 'mirror', {
     system: MIRROR_SYSTEM,
     text: mirrorText(items.map((i, k) => ({ index: k + 1, name: i.name, slot: i.slot, color: i.colorName }))),

@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { AiError, type AiErrorKind, describeAiError } from '@/ai/client';
+import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
 import type { Item } from '@/domain/types';
 import { confirmItem, keepCurrent, keepOriginal, needsReview, regenerateItem, removeItem, retryItem } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
@@ -76,6 +76,13 @@ export default function ReviewPage() {
     setBusy(true);
     try {
       await fn();
+    } catch (e) {
+      // e.g. the candidates changed under us after a regeneration; show the fresh state instead.
+      app.toast(`没有完成：${describeAiError(e)}`);
+      app.refresh();
+      return;
+    }
+    try {
       app.refresh();
       if (advance) {
         setDone((d) => d + 1);
@@ -148,7 +155,7 @@ export default function ReviewPage() {
                 <T v="caption" style={{ textAlign: 'center' }}>
                   {s.blocked ? describeAiError(new AiError(s.blocked as AiErrorKind, '')) : '正在生成标准图\n大约 20 秒'}
                 </T>
-                {s.blocked ? <Btn label="去处理" kind="outline" height={36} onPress={() => router.push('/apikey')} /> : null}
+                {s.blocked ? <Btn label="去处理" kind="outline" height={36} onPress={() => router.push(blockedRoute(s.blocked))} /> : null}
               </View>
             ) : (
               <T v="caption" style={{ textAlign: 'center', padding: 12, color: cur.status === 'failed' ? C.danger : C.sub }}>

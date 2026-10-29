@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { BackHandler, ScrollView, View } from 'react-native';
 import { SLOT_LABEL, seasonsLabel } from '@/domain/catalog';
 import { selectionFromItems } from '@/domain/outfit';
 import { computeItemStats, formatYuan } from '@/domain/stats';
@@ -11,6 +11,7 @@ import { updateItem } from '@/db/items';
 import { latestJobFor } from '@/db/jobs';
 import { needsReview, recordWear, regenerateItem, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
+import { useSafe } from '@/state/useSafe';
 import { itemsOf, loadSnapshot, tryonFor } from '@/state/snapshot';
 import { confirmAsync } from '@/ui/dialogs';
 import { formOf, ItemForm, patchOf } from '@/ui/ItemForm';
@@ -51,6 +52,17 @@ export default function ItemPage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<ReturnType<typeof formOf> | null>(null);
   const [busy, setBusy] = useState(false);
+  const safe = useSafe();
+
+  // Android back leaves edit mode instead of the page (and the unsaved edits).
+  useEffect(() => {
+    if (!editing) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setEditing(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [editing]);
 
   if (!s) return <Loading />;
   const item = s.byId.get(id);
@@ -71,22 +83,25 @@ export default function ItemPage() {
     setEditing(true);
   };
 
-  const save = async () => {
+  const save = safe(async () => {
     if (!form) return;
     setBusy(true);
-    await updateItem(app.db, item.id, patchOf(item, form));
-    setBusy(false);
-    setEditing(false);
-    app.refresh();
-  };
+    try {
+      await updateItem(app.db, item.id, patchOf(item, form));
+      setEditing(false);
+      app.refresh();
+    } finally {
+      setBusy(false);
+    }
+  });
 
-  const addPhoto = async () => {
+  const addPhoto = safe(async () => {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (r.canceled) return;
     await setItemPhoto(app, item.id, r.assets[0].uri);
     app.refresh();
-    app.toast('照片已添加，正在生成标准图');
-  };
+    app.toast(item.status === 'active' || item.status === 'archived' ? '照片已换好，新的标准图生成后可以选择换不换' : '照片已添加，正在生成标准图');
+  });
 
   if (editing && form) {
     return (
@@ -244,7 +259,10 @@ export default function ItemPage() {
             />
           </View>
         ) : null}
-        {item.status === 'failed' ? <Btn label="重新生成标准图" onPress={() => retryItem(app, item.id).then(app.refresh)} /> : null}
+        {item.status === 'failed' ? <Btn label="重新生成标准图" onPress={safe(() => retryItem(app, item.id).then(app.refresh))} /> : null}
+        {item.status === 'processing' || item.status === 'failed' || item.status === 'review' ? (
+          <Btn label="去确认 / 只存原图" kind="outline" onPress={() => router.push(`/review?id=${item.id}`)} />
+        ) : null}
         {item.originalUri && (item.status === 'active' || item.status === 'archived') ? (
           <Btn
             label="重新生成标准图"

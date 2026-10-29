@@ -9,7 +9,7 @@ export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsh
 export async function shareBase64File(name: string, base64: string, mimeType: string): Promise<void> {
   const file = new File(Paths.cache, name);
   file.create({ overwrite: true });
-  file.write(base64, { encoding: 'base64' });
+  await file.write(base64, { encoding: 'base64' });
   await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: name });
 }
 

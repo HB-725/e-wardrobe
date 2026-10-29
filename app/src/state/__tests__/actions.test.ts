@@ -187,3 +187,23 @@ describe('review fixes', () => {
     expect(images.removed).toEqual(['n1', 'n2']);
   });
 });
+
+describe('round 2 fixes', () => {
+  it('replacing the photo of a wardrobe item keeps it active and queues a catalog job', async () => {
+    const a = await createItem(db, { name: 'a', slot: 'top', status: 'active', originalUri: 'old', catalogUri: 'c' });
+    const { setItemPhoto } = jest.requireActual('../actions') as typeof import('../actions');
+    await setItemPhoto(ctx(), a.id, 'new');
+    const after = (await getItem(db, a.id))!;
+    expect(after.status).toBe('active');
+    expect(after.originalUri).toMatch(/^mem:\/\/original\//);
+    expect(images.removed).toContain('old');
+    expect(await listJobs(db, ['queued'])).toHaveLength(1);
+  });
+
+  it('treats same-name items with different colour or size as distinct on import', () => {
+    const base = { name: '白T恤', slot: 'top' as const, colorName: '白', size: 'M', brand: null };
+    const imported = { name: '白T恤', slot: 'top' as const, subcategory: null, colorName: '白', seasons: [], brand: null, size: 'L', material: null, priceCents: null, purchasedOn: null, channel: null, location: null, fitNotes: null, archived: false };
+    expect(isDuplicate([base], imported)).toBe(false);
+    expect(isDuplicate([base], { ...imported, size: 'M' })).toBe(true);
+  });
+});

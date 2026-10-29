@@ -409,3 +409,33 @@ describe('review fixes', () => {
     expect(await getAiBlocked(db)).toBe('cap');
   });
 });
+
+describe('round 2 fixes', () => {
+  it('a new photo for a wardrobe item re-runs autofill and generation but keeps the item usable', async () => {
+    const item = await createItem(db, { name: '旧名字', slot: 'top', status: 'active', originalUri: 'mem://o/new', catalogUri: 'mem://c/old', fieldSources: { name: 'user' } });
+    await enqueueJob(db, 'catalog', item.id);
+    const client = fakeClient();
+    await drain(new JobRunner(deps(client), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('active');
+    expect(after.name).toBe('旧名字');
+    expect(after.colorName).toBe('靛蓝');
+    expect(after.candidates).toHaveLength(2);
+  });
+
+  it('mirror matching sends the most-worn items first', async () => {
+    const rare = await createItem(db, { name: 'rare', slot: 'top', status: 'active', catalogUri: 'mem://c/r' });
+    const often = await createItem(db, { name: 'often', slot: 'top', status: 'active', catalogUri: 'mem://c/o' });
+    await db.runAsync("INSERT INTO wear_logs (id, date, source, created_at) VALUES ('l1', '2026-10-01', 'manual', 'x')");
+    await db.runAsync('INSERT INTO wear_log_items (log_id, item_id) VALUES (?, ?)', ['l1', often.id]);
+    const client = fakeClient();
+    let text = '';
+    client.visionJson = async <T,>(req: { text: string }) => {
+      text = req.text;
+      return { data: { matches: [], unmatched: [] } as T, usage: { in: 1, out: 1 } };
+    };
+    await matchMirror(deps(client), 'mem://mirror/1');
+    expect(text.indexOf('often')).toBeLessThan(text.indexOf('rare'));
+    expect(rare.id).toBeTruthy();
+  });
+});

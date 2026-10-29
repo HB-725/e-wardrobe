@@ -70,6 +70,11 @@ export function itemsOf(snap: Snapshot, ids: string[]): Item[] {
   return ids.map((id) => snap.byId.get(id)).filter((x): x is Item => !!x);
 }
 
+/** Cached try-on for a combination; items without a picture are not part of try-ons, so they are left out of the key. */
 export function tryonFor(snap: Snapshot, ids: string[]): string | null {
-  return snap.tryons.get(outfitKey(ids)) ?? null;
+  const drawable = ids.filter((id) => {
+    const it = snap.byId.get(id);
+    return !!it && !!(it.catalogUri ?? it.originalUri);
+  });
+  return snap.tryons.get(outfitKey(drawable)) ?? null;
 }

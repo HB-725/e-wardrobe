@@ -2,14 +2,17 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, TextInput, View } from 'react-native';
-import { type AiSettings, getAiSettings, qualityFor } from '@/ai/config';
+import { ActivityIndicator, BackHandler, Platform, TextInput, View } from 'react-native';
+import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
+import { type AiSettings, getAiBlocked, getAiSettings, qualityFor } from '@/ai/config';
 import { estimateImageCost, formatUsd } from '@/ai/models';
 import { getAvatar, saveAvatar } from '@/db/misc';
 import { getApiKey } from '@/platform/secrets';
 import type { Avatar } from '@/domain/types';
 import { startAvatar } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
+import { useSafe } from '@/state/useSafe';
+import { confirmAsync } from '@/ui/dialogs';
 import { Icon } from '@/ui/Icon';
 import { Btn, Chip, Loading, NavHeader, PrivacyNote, ProgressBar, Screen, T, Tap } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
@@ -25,12 +28,14 @@ const BUILDS = [
 export default function AvatarSetup() {
   const avatar = useData(getAvatar);
   const settings = useData(getAiSettings);
-  if (!avatar || !settings) return <Loading />;
-  return <Setup avatar={avatar} settings={settings} />;
+  const blocked = useData(getAiBlocked);
+  if (!avatar || !settings || blocked === undefined) return <Loading />;
+  return <Setup avatar={avatar} settings={settings} blocked={blocked} />;
 }
 
-function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
+function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSettings; blocked: string | null }) {
   const app = useApp();
+  const safe = useSafe();
   const params = useLocalSearchParams<{ step?: string }>();
   const processing = avatar.status === 'processing';
   const [step, setStep] = useState(Number(params.step) || (processing ? 3 : 1));
@@ -63,8 +68,23 @@ function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
   }, [processing]);
   const elapsed = processing && avatar.updatedAt ? (now - new Date(avatar.updatedAt).getTime()) / 1000 : 0;
 
+  // Android back steps back through the flow instead of closing it (and deleting the photos just taken).
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (step === 2) {
+        setStep(1);
+        return true;
+      }
+      if (step === 1 && photos.some((u) => u && !avatar.sourceUris.includes(u))) {
+        void confirmAsync('放弃已拍的照片？', '还没有开始生成，离开后这些照片会被删除。', '放弃').then((ok) => ok && router.back());
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [step, photos, avatar.sourceUris]);
 
-  const take = async (i: number, camera: boolean) => {
+  const take = safe(async (i: number, camera: boolean) => {
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9 };
     let r: ImagePicker.ImagePickerResult;
     if (camera && Platform.OS !== 'web') {
@@ -77,7 +97,7 @@ function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
     const prev = photos[i];
     if (prev && !avatar.sourceUris.includes(prev)) await app.images.remove(prev);
     setPhotos((p) => p.map((x, j) => (j === i ? uri : x)));
-  };
+  });
 
   const h = Number(height);
   const w = Number(weight);
@@ -86,7 +106,11 @@ function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
   const cost = estimateImageCost(null, { inputImages: 3, quality: qualityFor(settings.quality, 'avatar') }) + estimateImageCost(null, { inputImages: 2, quality: qualityFor(settings.quality, 'avatar') });
   const body = { heightCm: h, weightKg: w, build };
 
-  const generate = async () => {
+  const generate = safe(async () => {
+    if (processing) {
+      app.toast('上一次生成还没结束，完成后再试');
+      return;
+    }
     if (!(await getApiKey())) {
       app.toast('先填写 OpenAI API Key');
       router.push('/apikey');
@@ -100,7 +124,7 @@ function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
     } finally {
       setBusy(false);
     }
-  };
+  });
 
   const steps = (
     <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: PAD }}>
@@ -253,7 +277,14 @@ function Setup({ avatar, settings }: { avatar: Avatar; settings: AiSettings }) {
             </View>
           ))}
         </View>
-        {processing ? <ProgressBar value={Math.min(0.95, elapsed / 70)} /> : null}
+        {processing && blocked ? (
+          <View style={{ backgroundColor: '#FBF1E3', padding: 12, gap: 8 }}>
+            <T style={{ fontSize: 13 }}>AI 已暂停：{describeAiError(new AiError(blocked as AiErrorKind, ''))}</T>
+            <Btn label="去处理" kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(blocked))} />
+          </View>
+        ) : processing ? (
+          <ProgressBar value={Math.min(0.95, elapsed / 70)} />
+        ) : null}
       </View>
     );
     footer = ready ? (
