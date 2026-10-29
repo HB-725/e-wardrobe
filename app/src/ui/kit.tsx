@@ -34,8 +34,11 @@ const TEXT: Record<Variant, TextStyle> = {
   eyebrow: { fontSize: 11, letterSpacing: 1.8, color: C.sub },
 };
 
+/** Follows the system font size up to 1.35x: beyond that the fixed-size cards and tiles would clip their text. */
+export const MAX_FONT_SCALE = 1.35;
+
 export function T({ v = 'body', style, ...rest }: TextProps & { v?: Variant }) {
-  return <Text {...rest} style={[{ color: C.ink }, TEXT[v], style]} />;
+  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} style={[{ color: C.ink }, TEXT[v], style]} />;
 }
 
 // ---------- buttons ----------
@@ -87,7 +90,8 @@ export function Btn({
       ]}
     >
       {loading ? <ActivityIndicator size="small" color={fg} /> : icon ? <Icon name={icon} size={18} color={fg} /> : null}
-      <Text style={{ color: fg, fontSize: 14, fontWeight: primary ? '500' : '400', letterSpacing: 0.5 }} numberOfLines={1}>
+      {/* Shrinks rather than cutting off the end, which is often the price. */}
+      <Text style={{ color: fg, fontSize: 14, fontWeight: primary ? '500' : '400', letterSpacing: 0.5, flexShrink: 1 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {label}
       </Text>
     </Pressable>
@@ -215,6 +219,7 @@ export function Segmented<K extends string>({ options, value, onChange }: { opti
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.id)}
+            hitSlop={{ top: 7, bottom: 7 }}
             style={{ height: 34, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: on ? C.ink : 'transparent' }}
           >
             <Text style={{ fontSize: 13, color: on ? '#FFFFFF' : C.ink }}>{o.label}</Text>
@@ -231,6 +236,7 @@ export function Chip({ label, on, onPress }: { label: string; on: boolean; onPre
       accessibilityRole="button"
       accessibilityState={{ selected: on }}
       onPress={onPress}
+      hitSlop={{ top: 4, bottom: 4 }}
       style={{ height: 40, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderColor: on ? C.ink : C.muted, backgroundColor: on ? C.ink : C.bg }}
     >
       <Text style={{ fontSize: 13, color: on ? '#FFFFFF' : C.ink }}>{label}</Text>
@@ -245,6 +251,7 @@ export function Switch({ value, onChange, label }: { value: boolean; onChange: (
       accessibilityLabel={label}
       accessibilityState={{ checked: value }}
       onPress={() => onChange(!value)}
+      hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
       style={{ width: 48, height: 28, padding: 2, backgroundColor: value ? C.ink : C.muted, flexDirection: 'row', justifyContent: value ? 'flex-end' : 'flex-start' }}
     >
       <View style={{ width: 24, height: 24, backgroundColor: '#FFFFFF' }} />

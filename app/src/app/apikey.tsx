@@ -107,6 +107,9 @@ export default function ApiKeyPage() {
             <T style={{ fontSize: 13, textDecorationLine: 'underline' }}>打开 platform.openai.com/api-keys</T>
           </Tap>
         </View>
+        <T v="small" style={{ color: C.sub, lineHeight: 20 }}>
+          手机需要能访问 api.openai.com。部分地区（例如中国大陆）无法直接连接 OpenAI，AI 功能会提示网络连接失败。
+        </T>
         <PrivacyNote text="Key 加密保存在手机的系统钥匙串里，只用来直接请求 OpenAI" />
       </View>
     </Screen>

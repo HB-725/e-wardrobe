@@ -42,6 +42,8 @@ async function loadMe(db: Db) {
 type SheetKind = 'cap' | 'quality' | 'idle' | 'name' | 'licenses' | null;
 
 const FEEDBACK_URL = 'https://github.com/HB-725/e-wardrobe/issues';
+const PRIVACY_URL = 'https://github.com/HB-725/e-wardrobe/blob/main/PRIVACY.md';
+const REPORT_URL = 'https://github.com/HB-725/e-wardrobe/issues/new?title=%E4%B8%BE%E6%8A%A5+AI+%E7%94%9F%E6%88%90%E5%86%85%E5%AE%B9&labels=ai-content';
 const LICENSES: [string, string][] = [
   ['React · React Native', 'MIT'],
   ['Expo 及其模块', 'MIT'],
@@ -315,7 +317,9 @@ export default function MePage() {
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>关于</SectionTitle>
         <Row label="版本" value={`v${Constants.expoConfig?.version ?? '—'}`} />
+        <Row label="隐私政策" onPress={() => Linking.openURL(PRIVACY_URL).catch(() => app.toast('无法打开浏览器'))} />
         <Row label="反馈问题" value="GitHub" onPress={() => Linking.openURL(FEEDBACK_URL).catch(() => app.toast('无法打开浏览器'))} />
+        <Row label="举报不当的 AI 生成内容" sub="附上截图说明是哪张图，我们会改进提示词" onPress={() => Linking.openURL(REPORT_URL).catch(() => app.toast('无法打开浏览器'))} />
         <Row label="开源许可" onPress={() => setSheet('licenses')} last />
       </View>
       <T v="caption" style={{ textAlign: 'center', marginTop: 20 }}>

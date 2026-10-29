@@ -18,7 +18,7 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（94 个测试）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（97 个测试）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
@@ -56,6 +56,13 @@
   模拟器上完整跑通同意流程（拒绝 → 照片照样保存、队列暂停 → /consent 同意 → 自动继续）、录入、形象、快速预览、保存穿搭、今天穿这套、日历、生成大片；
   修复「生成大片 / 上身效果把纯 T 恤画成外套 + 内搭」（提示词重写，真实 API 正面 6/6 正确）；上身效果可「不满意？重新生成」；Android 上 2 件拼贴换行
 - 背面上身效果改为「背面形象 + 正面上身效果」让模型转身（tryonBackPrompt）：用平铺商品图时 gpt-image-1-mini 约一半会把胸前印花画到背后，转身方式实测 7/7 正确、满身花纹延续；没有正面时背面任务先生成正面；背面提示词带上每件衣服测得的 colorHex，否则第二次生成会偏色（米白变米色，模拟器上实测）。重新生成正面会删掉由旧正面转出的背面。账户若未验证组织，gpt-image-1 会 400，只能用 mini
+- [x] 0.4.1 已发给用户（APK SHA-256 b8943be4…db775941，可覆盖 0.4.0）
+- [x] 第八轮（0.5.0）：大衣橱性能（穿着统计一次遍历、同一版本各页面共享一次快照加载、队列刷新合并、衣橱 / 试衣间 / 镜子手选改为虚拟列表、今天页最多 10 套、穿搭库每次 20 套；`?demo=big` 约 600 件 + 两年记录）；
+  离线（连不上网的任务不消耗重试次数，回到前台立即重试；超时单独处理，因为可能已计费；界面上的错误不再承诺「自动重试」，镜子识别失败可原图重试）；
+  镜子识别（每个品类都有名额、新衣服也会参与、同品类取置信度最高、可多件配饰、取消「覆盖今天」时不留下合身笔记）；
+  Excel / CSV 导入（UTF-8 CSV、品类关键词、非法日期提示、单事务、10 MB 上限）；隐私政策 PRIVACY.md、举报 AI 内容入口、按钮文字自动缩小、触控区域、系统大字体上限 1.35x
+- 上架前要做（不是代码）：Play 后台填隐私政策链接（PRIVACY.md 合并到 main 后的 GitHub 地址，App 里「关于 → 隐私政策」也指向它）、Data safety 表单声明「照片会发送给 OpenAI 处理」、内容分级；
+  xlsx 0.18.5 有已知 CVE（解析用户自己选的文件，风险低）：修复版只在 SheetJS 自己的 CDN 上，这台机器的网络访问不到，能访问时执行 `cd app && npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`（npm 上的 @e965/xlsx 是第三方转发，未采用）
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
 - [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
 - 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。
