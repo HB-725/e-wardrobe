@@ -232,7 +232,7 @@ export default function FittingPage() {
                     ? `重新生成 · 约 ${formatUsd(cost)}`
                     : tryon?.status === 'failed'
                       ? '重新生成上身效果'
-                      : `生成上身效果 · 约 ${formatUsd(cost)}`
+                      : `上身效果 · 约 ${formatUsd(cost)}`
               }
               kind="outline"
               height={40}

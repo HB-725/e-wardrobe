@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const OUT=process.argv[2]; const only=process.argv[3];
 (async()=>{
   const b=await chromium.launch();
-  const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,locale:'zh-CN'});
+  const ctx=await b.newContext({viewport:{width:Number(process.env.VW||390),height:Number(process.env.VH||844)},deviceScaleFactor:2,locale:'zh-CN'});
   const p=await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(String(e))); p.on('console',m=>{if(m.type()==='error')errs.push(m.text())});
   const shot=async(name)=>{await p.waitForTimeout(1200); await p.screenshot({path:`${OUT}/${name}.png`}); console.log('shot',name);};
