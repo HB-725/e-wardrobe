@@ -18,7 +18,7 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（97 个测试）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（100 个测试）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
@@ -61,7 +61,8 @@
   离线（连不上网的任务不消耗重试次数，回到前台立即重试；超时单独处理，因为可能已计费；界面上的错误不再承诺「自动重试」，镜子识别失败可原图重试）；
   镜子识别（每个品类都有名额、新衣服也会参与、同品类取置信度最高、可多件配饰、取消「覆盖今天」时不留下合身笔记）；
   Excel / CSV 导入（UTF-8 CSV、品类关键词、非法日期提示、单事务、10 MB 上限）；隐私政策 PRIVACY.md、举报 AI 内容入口、按钮文字自动缩小、触控区域、系统大字体上限 1.35x
-- 上架前要做（不是代码）：Play 后台填隐私政策链接（PRIVACY.md 合并到 main 后的 GitHub 地址，App 里「关于 → 隐私政策」也指向它）、Data safety 表单声明「照片会发送给 OpenAI 处理」、内容分级；
+- 0.5.0 模拟器验证（API 33，x86 包，覆盖安装在 0.4.1 数据上）：数据和上身效果保留、关于显示 v0.5.0 (6)、App 内隐私政策页、虚拟化衣橱网格和试衣间托盘、镜子照片识别（真实 API：T 恤 + 运动鞋高置信度，短裤列为衣橱里没有）→ 记录今天
+- 上架前要做（不是代码）：Play 后台填隐私政策链接（PRIVACY.md 合并到 main 后的 GitHub 地址；App 内「关于 → 隐私政策」是同样内容的本地页面）、Data safety 表单声明「照片会发送给 OpenAI 处理」、内容分级；
   xlsx 0.18.5 有已知 CVE（解析用户自己选的文件，风险低）：修复版只在 SheetJS 自己的 CDN 上，这台机器的网络访问不到，能访问时执行 `cd app && npm i https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`（npm 上的 @e965/xlsx 是第三方转发，未采用）
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
 - [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
