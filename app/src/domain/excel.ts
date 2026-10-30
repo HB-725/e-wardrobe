@@ -123,9 +123,9 @@ function str(v: unknown): string | null {
   return s ? s : null;
 }
 
-function parseDate(v: unknown): string | null {
+function parseDate(v: unknown, date1904 = false): string | null {
   if (typeof v === 'number' && v > 20000 && v < 80000) {
-    return serialToDateKey(v); // Excel serial date
+    return serialToDateKey(v, date1904); // Excel serial date
   }
   const s = str(v);
   if (!s) return null;
@@ -164,18 +164,19 @@ export interface ImportResult {
 export class SpreadsheetError extends Error {}
 
 /** Excel workbooks are read as binary; CSV text must be UTF-8 (Excel's "CSV UTF-8"), older ANSI/GBK files are not. */
-function readBook(base64: string, fileName: string): Sheet[] {
+function readBook(base64: string, fileName: string): { sheets: Sheet[]; date1904: boolean } {
   const bytes = base64ToBytes(base64);
   if (/\.csv$/i.test(fileName)) {
     let bin = '';
     for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
     const text = decodeUtf8(bin);
     if (text === null) throw new SpreadsheetError('这个 CSV 不是 UTF-8 编码。请在 Excel 里另存为「Excel 工作簿 (.xlsx)」或「CSV UTF-8」后再导入。');
-    return [{ name: 'CSV', rows: parseCsv(text.replace(/^\uFEFF/, '')) }];
+    return { sheets: [{ name: 'CSV', rows: parseCsv(text.replace(/^\uFEFF/, '')) }], date1904: false };
   }
   try {
     return readXlsx(bytes);
   } catch (e) {
+    if (e instanceof XlsxError && e.message === 'too-large') throw new SpreadsheetError('表格太大了。请删掉无关的工作表或行后再导入。');
     if (e instanceof XlsxError && e.message === 'old-xls') throw new SpreadsheetError('这是旧版 .xls 文件。请在 Excel 或 WPS 里另存为「Excel 工作簿 (.xlsx)」后再导入。');
     if (e instanceof XlsxError) throw new SpreadsheetError('无法读取这个文件，请确认是 Excel（.xlsx）或 CSV 文件。');
     throw e;
@@ -211,7 +212,7 @@ export function decodeUtf8(bin: string): string | null {
 
 /** Reads the first sheet (or the one named 单品). Rows need at least 名称 and a recognisable 品类. */
 export function parseWorkbook(base64: string, fileName = 'import.xlsx'): ImportResult {
-  const book = readBook(base64, fileName);
+  const { sheets: book, date1904 } = readBook(base64, fileName);
   const sheet = book.find((x) => x.name === '单品') ?? book[0];
   if (!sheet || sheet.rows.length === 0) return { items: [], skipped: [], warnings: [] };
   const header = sheet.rows[0].map((h) => String(h).trim());
@@ -236,7 +237,7 @@ export function parseWorkbook(base64: string, fileName = 'import.xlsx'): ImportR
       .split(/[、,，/·\s]+/)
       .map((x) => SEASON_ALIASES[x] ?? x)
       .filter(isSeason);
-    const purchasedOn = parseDate(r['购买日期']);
+    const purchasedOn = parseDate(r['购买日期'], date1904);
     if (!purchasedOn && str(r['购买日期'])) warnings.push({ row: rowNo, reason: `购买日期「${str(r['购买日期'])}」无法识别，已留空` });
     const priceRaw = r['价格'];
     const price = typeof priceRaw === 'number' ? priceRaw : Number(String(priceRaw ?? '').replace(/[¥￥,\s元]/g, ''));

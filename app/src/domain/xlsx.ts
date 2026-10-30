@@ -128,6 +128,22 @@ function attr(tag: string, name: string): string | null {
   return m ? unesc(m[1]) : null;
 }
 
+/** The relationship id of a <sheet>, whatever prefix its namespace was given (r:id, ns1:id...). */
+function relId(tag: string): string | null {
+  const m = tag.match(/(?:^|\s)[A-Za-z_][\w.-]*:id="([^"]*)"/);
+  return m ? unesc(m[1]) : null;
+}
+
+/** Some generators (.NET Open XML SDK, some Java / Python libraries) write <x:row> etc.: drop element prefixes. */
+function plain(xml: string): string {
+  return xml.replace(/<(\/?)[A-Za-z_][\w.-]*:(?=[A-Za-z_])/g, '<$1');
+}
+
+/** Past these, a "spreadsheet" is not a wardrobe list (and would exhaust a phone's memory once unpacked). */
+const MAX_PART_BYTES = 30 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 60 * 1024 * 1024;
+const MAX_ROWS = 20_000;
+
 /** All text of <t> elements inside a fragment (rich text runs are joined; phonetic hints are dropped). */
 function texts(xml: string): string {
   return [...xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>|<t\b[^>]*\/>/g)].map((m) => unesc(m[1] ?? '')).join('');
@@ -145,6 +161,8 @@ function readCells(xml: string, shared: string[]): Cell[][] {
   for (const rm of xml.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
     const r = Number(attr(rm[1], 'r') ?? nextRow + 1) - 1;
     nextRow = r + 1;
+    // Empty rows (Excel sometimes leaves a formatted row 1048576) are skipped instead of padding the array.
+    if (!rm[2] || r >= MAX_ROWS) continue;
     const row: Cell[] = [];
     let nextCol = 0;
     for (const cm of (rm[2] ?? '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
@@ -180,15 +198,25 @@ function resolve(base: string, target: string): string {
   return parts.join('/');
 }
 
-export function readXlsx(bytes: Uint8Array): Sheet[] {
+export function readXlsx(bytes: Uint8Array): { sheets: Sheet[]; date1904: boolean } {
   if (bytes[0] === 0xd0 && bytes[1] === 0xcf) throw new XlsxError('old-xls');
   let files: Record<string, Uint8Array>;
+  let total = 0;
+  let tooLarge = false;
   try {
-    files = unzipSync(bytes, { filter: (f) => f.name.endsWith('.xml') || f.name.endsWith('.rels') });
+    files = unzipSync(bytes, {
+      filter: (f) => {
+        if (!(f.name.endsWith('.xml') || f.name.endsWith('.rels'))) return false;
+        total += f.originalSize;
+        if (f.originalSize > MAX_PART_BYTES || total > MAX_TOTAL_BYTES) tooLarge = true;
+        return !tooLarge;
+      },
+    });
   } catch {
     throw new XlsxError('not-xlsx');
   }
-  const text = (name: string) => (files[name] ? strFromU8(files[name]) : null);
+  if (tooLarge) throw new XlsxError('too-large');
+  const text = (name: string) => (files[name] ? plain(strFromU8(files[name])) : null);
   const wb = text('xl/workbook.xml');
   if (!wb) throw new XlsxError('not-xlsx');
   const rels = new Map<string, string>();
@@ -201,12 +229,13 @@ export function readXlsx(bytes: Uint8Array): Sheet[] {
   const sheets: Sheet[] = [];
   for (const m of wb.matchAll(/<sheet\b([^>]*)\/?>/g)) {
     const name = attr(m[1], 'name') ?? `Sheet${sheets.length + 1}`;
-    const rid = attr(m[1], 'r:id');
+    const rid = relId(m[1]);
     const path = (rid && rels.get(rid)) || `xl/worksheets/sheet${sheets.length + 1}.xml`;
     const xml = text(path);
     sheets.push({ name, rows: xml ? readCells(xml, shared) : [] });
   }
-  return sheets;
+  // Old Mac Excel and Numbers may count days from 1904.
+  return { sheets, date1904: /<workbookPr\b[^>]*\bdate1904="(1|true)"/.test(wb) };
 }
 
 /** RFC 4180: quoted fields may contain commas, quotes ("") and line breaks. Also accepts ; or tab separated files. */
@@ -244,9 +273,10 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
-/** Excel's serial day number (1900 date system) to YYYY-MM-DD. */
-export function serialToDateKey(serial: number): string {
+/** Excel's serial day number to YYYY-MM-DD (1900 date system, or 1904 for workbooks that say so). */
+export function serialToDateKey(serial: number, date1904 = false): string {
   // Day 60 is Excel's fictitious 1900-02-29; serials are counted from 1899-12-30 for dates after it.
-  const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86_400_000);
+  const base = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+  const d = new Date(base + Math.floor(serial) * 86_400_000);
   return d.toISOString().slice(0, 10);
 }
