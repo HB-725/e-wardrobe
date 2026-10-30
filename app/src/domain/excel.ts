@@ -108,11 +108,20 @@ const SLOT_KEYWORDS: [RegExp, Slot][] = [
   [/鞋|靴/, 'shoes'],
   [/T恤|t恤|衬衫|毛衣|卫衣|帽衫|连帽|开衫|针织|背心|吊带|上衣|打底|polo|POLO/, 'top'],
   [/包/, 'bag'],
-  [/帽|围巾|领带|腰带|皮带|手表|眼镜|首饰|项链|手链|耳环|袜|饰/, 'accessory'],
+  [/帽|巾|领带|腰带|皮带|手表|眼镜|首饰|项链|手链|耳环|袜|饰/, 'accessory'],
 ];
 
 function slotOf(raw: string): Slot | undefined {
   return SLOT_ALIASES[raw] ?? (SLOTS.find((s) => s.id === raw)?.id as Slot | undefined) ?? SLOT_KEYWORDS.find(([re]) => re.test(raw))?.[1];
+}
+
+/** Hand-made sheets often leave 品类 empty; 细类 or the name (面包服, 连帽卫衣) usually says it. */
+function guessSlot(subcategory: string | null, name: string): { slot: Slot; from: '细类' | '名称' } | undefined {
+  const match = (t: string | null) => (t ? SLOT_KEYWORDS.find(([re]) => re.test(t))?.[1] : undefined);
+  const bySub = match(subcategory);
+  if (bySub) return { slot: bySub, from: '细类' };
+  const byName = match(name);
+  return byName ? { slot: byName, from: '名称' } : undefined;
 }
 
 const SEASON_ALIASES: Record<string, Season> = { 春: 'spring', 夏: 'summer', 秋: 'autumn', 冬: 'winter' };
@@ -227,11 +236,16 @@ export function parseWorkbook(base64: string, fileName = 'import.xlsx'): ImportR
       if (Object.values(r).some((v) => str(v))) skipped.push({ row: rowNo, reason: '缺少名称' });
       return;
     }
-    const slotRaw = str(r['品类']) ?? '';
-    const slot = slotOf(slotRaw);
+    const slotRaw = str(r['品类']);
+    let slot = slotRaw ? slotOf(slotRaw) : undefined;
     if (!slot) {
-      skipped.push({ row: rowNo, reason: `品类「${slotRaw || '空'}」无法识别` });
-      return;
+      const guess = guessSlot(str(r['细类']), name);
+      if (!guess) {
+        skipped.push({ row: rowNo, reason: slotRaw ? `品类「${slotRaw}」无法识别` : '没有填品类，名称里也看不出是哪一类' });
+        return;
+      }
+      slot = guess.slot;
+      if (slotRaw) warnings.push({ row: rowNo, reason: `品类「${slotRaw}」无法识别，按${guess.from}归为${SLOTS.find((x) => x.id === slot)!.label}` });
     }
     const seasons = (str(r['季节']) ?? '')
       .split(/[、,，/·\s]+/)

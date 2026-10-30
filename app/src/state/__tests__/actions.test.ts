@@ -284,6 +284,27 @@ describe('spreadsheet edge cases', () => {
     });
   });
 
+  it('guesses the category from 细类 or the name when 品类 is empty or unknown', () => {
+    const csv = '名称,品类,细类\n黑色面包服,,\n灰色连帽卫衣,,\n小白鞋,,板鞋\n真丝方巾,丝巾类,\n神秘单品,,\n';
+    const r = parseWorkbook(Buffer.from(csv, 'utf8').toString('base64'), 'x.csv');
+    expect(r.items.map((i) => [i.name, i.slot])).toEqual([
+      ['黑色面包服', 'outer'],
+      ['灰色连帽卫衣', 'top'],
+      ['小白鞋', 'shoes'],
+      ['真丝方巾', 'accessory'],
+    ]);
+    expect(r.skipped).toEqual([{ row: 6, reason: '没有填品类，名称里也看不出是哪一类' }]);
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('falls back to the name when 品类 is filled with something unknown, and says so', () => {
+    const csv = '名称,品类\n羊毛大衣,冬季\n旧东西,杂物\n';
+    const r = parseWorkbook(Buffer.from(csv, 'utf8').toString('base64'), 'x.csv');
+    expect(r.items.map((i) => [i.name, i.slot])).toEqual([['羊毛大衣', 'outer']]);
+    expect(r.warnings).toEqual([{ row: 2, reason: '品类「冬季」无法识别，按名称归为外套' }]);
+    expect(r.skipped).toEqual([{ row: 3, reason: '品类「杂物」无法识别' }]);
+  });
+
   it('rejects invalid UTF-8 and keeps valid 4-byte characters', () => {
     const bin = (bytes: number[]) => String.fromCharCode(...bytes);
     expect(decodeUtf8(bin([0xf0, 0x9f, 0x98, 0x80]))).toBe('😀');
