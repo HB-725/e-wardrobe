@@ -1,3 +1,4 @@
+import { strToU8, zipSync } from 'fflate';
 import * as XLSX from 'xlsx';
 import { base64ToBytes, bytesToBase64, parseCsv, readXlsx, serialToDateKey, writeXlsx } from '../xlsx';
 
@@ -55,7 +56,6 @@ describe('xlsx', () => {
 });
 
 describe('xlsx from other generators', () => {
-  const { zipSync, strToU8 } = require('fflate') as typeof import('fflate');
   const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
   it('reads prefixed (Open XML SDK style) parts, 1904 dates, and skips empty trailing rows', () => {
     const bytes = zipSync({
