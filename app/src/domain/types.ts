@@ -4,6 +4,12 @@ export type ItemStatus = 'processing' | 'review' | 'active' | 'failed' | 'archiv
 
 export type FieldSource = 'ai' | 'tag' | 'user';
 
+export interface FidelityCheck {
+  label: string;
+  ok: boolean;
+  note: string;
+}
+
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export interface Item {
@@ -26,6 +32,10 @@ export interface Item {
   originalUri: string | null;
   catalogUri: string | null;
   tagUri: string | null;
+  /** Generated catalog images waiting for the user to pick one (the review step). */
+  candidates: string[];
+  /** Fidelity checklist per candidate, same order as `candidates`. */
+  checks: FidelityCheck[][];
   fieldSources: Partial<Record<keyof Item, FieldSource>>;
   error: string | null;
   createdAt: string;
@@ -85,7 +95,7 @@ export interface Job {
 
 export interface UsageEntry {
   id: string;
-  kind: JobType | 'other';
+  kind: JobType | 'photo' | 'other';
   model: string;
   costUsd: number;
   createdAt: string;

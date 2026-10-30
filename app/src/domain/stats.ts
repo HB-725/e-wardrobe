@@ -29,27 +29,41 @@ export function daysBetween(fromKey: string, to: Date): number {
   return Math.max(0, Math.round((toDay.getTime() - from.getTime()) / DAY_MS));
 }
 
-export function computeItemStats(item: Item, logs: WearLog[], today: Date): ItemStats {
-  let wears = 0;
-  let lastWorn: string | null = null;
-  for (const log of logs) {
-    if (!log.itemIds.includes(item.id)) continue;
-    wears += 1;
-    if (lastWorn === null || log.date > lastWorn) lastWorn = log.date;
-  }
-  const since = lastWorn ?? item.createdAt.slice(0, 10);
+interface Wear {
+  wears: number;
+  lastWorn: string | null;
+}
+
+function toStats(item: Item, w: Wear, today: Date): ItemStats {
+  // createdAt is a UTC timestamp; compare in the phone's local calendar.
+  const since = w.lastWorn ?? toDateKey(new Date(item.createdAt));
   return {
-    wears,
-    lastWorn,
-    costPerWearCents:
-      item.priceCents != null && wears > 0 ? Math.round(item.priceCents / wears) : null,
+    wears: w.wears,
+    lastWorn: w.lastWorn,
+    costPerWearCents: item.priceCents != null && w.wears > 0 ? Math.round(item.priceCents / w.wears) : null,
     idleDays: daysBetween(since, today),
   };
 }
 
+export function computeItemStats(item: Item, logs: WearLog[], today: Date): ItemStats {
+  return statsById([item], logs, today).get(item.id)!;
+}
+
+/** One pass over the logs (a large wardrobe has hundreds of items and years of logs). */
 export function statsById(items: Item[], logs: WearLog[], today: Date): Map<string, ItemStats> {
+  const wear = new Map<string, Wear>();
+  for (const log of logs) {
+    for (const id of new Set(log.itemIds)) {
+      const w = wear.get(id);
+      if (!w) wear.set(id, { wears: 1, lastWorn: log.date });
+      else {
+        w.wears += 1;
+        if (w.lastWorn === null || log.date > w.lastWorn) w.lastWorn = log.date;
+      }
+    }
+  }
   const map = new Map<string, ItemStats>();
-  for (const item of items) map.set(item.id, computeItemStats(item, logs, today));
+  for (const item of items) map.set(item.id, toStats(item, wear.get(item.id) ?? { wears: 0, lastWorn: null }, today));
   return map;
 }
 
@@ -129,4 +143,9 @@ export function monthGrid(year: number, month0: number): MonthCell[] {
   for (let i = 0; i < lead; i++) cells.push({ dateKey: null, day: null });
   for (let d = 1; d <= days; d++) cells.push({ dateKey: toDateKey(new Date(year, month0, d)), day: d });
   return cells;
+}
+
+/** Today's date key, computed at the moment of the call (never cache it across an app session). */
+export function currentDateKey(): string {
+  return toDateKey(new Date());
 }

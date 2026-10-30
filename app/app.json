@@ -3,7 +3,7 @@
     "name": "衣橱",
     "slug": "e-wardrobe",
     "scheme": "ewardrobe",
-    "version": "0.1.0",
+    "version": "0.5.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
     "android": {
       "package": "app.ewardrobe",
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#111111",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -27,7 +27,17 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.CAMERA"
-      ]
+      ],
+      "versionCode": 8,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+      ],
+      "allowBackup": false
     },
     "plugins": [
       "expo-router",
@@ -38,19 +48,38 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片"
+          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "用于从相册导入衣服照片",
-          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片"
+          "cameraPermission": "用于拍摄衣服、吊牌和镜子照片",
+          "microphonePermission": false
         }
-      ]
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "用于保存生成的穿搭大片",
+          "savePhotosPermission": "用于保存生成的穿搭大片",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      "./plugins/withReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
     }
   }
 }

@@ -80,6 +80,11 @@ export async function saveAvatar(db: Db, patch: Partial<Avatar>): Promise<Avatar
   return next;
 }
 
+/** An avatar with both views can be dressed, even while a newer one is being generated. */
+export function avatarUsable(a: Avatar): boolean {
+  return !!a.frontUri && !!a.backUri && a.status !== 'none';
+}
+
 /** Try-on images belong to one avatar; regenerating the avatar invalidates them via this version. */
 export function avatarVersion(a: Avatar): string {
   return a.frontUri ?? 'none';
@@ -101,6 +106,10 @@ export async function putTryon(db: Db, key: string, view: TryonView, version: st
      ON CONFLICT(key, view) DO UPDATE SET uri = excluded.uri, avatar_version = excluded.avatar_version, created_at = excluded.created_at`,
     [key, view, uri, version, nowIso()],
   );
+}
+
+export async function deleteTryon(db: Db, key: string, view: TryonView): Promise<void> {
+  await db.runAsync('DELETE FROM tryon_cache WHERE key = ? AND view = ?', [key, view]);
 }
 
 export async function listTryonUris(db: Db): Promise<string[]> {
@@ -144,9 +153,62 @@ export async function monthSpend(db: Db, ref: Date = new Date()): Promise<SpendS
 // ---------- wipe ----------
 
 export async function wipeAll(db: Db): Promise<void> {
-  await db.withTransactionAsync(async () => {
+  await db.withTransactionAsync(async (tx) => {
     for (const t of ['wear_log_items', 'wear_logs', 'outfit_items', 'outfits', 'tryon_cache', 'jobs', 'usage', 'avatar', 'items', 'settings']) {
-      await db.execAsync(`DELETE FROM ${t}`);
+      await tx.execAsync(`DELETE FROM ${t}`);
     }
   });
+}
+
+/** Drops cached try-on images that belong to an older avatar; returns their uris so the files can be deleted. */
+export async function pruneTryons(db: Db, currentVersion: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ uri: string }>('SELECT uri FROM tryon_cache WHERE avatar_version != ?', [currentVersion]);
+  await db.runAsync('DELETE FROM tryon_cache WHERE avatar_version != ?', [currentVersion]);
+  return rows.map((r) => r.uri);
+}
+
+/** Removes cached try-ons that include this item (its picture or category changed, or it was deleted). */
+export async function dropTryonsWithItem(db: Db, itemId: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ key: string; view: string; uri: string }>('SELECT key, view, uri FROM tryon_cache');
+  const hit = rows.filter((r) => r.key.split('+').includes(itemId));
+  for (const r of hit) await db.runAsync('DELETE FROM tryon_cache WHERE key = ? AND view = ?', [r.key, r.view]);
+  // Try-ons still waiting would draw the old look; a running one discards its result itself.
+  const jobs = await db.getAllAsync<{ id: string; ref_id: string }>("SELECT id, ref_id FROM jobs WHERE type = 'tryon' AND status != 'running'");
+  for (const j of jobs) if (j.ref_id.split('|')[0].split('+').includes(itemId)) await db.runAsync('DELETE FROM jobs WHERE id = ?', [j.id]);
+  return hit.map((r) => r.uri);
+}
+
+/** Every image uri the database still points at (for cleaning up orphaned files). */
+export async function referencedImages(db: Db): Promise<Set<string>> {
+  const out = new Set<string>();
+  const add = (v: string | null | undefined) => v && out.add(v);
+  for (const r of await db.getAllAsync<{ a: string | null; b: string | null; c: string | null; d: string }>('SELECT original_uri AS a, catalog_uri AS b, tag_uri AS c, candidates AS d FROM items')) {
+    add(r.a);
+    add(r.b);
+    add(r.c);
+    parseJson<string[]>(r.d, []).forEach(add);
+  }
+  for (const r of await db.getAllAsync<{ u: string | null }>('SELECT photo_uri AS u FROM wear_logs')) add(r.u);
+  for (const r of await db.getAllAsync<{ u: string }>('SELECT uri AS u FROM tryon_cache')) add(r.u);
+  for (const r of await db.getAllAsync<{ a: string | null; b: string | null; s: string }>('SELECT front_uri AS a, back_uri AS b, source_uris AS s FROM avatar')) {
+    add(r.a);
+    add(r.b);
+    parseJson<string[]>(r.s, []).forEach(add);
+  }
+  // Paid intermediate results of unfinished jobs.
+  for (const r of await db.getAllAsync<{ p: string }>("SELECT payload AS p FROM jobs WHERE status IN ('queued', 'running')")) {
+    const p = parseJson<{ generated?: string[]; front?: string }>(r.p, {});
+    (p.generated ?? []).forEach(add);
+    add(p.front);
+  }
+  return out;
+}
+
+/** Front-view try-on images for the current avatar, keyed by outfit key. */
+export async function frontTryons(db: Db, version: string): Promise<Map<string, string>> {
+  const rows = await db.getAllAsync<{ key: string; uri: string }>(
+    "SELECT key, uri FROM tryon_cache WHERE view = 'front' AND avatar_version = ?",
+    [version],
+  );
+  return new Map(rows.map((r) => [r.key, r.uri]));
 }

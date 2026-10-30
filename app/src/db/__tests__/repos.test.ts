@@ -4,8 +4,8 @@ import { migrate, SCHEMA_VERSION } from '../schema';
 import { countByStatus, createItem, deleteItem, getItem, listItems, setUserField, updateItem } from '../items';
 import { createOutfit, deleteOutfit, findOutfitByItems, listOutfits, outfitsContaining } from '../outfits';
 import { deleteLogByDate, getLogByDate, listLogs, logWear } from '../wear';
-import { claimNextJob, completeJob, deferJob, enqueueJob, failJob, listJobs, MAX_ATTEMPTS, recoverRunningJobs, retryJob } from '../jobs';
-import { addUsage, avatarVersion, getAvatar, getSetting, getTryon, monthSpend, putTryon, saveAvatar, setSetting, wipeAll } from '../misc';
+import { claimNextJob, completeJob, deferJob, enqueueJob, failJob, listJobs, MAX_ATTEMPTS, MAX_NETWORK_WAITS, recoverRunningJobs, retryJob, waitForNetwork, wakeWaitingJobs } from '../jobs';
+import { addUsage, avatarVersion, dropTryonsWithItem, getAvatar, getSetting, getTryon, monthSpend, putTryon, saveAvatar, setSetting, wipeAll } from '../misc';
 
 let db: Db;
 beforeEach(async () => {
@@ -157,9 +157,34 @@ describe('jobs', () => {
     await deferJob(db, job!, 'no key');
     const again = await claimNextJob(db, new Date(Date.now() + 1000));
     expect(again?.attempts).toBe(1);
-    expect(await recoverRunningJobs(db)).toBe(1);
+    expect(await recoverRunningJobs(db)).toEqual([]);
+    expect((await listJobs(db, ['queued'])).map((j) => j.id)).toEqual([again!.id]);
     await completeJob(db, again!.id);
     expect(await listJobs(db, ['queued', 'running'])).toEqual([]);
+  });
+
+  it('waits for the network a bounded number of times, and waking only touches those jobs', async () => {
+    const now = new Date('2030-01-01T00:00:00Z');
+    await enqueueJob(db, 'catalog', 'net');
+    let job = (await claimNextJob(db, now))!;
+    expect(await waitForNetwork(db, job, now)).toBe(true);
+    await enqueueJob(db, 'catalog', 'server');
+    const other = (await claimNextJob(db, now))!;
+    await failJob(db, other, '502', { retryable: true, now });
+    await wakeWaitingJobs(db, now);
+    const queued = await listJobs(db, ['queued']);
+    expect(queued.find((j) => j.refId === 'net')!.nextRunAt).toBe(now.toISOString());
+    expect(queued.find((j) => j.refId === 'server')!.nextRunAt > now.toISOString()).toBe(true); // its backoff is kept
+    job = { ...queued.find((j) => j.refId === 'net')!, payload: { netWaits: MAX_NETWORK_WAITS } };
+    expect(await waitForNetwork(db, job, now)).toBe(false);
+  });
+
+  it('gives up on interrupted jobs that already used every attempt', async () => {
+    const job = await enqueueJob(db, 'catalog', 'x');
+    await db.runAsync("UPDATE jobs SET status = 'running', attempts = ? WHERE id = ?", [MAX_ATTEMPTS, job.id]);
+    const given = await recoverRunningJobs(db);
+    expect(given.map((j) => j.id)).toEqual([job.id]);
+    expect(await listJobs(db, ['failed'])).toHaveLength(1);
   });
 });
 
@@ -181,6 +206,16 @@ describe('misc', () => {
     expect(await getTryon(db, 'a+b', 'front', v)).toBe('file:///t1.png');
     expect(await getTryon(db, 'a+b', 'front', 'other')).toBeNull();
     expect(await getTryon(db, 'a+b', 'back', v)).toBeNull();
+  });
+
+  it('dropping try-ons for an item also cancels waiting try-on jobs that include it', async () => {
+    await putTryon(db, 'a+b', 'front', 'v', 'file:///t1.png');
+    await putTryon(db, 'c+d', 'front', 'v', 'file:///t2.png');
+    await enqueueJob(db, 'tryon', 'a+b|back');
+    await enqueueJob(db, 'tryon', 'ab+c|back');
+    expect(await dropTryonsWithItem(db, 'a')).toEqual(['file:///t1.png']);
+    expect((await listJobs(db, ['queued'])).map((j) => j.refId)).toEqual(['ab+c|back']);
+    expect(await getTryon(db, 'c+d', 'front', 'v')).toBe('file:///t2.png');
   });
 
   it('sums spend for the month by kind', async () => {

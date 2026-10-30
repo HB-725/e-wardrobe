@@ -105,6 +105,10 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  `
+  ALTER TABLE items ADD COLUMN candidates TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE items ADD COLUMN checks TEXT NOT NULL DEFAULT '[]';
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
@@ -116,9 +120,9 @@ export async function migrate(db: Db): Promise<void> {
   while (version < MIGRATIONS.length) {
     const sql = MIGRATIONS[version];
     const next = version + 1;
-    await db.withTransactionAsync(async () => {
-      await db.execAsync(sql);
-      await db.execAsync(`PRAGMA user_version = ${next}`);
+    await db.withTransactionAsync(async (tx) => {
+      await tx.execAsync(sql);
+      await tx.execAsync(`PRAGMA user_version = ${next}`);
     });
     version = next;
   }

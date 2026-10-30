@@ -6,7 +6,7 @@ function item(id: string, extra: Partial<Item> = {}): Item {
   return {
     id, name: id, slot: 'top', subcategory: null, colorName: null, colorHex: null, seasons: [], brand: null,
     size: null, material: null, priceCents: null, purchasedOn: null, channel: null, location: null, fitNotes: null,
-    status: 'active', originalUri: null, catalogUri: null, tagUri: null, fieldSources: {}, error: null,
+    status: 'active', originalUri: null, catalogUri: null, tagUri: null, candidates: [], checks: [], fieldSources: {}, error: null,
     createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z', ...extra,
   };
 }
@@ -98,5 +98,14 @@ describe('outfit', () => {
     expect(s[0].badge).toBe('还没穿过');
     expect(s[1].badge).toBe('28 天没穿了');
     expect(s[2].badge).toBeNull();
+  });
+});
+
+describe('fitting selection after a category change', () => {
+  it('never lists a garment twice and moves it to its new category when picked again', () => {
+    const sel = { top: 'x' };
+    const moved = toggleInSelection(sel, { id: 'x', slot: 'outer' });
+    expect(moved).toEqual({ outer: 'x' });
+    expect(selectionIds({ top: 'x', outer: 'x' })).toEqual(['x']);
   });
 });
