@@ -42,8 +42,22 @@ export function normalizeDate(v: string): string | null {
   if (!m) return null;
   const mo = Number(m[2]);
   const d = m[3] ? Number(m[3]) : 1;
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  if (mo < 1 || mo > 12 || d < 1 || d > new Date(Number(m[1]), mo, 0).getDate()) return null;
   return `${m[1]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function priceOf(v: string): number | null | undefined {
+  const t = v.trim().replace(/[¥￥,\s元]/g, '');
+  if (!t) return null;
+  return /^\d+(\.\d{1,2})?$/.test(t) && Number(t) > 0 ? Math.round(Number(t) * 100) : undefined;
+}
+
+/** What is wrong with the form, for the user to fix before saving (empty list when it can be saved). */
+export function formProblems(f: Form): string[] {
+  const out: string[] = [];
+  if (priceOf(f.price) === undefined) out.push(`价格「${f.price.trim()}」不是有效的金额`);
+  if (f.purchasedOn.trim() && !normalizeDate(f.purchasedOn)) out.push(`购买日期「${f.purchasedOn.trim()}」无法识别，可以写 2025-09 或 2025-09-14`);
+  return out;
 }
 
 /** Turns the form into an item patch; every field that differs from what the AI filled is marked as typed by the user. */
@@ -57,9 +71,10 @@ export function patchOf(it: Item, f: Form): Partial<Item> {
     size: f.size.trim() || null,
     material: f.material.trim() || null,
     brand: f.brand.trim() || null,
-    priceCents: f.price.trim() && Number(f.price) > 0 ? Math.round(Number(f.price) * 100) : null,
+    // An unreadable value keeps what was stored (callers check formProblems first).
+    priceCents: priceOf(f.price) === undefined ? it.priceCents : priceOf(f.price)!,
     location: f.location.trim() || null,
-    purchasedOn: normalizeDate(f.purchasedOn),
+    purchasedOn: !f.purchasedOn.trim() ? null : (normalizeDate(f.purchasedOn) ?? it.purchasedOn),
     fitNotes: f.fitNotes.trim() || null,
   };
   const sources = { ...it.fieldSources };

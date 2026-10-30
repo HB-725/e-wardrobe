@@ -7,13 +7,15 @@ export type Selection = Partial<Record<Slot, string>>;
 /** Toggle an item into its slot; selecting the worn item again takes it off. */
 export function toggleInSelection(sel: Selection, item: Pick<Item, 'id' | 'slot'>): Selection {
   const next = { ...sel };
+  // The garment may still be listed under its old category (edited since it was put on).
+  for (const k of Object.keys(next) as Slot[]) if (k !== item.slot && next[k] === item.id) delete next[k];
   if (next[item.slot] === item.id) delete next[item.slot];
   else next[item.slot] = item.id;
   return next;
 }
 
 export function selectionIds(sel: Selection): string[] {
-  return LAYER_ORDER.map((s) => sel[s]).filter((x): x is string => !!x);
+  return [...new Set(LAYER_ORDER.map((s) => sel[s]).filter((x): x is string => !!x))];
 }
 
 export function selectionFromItems(items: Pick<Item, 'id' | 'slot'>[]): Selection {

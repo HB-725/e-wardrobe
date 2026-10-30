@@ -13,8 +13,8 @@ import { useApp, useData } from '@/state/app';
 import { useSafe } from '@/state/useSafe';
 import { usePhotoConsent } from '@/state/consent';
 import { itemsOf, loadSnapshot, tryonFor } from '@/state/snapshot';
-import { confirmAsync } from '@/ui/dialogs';
-import { formOf, ItemForm, patchOf } from '@/ui/ItemForm';
+import { confirmAsync, notify } from '@/ui/dialogs';
+import { formOf, formProblems, ItemForm, patchOf } from '@/ui/ItemForm';
 import { Banner, Btn, Loading, NavHeader, Screen, Segmented, SourceBadge, T, Tap } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
 import { ItemImage, OutfitBoard } from '@/ui/visuals';
@@ -86,6 +86,8 @@ export default function ItemPage() {
 
   const save = safe(async () => {
     if (!form) return;
+    const problems = formProblems(form);
+    if (problems.length) return notify('请先改一下', problems.join('\n'));
     setBusy(true);
     try {
       await saveItemEdits(app, item.id, patchOf(item, form));

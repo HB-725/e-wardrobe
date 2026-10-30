@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { AiError, blockedRoute, describeAiError } from '@/ai/client';
 import { getAiSettings, qualityFor } from '@/ai/config';
 import { generatePhoto } from '@/ai/engine';
@@ -11,6 +11,7 @@ import { avatarUsable } from '@/db/misc';
 import { saveImageToLibrary, shareImage } from '@/platform/files';
 import { useApp, useData } from '@/state/app';
 import { useSafe } from '@/state/useSafe';
+import { confirmAsync } from '@/ui/dialogs';
 import { usePhotoConsent } from '@/state/consent';
 import { itemsOf, loadSnapshot } from '@/state/snapshot';
 import { Btn, Chip, Loading, NavHeader, Screen, T } from '@/ui/kit';
@@ -26,6 +27,8 @@ export default function PhotoPage() {
   const settings = useData(getAiSettings);
   const [scene, setScene] = useState(SCENES[0].id);
   const [shots, setShots] = useState<string[]>([]);
+  const [pick, setPick] = useState(0);
+  const [saved, setSaved] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ text: string; kind: string | null } | null>(null);
   // Generated photos are only kept until the user leaves; saving copies them into the photo library.
@@ -41,11 +44,20 @@ export default function PhotoPage() {
     shotsRef.current = shots;
   }, [shots]);
   useEffect(() => () => void Promise.all(shotsRef.current.map((u) => app.images.remove(u))), [app.images]);
+  // Paid photos are deleted on leaving: ask first if some were never saved or one is still being made.
+  const navigation = useNavigation();
+  const unsaved = shots.filter((u) => !saved.has(u)).length;
+  usePreventRemove(unsaved > 0 || busy, ({ data }) => {
+    const msg = busy ? '正在生成的这张已经计费，离开后会丢弃。' : `还有 ${unsaved} 张没有保存到相册，离开后会删除。`;
+    void confirmAsync('离开真人大片？', msg, '离开').then((ok) => ok && navigation.dispatch(data.action));
+  });
 
   if (!s || !settings) return <Loading />;
   const ids = (param ?? '').split(',').filter(Boolean);
   const items = itemsOf(s, ids);
-  const current = shots[shots.length - 1] ?? null;
+  const current = shots[Math.min(pick, shots.length - 1)] ?? null;
+  // A new avatar is being made: a photo now would show the old one.
+  const remaking = s.avatar.status === 'processing';
   const cost = estimateImageCost(null, { inputImages: items.length + 1, quality: qualityFor(settings.quality, 'photo') });
 
   const run = async () => {
@@ -55,7 +67,10 @@ export default function PhotoPage() {
     try {
       const uri = await generatePhoto(app.ai, ids, scene);
       if (!mounted.current) return void app.images.remove(uri);
-      setShots((x) => [...x, uri]);
+      setShots((x) => {
+        setPick(x.length);
+        return [...x, uri];
+      });
     } catch (e) {
       setError({ text: describeAiError(e, true), kind: e instanceof AiError && e.needsUser ? e.kind : null });
     } finally {
@@ -69,16 +84,21 @@ export default function PhotoPage() {
       footer={
         current ? (
           <>
-            <Btn label="再生成一张" kind="outline" style={{ flex: 1, paddingHorizontal: 4 }} loading={busy} onPress={run} />
+            <Btn label="再生成一张" kind="outline" style={{ flex: 1, paddingHorizontal: 4 }} loading={busy} disabled={remaking} onPress={run} />
             <Btn label="分享" kind="outline" style={{ flex: 1 }} onPress={safe(() => shareImage(current))} />
             <Btn
               label="保存到相册"
               style={{ flex: 1, paddingHorizontal: 4 }}
-              onPress={safe(async () => app.toast((await saveImageToLibrary(current)) ? '已保存到相册' : '没有相册权限，可以用「分享」保存'))}
+              onPress={safe(async () => {
+                if (await saveImageToLibrary(current)) {
+                  setSaved((x) => new Set(x).add(current));
+                  app.toast('已保存到相册');
+                } else app.toast('没有相册权限，可以用「分享」保存');
+              })}
             />
           </>
         ) : (
-          <Btn label={`生成 · 约 ${formatUsd(cost)}`} style={{ flex: 1 }} loading={busy} disabled={items.length === 0 || !avatarUsable(s.avatar)} onPress={run} />
+          <Btn label={`生成 · 约 ${formatUsd(cost)}`} style={{ flex: 1 }} loading={busy} disabled={items.length === 0 || !avatarUsable(s.avatar) || remaking} onPress={run} />
         )
       }
     >
@@ -104,9 +124,17 @@ export default function PhotoPage() {
       {shots.length > 1 ? (
         <ScrollView horizontal style={{ marginTop: 10 }} contentContainerStyle={{ paddingHorizontal: PAD, gap: 6 }}>
           {shots.map((u, i) => (
-            <View key={u} style={{ width: 44, height: 66, borderWidth: 2, borderColor: i === shots.length - 1 ? C.ink : 'transparent' }}>
+            <Pressable
+              key={u}
+              accessibilityRole="button"
+              accessibilityLabel={`第 ${i + 1} 张${saved.has(u) ? '，已保存' : ''}`}
+              accessibilityState={{ selected: u === current }}
+              onPress={() => setPick(i)}
+              style={{ width: 44, height: 66, borderWidth: 2, borderColor: u === current ? C.ink : 'transparent' }}
+            >
               <Image source={{ uri: u }} style={{ flex: 1 }} contentFit="cover" />
-            </View>
+              {saved.has(u) ? <View style={{ position: 'absolute', right: 2, bottom: 2, width: 8, height: 8, backgroundColor: C.ok }} /> : null}
+            </Pressable>
           ))}
         </ScrollView>
       ) : null}
@@ -123,6 +151,11 @@ export default function PhotoPage() {
           <T v="small">先在试衣间选好要穿的衣服，再来拍大片。</T>
           <Btn label="去试衣间" kind="outline" onPress={() => router.navigate('/fitting')} />
         </View>
+      ) : null}
+      {remaking ? (
+        <T v="small" style={{ margin: PAD, color: C.sub }}>
+          新的个人形象正在生成，完成后就可以拍大片了。
+        </T>
       ) : null}
       {!avatarUsable(s.avatar) ? (
         <View style={{ margin: PAD, gap: 8 }}>

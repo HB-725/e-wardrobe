@@ -7,8 +7,8 @@ import type { Item } from '@/domain/types';
 import { confirmItem, keepCurrent, keepOriginal, needsReview, regenerateItem, removeItem, retryItem } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot, type Snapshot } from '@/state/snapshot';
-import { confirmAsync } from '@/ui/dialogs';
-import { type Form, formOf, ItemForm, patchOf } from '@/ui/ItemForm';
+import { confirmAsync, notify } from '@/ui/dialogs';
+import { type Form, formOf, formProblems, ItemForm, patchOf } from '@/ui/ItemForm';
 import { Btn, Loading, NavHeader, Screen, T, Tap } from '@/ui/kit';
 import { C, PAD } from '@/ui/theme';
 
@@ -90,24 +90,31 @@ export default function ReviewPage() {
     }
   };
 
+  // Edited fields must be readable before anything is saved (an unreadable price would otherwise be dropped).
+  const saveWith = (fn: (patch: ReturnType<typeof patchOf>) => Promise<void>) => () => {
+    const problems = formProblems(f);
+    if (problems.length) return notify('请先改一下', problems.join('\n'));
+    void run(() => fn(patchOf(cur, f)));
+  };
+
   const footer = isRegen ? (
     <>
-      <Btn label="保留现在的" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={() => run(() => keepCurrent(app, cur.id, patchOf(cur, f)))} />
-      <Btn label="换成新的" style={{ flex: 2 }} loading={busy} disabled={!chosen} onPress={() => run(() => confirmItem(app, cur.id, pick, patchOf(cur, f)))} />
+      <Btn label="保留现在的" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={saveWith((patch) => keepCurrent(app, cur.id, patch))} />
+      <Btn label="换成新的" style={{ flex: 2 }} loading={busy} disabled={!chosen} onPress={saveWith((patch) => confirmItem(app, cur.id, pick, patch))} />
     </>
   ) : cur.status === 'review' ? (
       <>
-        <Btn label="只存原图" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={() => run(() => confirmItem(app, cur.id, null, patchOf(cur, f)))} />
-        <Btn label={queue.length > 1 ? '保存，下一件' : '保存'} style={{ flex: 2 }} loading={busy} onPress={() => run(() => confirmItem(app, cur.id, pick, patchOf(cur, f)))} />
+        <Btn label="只存原图" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={saveWith((patch) => confirmItem(app, cur.id, null, patch))} />
+        <Btn label={queue.length > 1 ? '保存，下一件' : '保存'} style={{ flex: 2 }} loading={busy} onPress={saveWith((patch) => confirmItem(app, cur.id, pick, patch))} />
       </>
     ) : cur.status === 'failed' ? (
       <>
-        <Btn label="只存原图" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={() => run(() => keepOriginal(app, cur.id, patchOf(cur, f)))} />
+        <Btn label="只存原图" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={saveWith((patch) => keepOriginal(app, cur.id, patch))} />
         <Btn label="重新生成" style={{ flex: 2 }} loading={busy} onPress={() => run(() => retryItem(app, cur.id), false)} />
       </>
     ) : (
       <>
-        <Btn label="只存原图" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={() => run(() => keepOriginal(app, cur.id, patchOf(cur, f)))} />
+        <Btn label="只存原图" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={saveWith((patch) => keepOriginal(app, cur.id, patch))} />
         <Btn label={otherReady ? '先看下一件' : '等待生成…'} style={{ flex: 2 }} disabled={!otherReady} onPress={next} />
       </>
     );

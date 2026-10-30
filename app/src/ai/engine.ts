@@ -291,7 +291,8 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
   /** Caches a result, unless a garment was deleted, re-pictured or moved to another slot meanwhile. */
   const store = async (v: 'front' | 'back', b64: string): Promise<string | null> => {
     const uri = await images.saveBase64(b64, 'tryon');
-    if (look(await orderedGarments(db, itemIds)) !== startLook) {
+    // ...or the avatar was re-created meanwhile (the result shows the old one and would never be displayed).
+    if (look(await orderedGarments(db, itemIds)) !== startLook || avatarVersion(await getAvatar(db)) !== version) {
       await images.remove(uri);
       return null;
     }

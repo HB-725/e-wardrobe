@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Platform, TextInput, View } from 'react-native';
 import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
@@ -70,21 +70,25 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
   }, [processing]);
   const elapsed = processing && avatar.updatedAt ? (now - new Date(avatar.updatedAt).getTime()) / 1000 : 0;
 
-  // Android back steps back through the flow instead of closing it (and deleting the photos just taken).
+  // Opened from Me → 身材数据 to edit the numbers only.
+  const bodyOnly = params.step === '2';
+  // Android back steps back through the flow instead of closing it.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (step === 2) {
+      if (step === 2 && !bodyOnly) {
         setStep(1);
-        return true;
-      }
-      if (step === 1 && photos.some((u) => u && !avatar.sourceUris.includes(u))) {
-        void confirmAsync('放弃已拍的照片？', '还没有开始生成，离开后这些照片会被删除。', '放弃').then((ok) => ok && router.back());
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [step, photos, avatar.sourceUris]);
+  }, [step, bodyOnly]);
+  // Every way out (back, close, 稍后再说) asks before deleting photos taken here that were never used.
+  const navigation = useNavigation();
+  const fresh = photos.some((u) => u && !avatar.sourceUris.includes(u));
+  usePreventRemove(fresh && !busy, ({ data }) => {
+    void confirmAsync('放弃已拍的照片？', '还没有开始生成，离开后这些照片会被删除。', '放弃').then((ok) => ok && navigation.dispatch(data.action));
+  });
 
   const take = safe(async (i: number, camera: boolean) => {
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9 };
@@ -235,22 +239,24 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
         <T v="caption">生成正面和背面两张形象，预计 {formatUsd(cost)}，大约 1 分钟。</T>
       </View>
     );
-    footer = hasAvatar ? (
-      <>
-        <Btn
-          label="只保存数据"
-          kind="outline"
-          style={{ flex: 1 }}
-          disabled={!bodyOk}
-          onPress={async () => {
-            await saveAvatar(app.db, body);
-            app.refresh();
-            router.back();
-          }}
-        />
-        <Btn label="重新生成形象" style={{ flex: 1 }} disabled={!bodyOk || !photosOk} loading={busy} onPress={() => (photosOk ? generate() : setStep(1))} />
-      </>
-    ) : (
+    footer =
+      hasAvatar || bodyOnly ? (
+        <>
+          <Btn
+            label="只保存数据"
+            kind="outline"
+            style={{ flex: 1 }}
+            disabled={!bodyOk}
+            onPress={async () => {
+              await saveAvatar(app.db, body);
+              app.refresh();
+              router.back();
+            }}
+          />
+          {/* Without all three photos the button leads to the photo step first. */}
+          <Btn label={hasAvatar ? '重新生成形象' : '生成形象'} style={{ flex: 1 }} disabled={!bodyOk || processing} loading={busy} onPress={() => (photosOk ? generate() : setStep(1))} />
+        </>
+      ) : (
       <>
         <Btn label="上一步" kind="outline" style={{ flex: 1 }} onPress={() => setStep(1)} />
         <Btn label="开始生成" style={{ flex: 2 }} disabled={!bodyOk || !photosOk} loading={busy} onPress={generate} />

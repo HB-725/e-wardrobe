@@ -100,3 +100,12 @@ describe('outfit', () => {
     expect(s[2].badge).toBeNull();
   });
 });
+
+describe('fitting selection after a category change', () => {
+  it('never lists a garment twice and moves it to its new category when picked again', () => {
+    const sel = { top: 'x' };
+    const moved = toggleInSelection(sel, { id: 'x', slot: 'outer' });
+    expect(moved).toEqual({ outer: 'x' });
+    expect(selectionIds({ top: 'x', outer: 'x' })).toEqual(['x']);
+  });
+});

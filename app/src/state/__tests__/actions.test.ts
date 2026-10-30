@@ -12,7 +12,7 @@ import { addFitNote, addGarments, confirmItem, keepCurrent, keepOriginal, record
 import { avatarVersion, putTryon, saveAvatar } from '@/db/misc';
 import { outfitKey } from '@/domain/outfit';
 import { tryonRef } from '@/ai/engine';
-import { normalizeDate } from '@/ui/ItemForm';
+import { formOf, formProblems, normalizeDate, patchOf } from '@/ui/ItemForm';
 
 class Images implements ImageStore {
   removed: string[] = [];
@@ -288,5 +288,19 @@ describe('spreadsheet edge cases', () => {
     const bin = (bytes: number[]) => String.fromCharCode(...bytes);
     expect(decodeUtf8(bin([0xf0, 0x9f, 0x98, 0x80]))).toBe('😀');
     for (const bad of [[0xe0, 0x80, 0x80], [0xed, 0xa0, 0x80], [0xf4, 0x90, 0x80, 0x80], [0xc3], [0xc0, 0x80]]) expect(decodeUtf8(bin(bad))).toBeNull();
+  });
+});
+
+describe('item form validation', () => {
+  const item = { name: 'x', slot: 'top', priceCents: 19900, purchasedOn: '2025-09-14', fieldSources: {}, seasons: [] } as unknown as import('@/domain/types').Item;
+  it('reports unreadable price and date and keeps the stored values', () => {
+    const f = { ...formOf(item), price: '12.5.3', purchasedOn: '9/2025' };
+    expect(formProblems(f)).toHaveLength(2);
+    const p = patchOf(item, f);
+    expect(p.priceCents).toBe(19900);
+    expect(p.purchasedOn).toBe('2025-09-14');
+    expect(formProblems({ ...formOf(item), price: '¥99.5', purchasedOn: '2024年3月' })).toEqual([]);
+    expect(patchOf(item, { ...formOf(item), price: '', purchasedOn: '' })).toMatchObject({ priceCents: null, purchasedOn: null });
+    expect(normalizeDate('2025-02-31')).toBeNull();
   });
 });

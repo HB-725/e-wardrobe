@@ -118,13 +118,15 @@ export default function CapturePage() {
   };
 
   const close = async () => {
+    if (savingRef.current) return; // the photos are being saved; the screen moves on by itself
     if (pending.length > 0 && !(await confirmAsync('放弃这些照片？', `已拍的 ${pending.length} 张还没有保存。`, '放弃'))) return;
     router.back();
   };
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (pending.length === 0 || saving) return false;
+      if (saving) return true; // wait for the save to finish
+      if (pending.length === 0) return false;
       void close();
       return true;
     });

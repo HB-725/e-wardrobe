@@ -168,8 +168,9 @@ export default function FittingPage() {
   const [skipIntro, setSkipIntro] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const sel = app.fitting;
-  // Drop garments that were deleted or archived since they were put on; lookups and requests use the same list.
-  const worn = s ? itemsOf(s, selectionIds(sel)).filter((i) => i.status === 'active') : [];
+  // Drop garments that were deleted, archived or moved to another category since they were put on; lookups and
+  // requests use the same list.
+  const worn = s ? itemsOf(s, selectionIds(sel)).filter((i) => i.status === 'active' && sel[i.slot] === i.id) : [];
   const wornIds = worn.map((i) => i.id);
   const drawable = worn.filter((i) => i.catalogUri || i.originalUri);
   const drawableIds = drawable.map((i) => i.id);
@@ -228,7 +229,7 @@ export default function FittingPage() {
           </View>
           {avatarReady && busy && s.blocked ? (
             <Btn label="AI 已暂停 · 去处理" kind="outline" height={40} onPress={() => router.push(blockedRoute(s.blocked))} />
-          ) : avatarReady && drawable.length > 0 ? (
+          ) : avatarReady && s.avatar.status !== 'processing' && drawable.length > 0 ? (
             <Btn
               label={
                 busy

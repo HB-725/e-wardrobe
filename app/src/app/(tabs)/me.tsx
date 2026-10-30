@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { useState } from 'react';
-import { Linking, Platform, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, TextInput, View } from 'react-native';
 import { getAiSettings, getModelChoice, type QualityLevel, saveAiSettings, savePrefs } from '@/ai/config';
 import { formatUsd } from '@/ai/models';
 import type { Db } from '@/db/db';
@@ -345,6 +345,16 @@ export default function MePage() {
         衣橱 · 数据只属于你
       </T>
 
+      {/* Backup, restore and wipe take over the whole app: edits made meanwhile would be lost or half-written. */}
+      <Modal visible={busy === 'backup' || busy === 'restore' || busy === 'wipe'} transparent animationType="fade" statusBarTranslucent onRequestClose={() => undefined}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(17,17,17,0.55)', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <View accessibilityLiveRegion="polite" style={{ backgroundColor: C.bg, padding: 24, gap: 12, alignItems: 'center', minWidth: 220 }}>
+            <ActivityIndicator color={C.ink} />
+            <T style={{ fontSize: 15, fontWeight: '600' }}>{busy === 'backup' ? '正在备份' : busy === 'restore' ? '正在恢复' : '正在删除'}</T>
+            <T v="caption">{progress ? `${progress} 张图片` : '请不要离开这个页面'}</T>
+          </View>
+        </View>
+      </Modal>
       <Sheet visible={sheet === 'cap'} onClose={() => setSheet(null)} title="每月花费上限">
         <T v="small" style={{ color: C.sub }}>
           达到上限后，新的 AI 任务会暂停，已有的衣服和穿搭不受影响。按 OpenAI 的价格估算，实际以账单为准。
