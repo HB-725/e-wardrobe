@@ -82,11 +82,31 @@
 - Play 上架资料在 `docs/store/README.md`（商品详情文字、数据安全答案、分级、受众、App access 说明、发布步骤）；`BUNDLE=1 scripts/build-apk.sh` 出 AAB；
   商店截图 `VW=360 VH=640 DPR=3 node scripts/web-shots/shoot.js <目录>`（1080×1920）。隐私政策网址要等 PR 合并到 main（或放到别的公开网址）；新个人开发者账号需要 12 人 14 天封闭测试
 - [ ] 试衣间重构：用户觉得右侧竖排分类放不下「毛呢大衣」这类细分名、托盘一列只有两件。另一个会话在设计画布上放了 F1（上下布局）/ F2（全屏舞台 + 底部抽屉）两个方案，等用户选，选定前不要改试衣间布局
-- [ ] 多家 AI 服务商（设计说明 `docs/design/multi-provider.md`，等用户确认）：已完成但**还没接入 App** 的部分——
-  `src/ai/providers/gemini.ts`（Gemini 适配，按公开 REST 文档写，fake fetch 单测，未用真实 API 验证；ai.google.dev 在这个环境里访问不了）、
-  `src/ai/catalog.ts`（模型表、价格、自动顺序、按用途路由、未知价格返回 null）、`src/ai/keys.ts`（多个 Key、按服务商同意、0.5.x 单 Key 迁移，可中断续跑）。剩下：启动时跑迁移、engine 按用途取 provider、「API 与模型」页面、同意框和隐私文案。
-  注意：Gemini 返回的多半是 PNG，接入时保存要用对扩展名
-- [ ] 试衣间布局：F2 实现在 c208718（已 revert），另一个会话在画布上加了 F3–F6，等用户选
+## 待决事项和下一步（2026-10-30 收尾，用户改为在自己电脑上本地继续）
+
+最新安装包仍是 **0.5.2**（versionCode 8）：APK SHA-256 `7a3a738eeba0bb9d1d5579ace82d47579d43c1e4917198503960646f021a1cd0`，Play 用 AAB SHA-256 `2acd06ce66d91d281877959fd60e9ba0fbfaaca943fa01521d7ff44a722374f1`。b19e5b9 之后的提交只新增了还没接入的文件，App 行为没变。
+
+- [ ] **试衣间布局待用户选**：画布 https://claude.ai/artifact/3zpeTSFattB9rStC2iq7aq 最上排 F1–F6。「F2 改」（全屏舞台 + 底部抽屉）已实现在 c208718，后来 revert（5f31eed），选 F2 或混搭时可以 `git revert 5f31eed` 再改；它用 RN Animated + PanResponder 做抽屉，web 和 Android 都能用。
+- [ ] **多层叠穿**（上衣 / 外套可多件并排序，配饰可多条，建议上限约 8 件）和 **妆容**（只在脸部区域做遮罩局部编辑 + 视觉模型比对是否同一人，不像就重来）：方案待用户决定。
+- [ ] **多家 AI 服务商**：用户已确认 `docs/design/multi-provider.md`（会话最后通过提问确认「按这个做」）。
+  - 已完成、已测试、**还没接入**：`src/ai/providers/gemini.ts`（Gemini 适配，按公开 REST 写，fake fetch 单测，未用真实 API 验证——用户说不需要；ai.google.dev 在云端环境里访问不了）、
+    `src/ai/catalog.ts`（模型表、价格、自动顺序、按用途路由、未知价格返回 null）、`src/ai/keys.ts`（多个 Key 只存 SecureStore、按服务商同意、0.5.x 单 Key 迁移，可中断续跑）、`platform/secrets*.ts` 的 `secureSecrets`。
+  - 待办：
+    1. Gemini `imageEdit` 在 n>1 时改用 `Promise.allSettled`：至少一张成功就返回成功的（usage 累加成功的，失败那次响应里若有 usageMetadata 也计入），全部失败才抛第一个错误；补一条「2 次里 1 次 SAFETY」的测试。
+    2. engine 接入：`AiDeps.getClient` 换成 `clientFor(key)`，每个任务按用途 `resolveRoute`（商品图 / 形象 / 上身效果 / 大片 / 识别）；过期 Key 重新探测模型；模型不可用时 `blockModelForKey` 后重试；`callCost` 未知价格记 0（不计入上限）；只在支持的模型上传画质；Gemini 返回 PNG，保存时按内容选扩展名（`/9j/` jpg、`iVBOR` png、`UklGR` webp），备份恢复也要认 png；Gemini 商品图额外传一张已有标准图当风格参考。
+    3. 启动时先跑 `migrateLegacyKey`，**再**把 `hasPhotoConsent` 改成读按服务商的同意（顺序反了老用户会被要求重新同意）。
+    4. 「我的 → API 与模型」页面（多个 Key、添加 / 详情 / 重新验证 / 改名 / 删除、按用途选模型、换模型时的提示、画质只在支持时显示）；按钮上的「约 $x」按实际路由估算，未知价格显示「价格未知」。
+    5. 同意框按服务商、`describeAiError` 里的「OpenAI」改成通用说法、App 内隐私页、PRIVACY.md、`docs/store/README.md` 改成「发送给你选择的 AI 服务商（OpenAI / Google）」；备份不能带 Key（`ai.keys` 只是描述，恢复后没有密钥的条目要丢掉或标成需要重新填）；「永久删除」要删掉所有 `ai.key.*`。
+- [ ] 上架：隐私政策网址要等 PR 合并到 main（或把 PRIVACY.md 放到别的公开网址）；新个人开发者账号需要 12 人 14 天封闭测试。
+
+## 本地构建（用户自己的电脑）
+
+- 需要 Node 22、JDK 17、Android SDK（platform 37、build-tools 37、NDK 27.1）。`cd app && npm ci`，然后：
+  - 开发：`npx expo start`（Expo Go 不含所有原生模块，建议 `npx expo run:android` 装开发版）。
+  - 检查：`npx tsc --noEmit`、`npx expo lint`、`npx jest`（139 个测试，1 个真实 API 测试默认跳过）。
+  - 正式包：`EW_SIGNING_ENV=/path/to/signing.env scripts/build-apk.sh`（APK）或加 `BUNDLE=1`（Play 用 AAB）。`signing.env` 和 `ewardrobe-release.jks` 已交给用户保管，**不在仓库里**；脚本里装 SDK、写 Gradle 镜像那几步是给云端 Linux 机器用的，本机已装好 SDK 时可以跳过。
+- 每次发新版：`app/app.json` 的 `version` 和 `android.versionCode` 加一。
+
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
 - [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
 - 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。
