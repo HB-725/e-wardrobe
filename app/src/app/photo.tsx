@@ -15,7 +15,7 @@ import { confirmAsync } from '@/ui/dialogs';
 import { usePhotoConsent } from '@/state/consent';
 import { itemsOf, loadSnapshot } from '@/state/snapshot';
 import { Btn, Chip, Loading, NavHeader, Screen, T } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 import { OutfitBoard } from '@/ui/visuals';
 
 export default function PhotoPage() {
@@ -103,7 +103,7 @@ export default function PhotoPage() {
       }
     >
       <NavHeader title="真人大片" border={false} />
-      <View style={{ marginTop: 6, marginHorizontal: PAD, aspectRatio: 2 / 3, maxHeight: 486, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ marginTop: 6, marginHorizontal: PAD, aspectRatio: 2 / 3, maxHeight: 486, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
         {current ? (
           <Image source={{ uri: current }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={200} />
         ) : (
@@ -130,7 +130,7 @@ export default function PhotoPage() {
               accessibilityLabel={`第 ${i + 1} 张${saved.has(u) ? '，已保存' : ''}`}
               accessibilityState={{ selected: u === current }}
               onPress={() => setPick(i)}
-              style={{ width: 44, height: 66, borderWidth: 2, borderColor: u === current ? C.ink : 'transparent' }}
+              style={{ width: 44, height: 66, borderRadius: R.small, overflow: 'hidden', borderWidth: 2, borderColor: u === current ? C.ink : 'transparent' }}
             >
               <Image source={{ uri: u }} style={{ flex: 1 }} contentFit="cover" />
               {saved.has(u) ? <View style={{ position: 'absolute', right: 2, bottom: 2, width: 8, height: 8, backgroundColor: C.ok }} /> : null}
@@ -164,7 +164,7 @@ export default function PhotoPage() {
         </View>
       ) : null}
       {error ? (
-        <View style={{ margin: PAD, padding: 12, backgroundColor: '#FBF1E3', gap: 8 }}>
+        <View style={{ margin: PAD, padding: 12, borderRadius: R.card, backgroundColor: '#FBF1E3', gap: 8 }}>
           <T style={{ fontSize: 13 }}>{error.text}</T>
           {error.kind ? <Btn label="去处理" kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(error.kind))} /> : null}
         </View>

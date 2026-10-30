@@ -13,7 +13,7 @@ import { useRecordToday } from '@/state/recordToday';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
 import { Btn, Checkbox, Loading, NavHeader, Screen, Sheet, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 import { ItemImage } from '@/ui/visuals';
 
 const CONF: Record<MirrorMatch['confidence'], string> = { high: '匹配度高', medium: '匹配度中', low: '匹配度低，请确认' };
@@ -130,16 +130,13 @@ export default function MirrorPage() {
       <Screen>
         <NavHeader title="记录今天的穿搭" subtitle={dateLabel} />
         <View style={{ padding: PAD, gap: 16 }}>
-          <View style={{ height: 320, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <T v="body" style={{ textAlign: 'center', color: C.sub, lineHeight: 24 }}>
-              对着镜子拍一张全身照，AI 会认出你穿的是衣橱里的哪几件，并记下实际的上身效果。
+          <View style={{ height: 320, borderRadius: R.card, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <T v="body" style={{ textAlign: 'center', color: C.sub }}>
+              拍一张镜子全身照，自动认出穿了哪几件
             </T>
           </View>
-          <Btn label="拍一张镜子照" icon="camera" height={52} onPress={() => choose(true)} />
+          <Btn label="拍镜子照 · 约 $0.002" icon="camera" height={52} onPress={() => choose(true)} />
           <Btn label="从相册选" kind="outline" onPress={() => choose(false)} />
-          <T v="caption" style={{ textAlign: 'center' }}>
-            识别一次大约 $0.002。照片会发送给 OpenAI 识别，只保存在这台手机上。
-          </T>
         </View>
       </Screen>
     );
@@ -160,7 +157,7 @@ export default function MirrorPage() {
       }
     >
       <NavHeader title="记录今天的穿搭" subtitle={dateLabel} />
-      <View style={{ marginTop: 16, marginHorizontal: PAD, height: 380, backgroundColor: C.card }}>
+      <View style={{ marginTop: 16, marginHorizontal: PAD, height: 380, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card }}>
         <Image source={{ uri: phase.photo }} style={{ flex: 1 }} contentFit="contain" />
         {phase.k === 'matching' ? (
           <View style={{ position: 'absolute', left: 10, top: 10, flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: C.scrim, paddingHorizontal: 10, paddingVertical: 6 }}>
@@ -172,7 +169,7 @@ export default function MirrorPage() {
       {phase.k === 'done' ? (
         <View style={{ paddingTop: 18, paddingHorizontal: PAD }}>
           {phase.error ? (
-            <View style={{ backgroundColor: '#FBF1E3', padding: 12, gap: 8, marginBottom: 12 }}>
+            <View style={{ backgroundColor: '#FBF1E3', borderRadius: R.card, padding: 12, gap: 8, marginBottom: 12 }}>
               <T style={{ fontSize: 13 }}>识别失败：{phase.error}</T>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {phase.needsKey ? (
@@ -202,7 +199,7 @@ export default function MirrorPage() {
         </View>
       ) : null}
       {notes.length ? (
-        <View style={{ marginTop: 8, marginHorizontal: PAD, padding: 14, backgroundColor: C.card, gap: 6 }}>
+        <View style={{ marginTop: 8, marginHorizontal: PAD, padding: 14, borderRadius: R.card, backgroundColor: C.card, gap: 6 }}>
           <T style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>将记到合身笔记</T>
           {notes.map((m) => (
             <T key={m.itemId} v="small">
@@ -230,7 +227,7 @@ export default function MirrorPage() {
                   contentContainerStyle={{ gap: 6 }}
                   renderItem={({ item: it }) => (
                     <Tap accessibilityRole="checkbox" accessibilityLabel={it.name} accessibilityState={{ checked: on.has(it.id) }} onPress={() => toggle(it.id, it)} style={{ width: 72, gap: 4 }}>
-                      <ItemImage item={it} style={{ width: 66, height: 88, borderWidth: 2, borderColor: on.has(it.id) ? C.ink : C.card }} />
+                      <ItemImage item={it} style={{ width: 66, height: 88, borderRadius: R.tile, borderWidth: 2, borderColor: on.has(it.id) ? C.ink : C.card }} />
                       <T style={{ fontSize: 11 }} numberOfLines={1}>
                         {it.name}
                       </T>

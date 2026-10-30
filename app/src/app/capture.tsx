@@ -12,7 +12,7 @@ import { usePhotoConsent } from '@/state/consent';
 import { confirmAsync } from '@/ui/dialogs';
 import { Icon } from '@/ui/Icon';
 import { Btn, IconBtn, T } from '@/ui/kit';
-import { C } from '@/ui/theme';
+import { C, R } from '@/ui/theme';
 
 type Mode = 'cloth' | 'tag' | 'batch';
 
@@ -135,10 +135,10 @@ export default function CapturePage() {
 
   const hint =
     mode === 'tag'
-      ? '对准吊牌或洗标，自动读出品牌、尺码、材质。这一步可以跳过。'
+      ? '对准吊牌，可跳过'
       : last
-        ? `已拍 ${pending.length} 件。可以接着拍下一件，或切到「拍吊牌」补拍这件的吊牌。`
-        : '平铺、挂起都可以，不用在意背景和褶皱。一张照片拍一件。';
+        ? `已拍 ${pending.length} 件，可以接着拍`
+        : '一张照片拍一件';
 
   return (
     <View style={{ flex: 1, backgroundColor: C.ink, paddingTop: insets.top }}>
@@ -157,11 +157,12 @@ export default function CapturePage() {
                 key={`${p.uri}${i}`}
                 accessibilityLabel={`第 ${i + 1} 张，点按移除`}
                 onPress={() => setPending((x) => x.filter((_, j) => j !== i))}
-                style={{ width: '32.4%', height: 112 }}
+                style={{ width: '32.4%', height: 112, borderRadius: R.tile, overflow: 'hidden' }}
               >
                 <Image source={{ uri: p.uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-                <View style={{ position: 'absolute', right: 6, top: 6, width: 22, height: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700' }}>{i + 1}</Text>
+                {/* Tapping a photo removes it; the × says so without a line of text. */}
+                <View style={{ position: 'absolute', right: 6, top: 6, width: 24, height: 24, borderRadius: R.pill, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="close" size={14} color={C.ink} strokeWidth={2} />
                 </View>
               </Pressable>
             ))}
@@ -170,9 +171,7 @@ export default function CapturePage() {
                 <Text style={{ color: '#FFFFFF', fontSize: 14, textAlign: 'center', lineHeight: 22 }}>一次最多选 {MAX_BATCH} 张，每张照片一件衣服</Text>
                 <Btn label="打开相册" kind="outline" onPress={pickAlbum} style={{ paddingHorizontal: 24 }} />
               </View>
-            ) : (
-              <Text style={{ width: '100%', color: '#9A9A9A', fontSize: 12, paddingTop: 8 }}>点按照片可以移除，点快门继续添加</Text>
-            )}
+            ) : null}
           </View>
         ) : cameraOk ? (
           <>
@@ -203,8 +202,8 @@ export default function CapturePage() {
           </View>
         )}
         {mode !== 'batch' ? (
-          <View style={{ position: 'absolute', left: 16, right: 16, bottom: 20, padding: 12, backgroundColor: C.scrim, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <View style={{ width: 8, height: 8, backgroundColor: '#7BD88F' }} />
+          <View style={{ position: 'absolute', left: 16, right: 16, bottom: 20, padding: 12, borderRadius: R.card, backgroundColor: C.scrim, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <View style={{ width: 8, height: 8, borderRadius: R.pill, backgroundColor: '#7BD88F' }} />
             <Text style={{ flex: 1, color: '#FFFFFF', fontSize: 13, lineHeight: 20 }}>{hint}</Text>
           </View>
         ) : null}

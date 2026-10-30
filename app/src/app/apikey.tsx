@@ -7,16 +7,12 @@ import { verifyKey } from '@/ai/engine';
 import { getSetting, setSetting } from '@/db/misc';
 import { setApiKey } from '@/platform/secrets';
 import { useApp, useData } from '@/state/app';
-import { confirmAsync } from '@/ui/dialogs';
+import { confirmAsync, notify } from '@/ui/dialogs';
+import { Icon } from '@/ui/Icon';
 import { Btn, NavHeader, PrivacyNote, Screen, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 
-const STEPS = [
-  '打开 platform.openai.com 并登录（没有账号就注册一个）',
-  '在 Billing 里充值，最低 $5 就够用很久',
-  '在 API keys 页面点 Create new secret key，复制以 sk- 开头的 Key',
-  '回到这里粘贴，点「验证并保存」',
-];
+const STEPS = ['打开 platform.openai.com', '充值（$5 起）', '创建 Key，复制 sk- 开头的', '粘贴并保存'];
 
 export default function ApiKeyPage() {
   const app = useApp();
@@ -74,8 +70,8 @@ export default function ApiKeyPage() {
     >
       <NavHeader title="OpenAI API Key" />
       <View style={{ padding: PAD, gap: 16 }}>
-        <T v="body" style={{ color: C.sub, lineHeight: 24 }}>
-          生成商品图、个人形象和上身效果需要你自己的 OpenAI API Key。费用直接由 OpenAI 按用量收取，录入一件衣服大约 $0.01–0.02。
+        <T v="body" style={{ color: C.sub }}>
+          费用由你的 OpenAI 账户支付，录入一件约 $0.01
         </T>
         {last4 ? <T style={{ fontSize: 14 }}>当前已绑定 ••••{last4}，粘贴新的 Key 可以替换。</T> : null}
         <TextInput
@@ -90,10 +86,10 @@ export default function ApiKeyPage() {
           autoCorrect={false}
           secureTextEntry
           accessibilityLabel="API Key"
-          style={{ height: 50, paddingHorizontal: 12, borderWidth: 1, borderColor: error ? C.danger : C.muted, fontSize: 15, color: C.ink }}
+          style={{ height: 50, paddingHorizontal: 14, borderRadius: R.input, backgroundColor: C.card, borderWidth: error ? 1 : 0, borderColor: C.danger, fontSize: 15, color: C.ink }}
         />
         {error ? <T style={{ fontSize: 13, color: C.danger, lineHeight: 20 }}>{error}</T> : null}
-        <View style={{ backgroundColor: C.card, padding: 16, gap: 10 }}>
+        <View style={{ backgroundColor: C.card, borderRadius: R.card, padding: 16, gap: 10 }}>
           <T style={{ fontSize: 13, fontWeight: '700' }}>怎么获取 Key</T>
           {STEPS.map((s, i) => (
             <View key={s} style={{ flexDirection: 'row', gap: 10 }}>
@@ -107,10 +103,14 @@ export default function ApiKeyPage() {
             <T style={{ fontSize: 13, textDecorationLine: 'underline' }}>打开 platform.openai.com/api-keys</T>
           </Tap>
         </View>
-        <T v="small" style={{ color: C.sub, lineHeight: 20 }}>
-          手机需要能访问 api.openai.com。部分地区（例如中国大陆）无法直接连接 OpenAI，AI 功能会提示网络连接失败。
-        </T>
-        <PrivacyNote text="Key 加密保存在手机的系统钥匙串里，只用来直接请求 OpenAI" />
+        <Tap
+          onPress={() => notify('连不上 OpenAI？', '手机需要能访问 api.openai.com。部分地区（例如中国大陆）无法直接连接，AI 功能会提示网络连接失败。')}
+          style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+        >
+          <Icon name="info" size={15} color={C.sub} strokeWidth={1.8} />
+          <T v="caption">连不上 OpenAI？</T>
+        </Tap>
+        <PrivacyNote text="Key 加密保存在本机，只用来请求 OpenAI" />
       </View>
     </Screen>
   );

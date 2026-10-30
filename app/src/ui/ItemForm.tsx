@@ -2,7 +2,7 @@ import { TextInput, View, type ViewStyle } from 'react-native';
 import { SEASONS, SLOTS } from '@/domain/catalog';
 import type { Item, Season, Slot } from '@/domain/types';
 import { Chip, SourceBadge, T } from './kit';
-import { C } from './theme';
+import { C, R } from './theme';
 
 export interface Form {
   name: string;
@@ -145,7 +145,7 @@ export function ItemForm({ item, form, onChange, style, notes }: { item: Item; f
             placeholderTextColor={C.faint}
             multiline
             accessibilityLabel="合身笔记"
-            style={{ minHeight: 80, padding: 10, borderWidth: 1, borderColor: C.muted, fontSize: 14, color: C.ink, textAlignVertical: 'top' }}
+            style={{ minHeight: 80, padding: 12, borderRadius: R.input, backgroundColor: C.card, fontSize: 14, color: C.ink, textAlignVertical: 'top' }}
           />
         </View>
       ) : null}

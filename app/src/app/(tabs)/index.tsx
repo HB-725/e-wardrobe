@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
 import { todaySuggestions } from '@/domain/outfit';
@@ -12,7 +12,7 @@ import { useApp, useData } from '@/state/app';
 import { itemsOf, loadSnapshot, type Snapshot, tryonFor } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
 import { Banner, Btn, Loading, Screen, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 import { ItemImage, OutfitBoard } from '@/ui/visuals';
 
 const CARD_W = 250;
@@ -69,7 +69,7 @@ function DateHeader({ s }: { s: Snapshot }) {
       <View style={{ flexDirection: 'row', gap: 4, paddingTop: 18, paddingHorizontal: PAD }} accessibilityLabel={`本周已记录 ${week.filter((w) => w.logged).length} 天`}>
         {week.map((w) => (
           <View key={w.dateKey} style={{ flex: 1, gap: 6 }}>
-            <View style={{ height: 3, backgroundColor: w.logged ? C.ink : w.isToday ? C.faint : C.line }} />
+            <View style={{ height: 4, borderRadius: R.pill, backgroundColor: w.logged ? C.ink : w.isToday ? C.faint : C.line }} />
             <T style={{ fontSize: 11, color: w.isToday ? C.ink : C.sub, fontWeight: w.isToday ? '700' : '400' }}>{w.label}</T>
           </View>
         ))}
@@ -89,13 +89,12 @@ function StatusBanners({ s }: { s: Snapshot }) {
     banners.push(
       <Banner
         key="review"
-        title={`${s.review.length} 件新衣服生成好了`}
-        sub="确认后就会出现在衣橱里"
+        title={`${s.review.length} 件新衣服待确认`}
         onPress={() => router.push('/review')}
         left={
           <View style={{ flexDirection: 'row' }}>
             {s.review.slice(0, 3).map((it, i) => (
-              <ItemImage key={it.id} item={it} style={{ width: 39, height: 52, backgroundColor: '#FFFFFF', marginLeft: i ? -10 : 0, borderLeftWidth: i ? 2 : 0, borderLeftColor: C.card }} />
+              <ItemImage key={it.id} item={it} style={{ width: 39, height: 52, borderRadius: R.small, backgroundColor: '#FFFFFF', marginLeft: i ? -10 : 0, borderWidth: i ? 2 : 0, borderColor: C.card }} />
             ))}
           </View>
         }
@@ -103,13 +102,34 @@ function StatusBanners({ s }: { s: Snapshot }) {
     );
   }
   if (s.processing.length > 0 && !s.blocked) {
-    banners.push(<Banner key="proc" title={`${s.processing.length} 件衣服正在生成标准图`} sub="每件大约 20 秒，可以先去做别的" onPress={() => router.push('/review')} />);
+    banners.push(<Banner key="proc" title={`${s.processing.length} 件衣服正在生成标准图`} onPress={() => router.push('/review')} />);
   }
   if (s.failed.length > 0) {
-    banners.push(<Banner key="failed" tone="warn" title={`${s.failed.length} 件衣服生成失败`} sub="去衣橱里重试，或只保存原图" onPress={() => router.push('/wardrobe')} />);
+    banners.push(<Banner key="failed" tone="warn" title={`${s.failed.length} 件衣服生成失败`} sub="去衣橱里重试" onPress={() => router.push('/wardrobe')} />);
   }
   if (banners.length === 0) return null;
   return <View style={{ gap: 8, marginTop: 20 }}>{banners}</View>;
+}
+
+function Step({ n, title, sub, onPress, dim, children }: { n: string; title: string; sub: string; onPress?: () => void; dim?: boolean; children?: ReactNode }) {
+  const body = (
+    <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+      <T style={{ fontSize: 12, fontWeight: '700', color: dim ? C.faint : C.ink }}>{n}</T>
+      <View style={{ flex: 1, gap: 2 }}>
+        <T style={{ fontSize: 17, fontWeight: '600', color: dim ? C.faint : C.ink }}>{title}</T>
+        <T v="small" style={{ color: dim ? C.faint : C.sub }}>
+          {sub}
+        </T>
+      </View>
+      {onPress ? <Icon name="forward" size={18} color={dim ? C.faint : C.ink} /> : null}
+    </View>
+  );
+  return (
+    <View style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.line, gap: 14 }}>
+      {onPress ? <Tap onPress={onPress}>{body}</Tap> : body}
+      {children}
+    </View>
+  );
 }
 
 function Onboarding({ s }: { s: Snapshot }) {
@@ -117,64 +137,29 @@ function Onboarding({ s }: { s: Snapshot }) {
   const avatarDone = s.avatar.status === 'ready';
   return (
     <>
-      <View style={{ paddingTop: 28, paddingHorizontal: PAD, gap: 8 }}>
+      <View style={{ paddingTop: 28, paddingHorizontal: PAD }}>
         <T v="h2" style={{ fontSize: 24, lineHeight: 34 }}>
           {hasItems ? '衣服正在进衣橱。\n再搭一套就能开始了。' : '欢迎。\n先把衣柜搬进来吧。'}
         </T>
-        <T v="body" style={{ color: C.sub, lineHeight: 24 }}>
-          三步就能开始换装。每一步都可以随时暂停，下次打开会从这里继续。
-        </T>
       </View>
-      <View style={{ marginTop: 22, marginHorizontal: PAD, borderTopWidth: 1, borderTopColor: C.ink }}>
-        {!s.hasKey ? (
-          <Tap onPress={() => router.push('/apikey')} style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: C.line, flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-            <T style={{ fontSize: 12, fontWeight: '700' }}>00</T>
-            <View style={{ flex: 1, gap: 4 }}>
-              <T style={{ fontSize: 17, fontWeight: '700' }}>填写 OpenAI API Key</T>
-              <T v="small" style={{ color: C.sub }}>
-                AI 生成商品图、形象和上身效果要用。费用由你的 OpenAI 账户按量支付，录入一件约 $0.01–0.02。
-              </T>
-            </View>
-            <Icon name="forward" size={18} />
-          </Tap>
-        ) : null}
-        <View style={{ paddingTop: 18, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: C.line, gap: 14 }}>
-          <View style={{ flexDirection: 'row', gap: 14 }}>
-            <T style={{ fontSize: 12, fontWeight: '700', paddingTop: 3 }}>01</T>
-            <View style={{ flex: 1, gap: 4 }}>
-              <T style={{ fontSize: 17, fontWeight: '700' }}>录入衣服{hasItems ? ` · 已录入 ${s.items.length} 件` : ''}</T>
-              <T v="small" style={{ color: C.sub }}>
-                建议先从相册批量导入，一次可以选几十张。AI 每件大约 20 秒，可以边录边做别的。
-              </T>
-            </View>
-          </View>
+      <View style={{ marginTop: 18, marginHorizontal: PAD }}>
+        {!s.hasKey ? <Step n="00" title="填写 OpenAI API Key" sub="录入一件约 $0.01" onPress={() => router.push('/apikey')} /> : null}
+        <Step n="01" title={`录入衣服${hasItems ? ` · 已录入 ${s.items.length} 件` : ''}`} sub="可从相册批量导入">
           <View style={{ paddingLeft: 30, gap: 8 }}>
             <Btn label="从相册批量导入" onPress={() => router.push('/capture?mode=batch')} />
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Btn label="一件一件拍" kind="outline" height={44} style={{ flex: 1 }} onPress={() => router.push('/capture')} />
-              <Btn label="从 Excel 导入" kind="outline" height={44} style={{ flex: 1, borderColor: C.muted }} onPress={() => router.push('/me')} />
+              <Btn label="从 Excel 导入" kind="outline" height={44} style={{ flex: 1 }} onPress={() => router.push('/me')} />
             </View>
           </View>
-        </View>
-        <Tap onPress={() => router.push('/avatar')} style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: C.line, flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <T style={{ fontSize: 12, color: C.sub }}>02</T>
-          <View style={{ flex: 1, gap: 4 }}>
-            <T style={{ fontSize: 17, fontWeight: '500' }}>{avatarDone ? '个人形象已建立' : s.avatar.status === 'processing' ? '形象生成中…' : '建立你的形象'}</T>
-            <T v="small" style={{ color: C.sub }}>
-              3 张全身照 + 身高体重，大约 2 分钟
-            </T>
-          </View>
-          <Icon name="forward" size={18} />
-        </Tap>
-        <Tap onPress={() => router.push('/fitting')} style={{ paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: C.line, flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-          <T style={{ fontSize: 12, color: C.faint }}>03</T>
-          <View style={{ flex: 1, gap: 4 }}>
-            <T style={{ fontSize: 17, fontWeight: '500', color: hasItems ? C.ink : C.faint }}>搭第一套穿搭</T>
-            <T v="small" style={{ color: C.faint }}>
-              在试衣间挑好衣服保存，这里就会变成你每天的穿搭页
-            </T>
-          </View>
-        </Tap>
+        </Step>
+        <Step
+          n="02"
+          title={avatarDone ? '形象已建立' : s.avatar.status === 'processing' ? '形象生成中…' : '建立你的形象'}
+          sub="3 张全身照"
+          onPress={() => router.push('/avatar')}
+        />
+        <Step n="03" title="搭第一套" sub="在试衣间挑好衣服保存" dim={!hasItems} onPress={() => router.push('/fitting')} />
       </View>
     </>
   );
@@ -258,14 +243,14 @@ export default function TodayPage() {
                     setIdx(i);
                     scroller.current?.scrollTo({ x: i * (CARD_W + CARD_GAP), animated: true });
                   }}
-                  style={{ width: CARD_W, height: 316, backgroundColor: C.card, opacity: i === idx ? 1 : 0.55 }}
+                  style={{ width: CARD_W, height: 316, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card, opacity: i === idx ? 1 : 0.55 }}
                 >
-                  <OutfitBoard items={c.items} tryonUri={tryonFor(s, c.items.map((x) => x.id))} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 64 }} />
+                  <OutfitBoard items={c.items} tryonUri={tryonFor(s, c.items.map((x) => x.id))} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 64, borderRadius: 0 }} />
                   {c.badge ? (
-                    <T style={{ position: 'absolute', left: 14, top: 14, fontSize: 11, letterSpacing: 0.6, color: C.sub, backgroundColor: 'rgba(241,241,242,0.9)', paddingHorizontal: 4 }}>{c.badge}</T>
+                    <T style={{ position: 'absolute', left: 12, top: 12, fontSize: 11, color: C.sub, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: R.pill, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2 }}>{c.badge}</T>
                   ) : null}
                   {isLogged ? (
-                    <View style={{ position: 'absolute', right: 12, top: 12, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: C.ink }}>
+                    <View style={{ position: 'absolute', right: 12, top: 12, paddingHorizontal: 10, paddingVertical: 3, borderRadius: R.pill, backgroundColor: C.ink }}>
                       <T style={{ color: '#FFFFFF', fontSize: 11 }}>今天 ✓</T>
                     </View>
                   ) : null}
@@ -274,7 +259,7 @@ export default function TodayPage() {
                       {c.name}
                     </T>
                     <T v="caption" numberOfLines={1}>
-                      {c.items.length} 件 · {c.items.map((x) => x.name).join('、')}
+                      {c.items.length} 件
                     </T>
                   </View>
                 </Tap>
@@ -285,24 +270,21 @@ export default function TodayPage() {
             <Tap
               accessibilityLabel="拍镜子照记录"
               onPress={() => router.push('/mirror')}
-              style={{ width: 52, height: 52, borderWidth: 1, borderColor: C.ink, alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 52, height: 52, borderRadius: R.card, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}
             >
               <Icon name="camera" size={22} strokeWidth={1.6} />
             </Tap>
             <Btn label={loggedThis ? '已记录 · 撤销' : '就穿这套'} kind={loggedThis ? 'outline' : 'primary'} height={52} style={{ flex: 1 }} loading={busy} onPress={primary} />
           </View>
           <Tap onPress={() => router.push('/fitting')} style={{ marginTop: 6, marginHorizontal: PAD, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <T style={{ fontSize: 13, color: C.sub }}>没有合适的？去试衣间搭一套</T>
+            <T style={{ fontSize: 13, color: C.sub }}>去试衣间搭一套</T>
             <Icon name="forward" size={14} color={C.sub} strokeWidth={1.8} />
           </Tap>
         </>
       )}
       {idle.length > 0 ? (
         <View style={{ paddingTop: 22, paddingHorizontal: PAD, gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-            <T v="title">好久没穿了</T>
-            <T v="caption">给它们一次机会？</T>
-          </View>
+          <T v="title">好久没穿了</T>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {idle.map(({ item, days }) => (
               <Tap key={item.id} onPress={() => router.push(`/item/${item.id}`)} style={{ flex: 1, gap: 6 }}>

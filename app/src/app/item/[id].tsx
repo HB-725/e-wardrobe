@@ -16,7 +16,7 @@ import { itemsOf, loadSnapshot, tryonFor } from '@/state/snapshot';
 import { confirmAsync, notify } from '@/ui/dialogs';
 import { formOf, formProblems, ItemForm, patchOf } from '@/ui/ItemForm';
 import { Banner, Btn, Loading, NavHeader, Screen, Segmented, SourceBadge, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 import { ItemImage, OutfitBoard } from '@/ui/visuals';
 
 function ago(days: number | null): string {
@@ -135,7 +135,7 @@ export default function ItemPage() {
           <Image source={{ uri: item.originalUri }} style={{ alignSelf: 'stretch', flex: 1 }} contentFit="cover" />
         ) : (
           // The catalog image at its own 2:3 shape: the whole garment, and no box where its background meets ours.
-          <ItemImage item={item} style={{ height: '100%', aspectRatio: 2 / 3 }} />
+          <ItemImage item={item} style={{ height: '100%', aspectRatio: 2 / 3, borderRadius: R.card }} />
         )}
         {!item.originalUri && !item.catalogUri ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -189,7 +189,7 @@ export default function ItemPage() {
         <Tap onPress={item.colorName ? undefined : startEdit} disabled={!!item.colorName} style={{ minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: C.lineSoft }}>
           <T style={{ fontSize: 14, color: C.sub }}>颜色</T>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {item.colorHex ? <View style={{ width: 14, height: 14, backgroundColor: item.colorHex, borderWidth: 1, borderColor: C.line }} /> : null}
+            {item.colorHex ? <View style={{ width: 14, height: 14, borderRadius: R.pill, backgroundColor: item.colorHex, borderWidth: 1, borderColor: C.line }} /> : null}
             <T style={{ fontSize: 14, color: item.colorName ? C.ink : C.sub }}>{item.colorName ?? '点击填写'}</T>
             {item.colorName ? <SourceBadge source={item.fieldSources.colorName} /> : null}
           </View>
@@ -211,7 +211,7 @@ export default function ItemPage() {
         </Attr>
       </View>
       {item.fitNotes ? (
-        <View style={{ marginTop: 8, marginHorizontal: PAD, padding: 16, backgroundColor: C.card, gap: 6 }}>
+        <View style={{ marginTop: 8, marginHorizontal: PAD, padding: 16, borderRadius: R.card, backgroundColor: C.card, gap: 6 }}>
           <T style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>合身笔记</T>
           <T v="body">{item.fitNotes}</T>
         </View>

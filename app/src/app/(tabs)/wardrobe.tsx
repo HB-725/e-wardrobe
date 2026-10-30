@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { SLOTS } from '@/domain/catalog';
 import { wearRank } from '@/domain/stats';
 import type { Item, Slot } from '@/domain/types';
@@ -9,7 +9,7 @@ import { useApp, useData } from '@/state/app';
 import { loadSnapshot, type Snapshot } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
 import { Btn, Loading, PageHeader, Screen, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 import { ItemImage } from '@/ui/visuals';
 
 type Cat = 'all' | Slot | 'archived';
@@ -27,12 +27,14 @@ const Tile = memo(function Tile({ item: it, on, wears, onPress }: { item: Item; 
       accessibilityHint={on ? '再点一次打开' : '选中后再点一次打开'}
       accessibilityState={{ selected: on }}
       onPress={() => onPress(it)}
-      style={{ flex: 1, aspectRatio: 0.75, borderWidth: 2, borderColor: on ? C.ink : C.card }}
+      style={{ flex: 1, aspectRatio: 0.75, borderRadius: R.tile, overflow: 'hidden', borderWidth: 2, borderColor: on ? C.ink : 'transparent' }}
     >
       <ItemImage item={it} style={{ flex: 1 }} />
-      {it.status === 'active' ? <T style={{ position: 'absolute', right: 3, bottom: 3, fontSize: 10, color: C.sub, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 3 }}>×{wears}</T> : null}
+      {it.status === 'active' ? (
+        <T style={{ position: 'absolute', right: 4, bottom: 4, fontSize: 10, color: C.sub, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: R.pill, overflow: 'hidden', paddingHorizontal: 6 }}>×{wears}</T>
+      ) : null}
       {it.status === 'review' || it.status === 'failed' ? (
-        <View style={{ position: 'absolute', left: 0, top: 0, paddingHorizontal: 5, paddingVertical: 1, backgroundColor: it.status === 'failed' ? C.danger : C.ink }}>
+        <View style={{ position: 'absolute', left: 4, top: 4, paddingHorizontal: 7, paddingVertical: 1, borderRadius: R.pill, backgroundColor: it.status === 'failed' ? C.danger : C.ink }}>
           <T style={{ color: '#FFFFFF', fontSize: 10 }}>{it.status === 'failed' ? '失败' : '待确认'}</T>
         </View>
       ) : null}
@@ -55,9 +57,9 @@ function pageFor(it: Item): string {
 function subtitle(s: Snapshot, it: Item): string {
   switch (it.status) {
     case 'review':
-      return 'AI 已生成 · 等你确认';
+      return '待确认';
     case 'processing':
-      return s.blocked ? 'AI 已暂停，处理好后自动继续' : '正在生成标准图…';
+      return s.blocked ? '已暂停' : '正在生成标准图…';
     case 'failed':
       return it.error ?? '生成失败';
     case 'archived':
@@ -101,19 +103,15 @@ export default function WardrobePage() {
   return (
     <Screen scroll={false}>
       <PageHeader
-        eyebrow="MY WARDROBE"
         title="衣橱"
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <T style={{ fontSize: 13, color: C.sub }}>共 {s.active.length} 件</T>
-            <Tap onPress={() => router.push('/capture')} style={{ height: 36, paddingHorizontal: 12, borderWidth: 1, borderColor: C.ink, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Icon name="plus" size={16} strokeWidth={1.8} />
-              <T style={{ fontSize: 13, fontWeight: '500' }}>添加</T>
-            </Tap>
+            <Btn label="添加" icon="plus" kind="outline" height={40} onPress={() => router.push('/capture')} />
           </View>
         }
       />
-      <View style={{ flexDirection: 'row', marginTop: 20, marginHorizontal: PAD, zIndex: 2 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }} contentContainerStyle={{ paddingHorizontal: PAD, gap: 8 }}>
         {tabs.map((c) => {
           const on = c.id === cat;
           return (
@@ -125,31 +123,23 @@ export default function WardrobePage() {
                 setCat(c.id);
                 setSelId(null);
               }}
-              style={{
-                flex: 1,
-                height: 44,
-                marginBottom: -1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: on ? C.bg : C.card,
-                borderWidth: 1,
-                borderColor: on ? C.ink : C.card,
-                borderBottomColor: on ? C.bg : C.ink,
-              }}
+              hitSlop={{ top: 4, bottom: 4 }}
+              style={{ height: 36, paddingHorizontal: 16, borderRadius: R.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.ink : C.card }}
             >
-              <Text style={{ fontSize: 13, color: on ? C.ink : C.sub, fontWeight: on ? '700' : '400' }}>{c.label}</Text>
+              <Text style={{ fontSize: 13, color: on ? '#FFFFFF' : C.sub, fontWeight: on ? '600' : '400' }}>{c.label}</Text>
             </Pressable>
           );
         })}
-      </View>
-      <View style={{ flex: 1, marginHorizontal: PAD, marginBottom: 16, padding: 12, borderWidth: 1, borderColor: C.ink, gap: 12 }}>
+      </ScrollView>
+      <View style={{ flex: 1, marginTop: 14 }}>
         <FlatList
           style={{ flex: 1 }}
           data={cells}
           keyExtractor={(c) => c.key}
           numColumns={COLS}
-          columnWrapperStyle={{ gap: 6 }}
-          contentContainerStyle={{ gap: 6 }}
+          columnWrapperStyle={{ gap: 8 }}
+          // Room at the end for the floating card of the selected garment.
+          contentContainerStyle={{ gap: 8, paddingHorizontal: PAD, paddingBottom: sel ? 112 : 20 }}
           initialNumToRender={24}
           windowSize={5}
           removeClippedSubviews
@@ -161,7 +151,7 @@ export default function WardrobePage() {
                 accessibilityRole="button"
                 accessibilityLabel="添加新衣服"
                 onPress={() => router.push('/capture')}
-                style={{ flex: 1, aspectRatio: 0.75, borderWidth: 1, borderStyle: 'dashed', borderColor: C.muted, alignItems: 'center', justifyContent: 'center' }}
+                style={{ flex: 1, aspectRatio: 0.75, borderRadius: R.tile, borderWidth: 1, borderStyle: 'dashed', borderColor: C.muted, alignItems: 'center', justifyContent: 'center' }}
               >
                 <Icon name="plus" size={20} color={C.faint} strokeWidth={1.6} />
               </Pressable>
@@ -178,8 +168,22 @@ export default function WardrobePage() {
           }
         />
         {sel ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line }}>
-            <ItemImage item={sel} style={{ width: 54, height: 72 }} />
+          <View
+            style={{
+              position: 'absolute',
+              left: 12,
+              right: 12,
+              bottom: 12,
+              padding: 12,
+              borderRadius: R.card,
+              backgroundColor: C.bg,
+              boxShadow: '0 4px 20px rgba(17,17,17,0.10)',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <ItemImage item={sel} style={{ width: 54, height: 72, borderRadius: R.small }} />
             <Tap onPress={() => router.push(pageFor(sel))} style={{ flex: 1, gap: 2 }}>
               <T style={{ fontSize: 15, fontWeight: '700' }} numberOfLines={1}>
                 {sel.name}
@@ -190,12 +194,12 @@ export default function WardrobePage() {
             </Tap>
             <Btn label={ctaLabel} height={44} onPress={cta} />
           </View>
-        ) : (
-          <View style={{ paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line, gap: 4 }}>
-            <T style={{ fontSize: 15, fontWeight: '700' }}>{cat === 'all' ? '衣橱还是空的' : '这一类还没有衣服'}</T>
-            <T v="caption">点「添加」拍照，或从相册批量导入。</T>
+        ) : list.length === 0 && cat !== 'archived' ? (
+          <View style={{ position: 'absolute', left: PAD, right: PAD, top: '30%', alignItems: 'center', gap: 14 }}>
+            <T v="title">{cat === 'all' ? '还没有衣服' : '这一类还没有衣服'}</T>
+            <Btn label="添加" icon="plus" onPress={() => router.push('/capture')} style={{ paddingHorizontal: 28 }} />
           </View>
-        )}
+        ) : null}
       </View>
     </Screen>
   );

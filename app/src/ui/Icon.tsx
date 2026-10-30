@@ -16,7 +16,8 @@ export type IconName =
   | 'album'
   | 'flash'
   | 'play'
-  | 'check';
+  | 'check'
+  | 'info';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   today: (
@@ -62,7 +63,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   lock: (
     <>
-      <Rect x={5} y={11} width={14} height={10} />
+      <Rect x={5} y={11} width={14} height={10} rx={2} />
       <Path d="M8 11V7a4 4 0 0 1 8 0v4" />
     </>
   ),
@@ -76,6 +77,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
   flash: <Path d="M13 3L5 13h6l-1 8 8-10h-6z" />,
   play: <Path d="M8 5v14l11-7z" fill="currentColor" stroke="none" />,
   check: <Path d="M5 12.5l4.5 4.5L19 7.5" />,
+  info: (
+    <>
+      <Circle cx={12} cy={12} r={9} />
+      <Path d="M12 11v5M12 8h.01" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 24, color = C.ink, strokeWidth = 1.7 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {

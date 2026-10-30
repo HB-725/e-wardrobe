@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FieldSource } from '@/domain/types';
 import { Icon, type IconName } from './Icon';
-import { C, PAD } from './theme';
+import { C, PAD, R } from './theme';
 
 // ---------- text ----------
 
@@ -76,14 +76,16 @@ export function Btn({
       style={({ pressed }) => [
         {
           height,
-          paddingHorizontal: 14,
+          paddingHorizontal: 16,
           flexDirection: 'row',
           gap: 6,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: primary ? C.ink : C.bg,
-          borderWidth: kind === 'ghost' || kind === 'dangerGhost' ? 0 : 1,
-          borderColor: kind === 'danger' ? C.danger : C.ink,
+          borderRadius: R.pill,
+          // Secondary buttons are a soft filled pill rather than a black outline.
+          backgroundColor: primary ? C.ink : kind === 'outline' ? C.card : C.bg,
+          borderWidth: kind === 'danger' ? 1 : 0,
+          borderColor: C.danger,
           opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
         },
         style,
@@ -105,7 +107,7 @@ export function IconBtn({ name, onPress, label, color = C.ink, bg, size = 22 }: 
       accessibilityLabel={label}
       onPress={onPress}
       hitSlop={4}
-      style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, opacity: pressed ? 0.6 : 1 })}
+      style={({ pressed }) => ({ width: 44, height: 44, borderRadius: R.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: bg, opacity: pressed ? 0.6 : 1 })}
     >
       <Icon name={name} size={size} color={color} />
     </Pressable>
@@ -141,15 +143,12 @@ export function Screen({ children, scroll = true, footer, style }: { children: R
 }
 
 /** Large page header used by the tab pages. */
-export function PageHeader({ eyebrow, title, right }: { eyebrow: string; title: string; right?: ReactNode }) {
+export function PageHeader({ title, right }: { title: string; right?: ReactNode }) {
   return (
-    <View style={{ paddingTop: 28, paddingHorizontal: PAD, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-      <View style={{ gap: 4 }}>
-        <T v="eyebrow">{eyebrow}</T>
-        <T v="h1" accessibilityRole="header">
-          {title}
-        </T>
-      </View>
+    <View style={{ paddingTop: 24, paddingHorizontal: PAD, minHeight: 72, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+      <T v="h1" accessibilityRole="header">
+        {title}
+      </T>
       {right}
     </View>
   );
@@ -203,15 +202,15 @@ export function Row({ label, value, sub, onPress, right, last, danger }: { label
 export function SourceBadge({ source }: { source: FieldSource | undefined }) {
   if (source !== 'ai' && source !== 'tag') return null;
   return (
-    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderWidth: 1, borderColor: C.ink }}>
-      <Text style={{ fontSize: 10, color: C.ink }}>{source === 'ai' ? 'AI' : '吊牌'}</Text>
+    <View style={{ paddingHorizontal: 7, paddingVertical: 1, borderRadius: R.pill, backgroundColor: C.card }}>
+      <Text style={{ fontSize: 10, color: C.sub }}>{source === 'ai' ? 'AI' : '吊牌'}</Text>
     </View>
   );
 }
 
 export function Segmented<K extends string>({ options, value, onChange }: { options: { id: K; label: string }[]; value: K; onChange: (k: K) => void }) {
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: C.card, padding: 3 }}>
+    <View style={{ flexDirection: 'row', backgroundColor: C.card, padding: 3, borderRadius: R.pill }}>
       {options.map((o) => {
         const on = o.id === value;
         return (
@@ -221,7 +220,7 @@ export function Segmented<K extends string>({ options, value, onChange }: { opti
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.id)}
             hitSlop={{ top: 7, bottom: 7 }}
-            style={{ height: 34, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: on ? C.ink : 'transparent' }}
+            style={{ height: 34, paddingHorizontal: 14, borderRadius: R.pill, justifyContent: 'center', backgroundColor: on ? C.ink : 'transparent' }}
           >
             <Text style={{ fontSize: 13, color: on ? '#FFFFFF' : C.ink }}>{o.label}</Text>
           </Pressable>
@@ -238,7 +237,7 @@ export function Chip({ label, on, onPress }: { label: string; on: boolean; onPre
       accessibilityState={{ selected: on }}
       onPress={onPress}
       hitSlop={{ top: 4, bottom: 4 }}
-      style={{ height: 40, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderColor: on ? C.ink : C.muted, backgroundColor: on ? C.ink : C.bg }}
+      style={{ height: 40, paddingHorizontal: 16, borderRadius: R.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? C.ink : C.card }}
     >
       <Text style={{ fontSize: 13, color: on ? '#FFFFFF' : C.ink }}>{label}</Text>
     </Pressable>
@@ -253,16 +252,16 @@ export function Switch({ value, onChange, label }: { value: boolean; onChange: (
       accessibilityState={{ checked: value }}
       onPress={() => onChange(!value)}
       hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-      style={{ width: 48, height: 28, padding: 2, backgroundColor: value ? C.ink : C.muted, flexDirection: 'row', justifyContent: value ? 'flex-end' : 'flex-start' }}
+      style={{ width: 48, height: 28, padding: 2, borderRadius: R.pill, backgroundColor: value ? C.ink : C.muted, flexDirection: 'row', justifyContent: value ? 'flex-end' : 'flex-start' }}
     >
-      <View style={{ width: 24, height: 24, backgroundColor: '#FFFFFF' }} />
+      <View style={{ width: 24, height: 24, borderRadius: R.pill, backgroundColor: '#FFFFFF' }} />
     </Pressable>
   );
 }
 
 export function Checkbox({ on }: { on: boolean }) {
   return (
-    <View style={{ width: 22, height: 22, borderWidth: 1.5, borderColor: C.ink, backgroundColor: on ? C.ink : C.bg, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: C.ink, backgroundColor: on ? C.ink : C.bg, alignItems: 'center', justifyContent: 'center' }}>
       {on ? <Icon name="check" size={16} color="#FFFFFF" strokeWidth={2.2} /> : null}
     </View>
   );
@@ -273,7 +272,7 @@ export function Banner({ title, sub, onPress, tone = 'card', left }: { title: st
     <Tap
       onPress={onPress}
       disabled={!onPress}
-      style={{ marginHorizontal: PAD, padding: 14, backgroundColor: tone === 'warn' ? '#FBF1E3' : C.card, flexDirection: 'row', alignItems: 'center', gap: 14 }}
+      style={{ marginHorizontal: PAD, padding: 14, borderRadius: R.card, backgroundColor: tone === 'warn' ? '#FBF1E3' : C.card, flexDirection: 'row', alignItems: 'center', gap: 14 }}
     >
       {left}
       <View style={{ flex: 1, gap: 2 }}>
@@ -292,8 +291,8 @@ export function Sheet({ visible, onClose, children, title }: { visible: boolean;
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable accessibilityLabel="关闭" style={[StyleSheet.absoluteFill, { backgroundColor: C.overlay }]} onPress={onClose} />
-        <View style={{ backgroundColor: C.bg, paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 20 + insets.bottom, gap: 18, maxHeight: '90%' }}>
-          <View style={{ alignSelf: 'center', width: 40, height: 4, backgroundColor: '#D4D4D7' }} />
+        <View style={{ backgroundColor: C.bg, borderTopLeftRadius: R.sheet, borderTopRightRadius: R.sheet, paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 20 + insets.bottom, gap: 18, maxHeight: '90%' }}>
+          <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: R.pill, backgroundColor: '#D4D4D7' }} />
           {title ? <T v="h2">{title}</T> : null}
           {children}
         </View>
@@ -313,8 +312,8 @@ export function Loading({ label }: { label?: string }) {
 
 export function ProgressBar({ value }: { value: number }) {
   return (
-    <View style={{ height: 4, backgroundColor: C.line }}>
-      <View style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`, height: '100%', backgroundColor: C.ink }} />
+    <View style={{ height: 4, borderRadius: R.pill, overflow: 'hidden', backgroundColor: C.line }}>
+      <View style={{ width: `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`, height: '100%', borderRadius: R.pill, backgroundColor: C.ink }} />
     </View>
   );
 }

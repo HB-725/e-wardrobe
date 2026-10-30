@@ -5,7 +5,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { SLOT_ORDER } from '@/domain/catalog';
 import type { Item, Slot } from '@/domain/types';
 import { displayUri } from '@/state/actions';
-import { C } from './theme';
+import { C, R } from './theme';
 
 
 /** A garment picture on the card colour. Falls back to the name when there is no image (Excel imports). */
@@ -16,7 +16,7 @@ import { C } from './theme';
 export function ItemImage({ item, style }: { item: Pick<Item, 'catalogUri' | 'originalUri' | 'candidates' | 'name' | 'status'>; style?: ViewStyle }) {
   const uri = displayUri(item);
   return (
-    <View style={[{ backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>
+    <View style={[{ backgroundColor: C.card, borderRadius: R.tile, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>
       {uri ? (
         <Image
           source={{ uri }}
@@ -46,7 +46,7 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
   const [box, setBox] = useState({ width: 0, height: 0 });
   if (tryonUri) {
     return (
-      <View style={[{ backgroundColor: C.card, overflow: 'hidden' }, style]}>
+      <View style={[{ backgroundColor: C.card, borderRadius: compact ? R.small : R.card, overflow: 'hidden' }, style]}>
         <Image source={{ uri: tryonUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" transition={120} />
       </View>
     );
@@ -59,7 +59,7 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
   const pad = compact ? 2 : 10;
   return (
     <View
-      style={[{ backgroundColor: '#FFFFFF', padding: pad, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center', gap, overflow: 'hidden' }, style]}
+      style={[{ backgroundColor: '#FFFFFF', borderRadius: compact ? R.small : R.card, padding: pad, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center', gap, overflow: 'hidden' }, style]}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
         if (width !== box.width || height !== box.height) setBox({ width, height });
@@ -79,9 +79,9 @@ export function OutfitBoard({ items, tryonUri, style, compact }: { items: Item[]
             const w = fit(shown.length) < MIN_TILE ? fit(1) : fit(shown.length);
             return (
               <View key={it.id} style={{ width: w, height: w / 0.75 }}>
-                <ItemImage item={it} style={{ flex: 1 }} />
+                <ItemImage item={it} style={{ flex: 1, borderRadius: compact ? 4 : R.tile }} />
                 {extra > 0 && !compact && i === shown.length - 1 ? (
-                  <View style={{ position: 'absolute', right: 2, bottom: 2, backgroundColor: C.ink, paddingHorizontal: 5 }}>
+                  <View style={{ position: 'absolute', right: 4, bottom: 4, borderRadius: R.pill, backgroundColor: C.ink, paddingHorizontal: 6 }}>
                     <Text style={{ color: '#FFFFFF', fontSize: 10 }}>+{extra}</Text>
                   </View>
                 ) : null}
@@ -120,7 +120,7 @@ export function Stage({
   style?: ViewStyle;
 }) {
   return (
-    <View style={[{ backgroundColor: C.card, overflow: 'hidden' }, style]}>
+    <View style={[{ backgroundColor: C.card, borderRadius: R.card, overflow: 'hidden' }, style]}>
       {tryonUri ? (
         <Image source={{ uri: tryonUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" transition={200} />
       ) : (
@@ -128,14 +128,15 @@ export function Stage({
           {/* The figure fills the stage exactly as the AI try-on will; the chosen garments sit in a narrow column
               on the right edge at about the height they are worn, so nothing looks "worn" before the try-on. */}
           {avatarUri ? <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" /> : <Silhouette />}
-          <View style={{ position: 'absolute', right: 4, top: '2%', bottom: '2%', width: 60 }}>
+          {/* Ends above the turn buttons that the fitting room lays over the bottom of the stage. */}
+          <View style={{ position: 'absolute', right: 4, top: '2%', bottom: 60, width: 60 }}>
             {BANDS.map((slot) => {
               const it = items.find((x) => x.slot === slot);
               return (
                 <View key={slot} style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end' }}>
                   {it ? (
-                    <View style={{ height: '94%', maxHeight: 80, aspectRatio: 0.75, padding: 2, backgroundColor: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.18)' }}>
-                      <ItemImage item={it} style={{ flex: 1 }} />
+                    <View style={{ height: '94%', maxHeight: 80, aspectRatio: 0.75, padding: 2, borderRadius: R.small, backgroundColor: '#FFFFFF', boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }}>
+                      <ItemImage item={it} style={{ flex: 1, borderRadius: 6 }} />
                     </View>
                   ) : null}
                 </View>
@@ -145,7 +146,7 @@ export function Stage({
         </>
       )}
       {busy ? (
-        <View style={{ position: 'absolute', left: 8, top: 8, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.scrim, paddingHorizontal: 8, paddingVertical: 4 }}>
+        <View style={{ position: 'absolute', left: 8, top: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: R.pill, backgroundColor: C.scrim, paddingHorizontal: 10, paddingVertical: 4 }}>
           <ActivityIndicator size="small" color="#FFFFFF" />
           <Text style={{ color: '#FFFFFF', fontSize: 11 }}>正在生成上身效果</Text>
         </View>

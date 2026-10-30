@@ -11,7 +11,7 @@ import { useRecordToday } from '@/state/recordToday';
 import { itemsOf, loadSnapshot, type Snapshot, tryonFor } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
 import { Btn, IconBtn, Loading, PageHeader, Screen, Segmented, Sheet, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 import { confirmAsync } from '@/ui/dialogs';
 import { OutfitBoard } from '@/ui/visuals';
 
@@ -91,22 +91,29 @@ function Library({ s, onOpen }: { s: Snapshot; onOpen: (o: Outfit) => void }) {
   if (s.outfits.length === 0) {
     return (
       <View style={{ padding: PAD, paddingTop: 40, gap: 12, alignItems: 'flex-start' }}>
-        <T v="title">还没有保存的穿搭</T>
-        <T v="body" style={{ color: C.sub }}>
-          在试衣间挑好衣服，点「保存穿搭」，就会出现在这里，也会出现在「今天」的推荐里。
-        </T>
+        <T v="title">还没有穿搭</T>
         <Btn label="去试衣间" onPress={() => router.navigate('/fitting')} style={{ paddingHorizontal: 24 }} />
       </View>
     );
   }
   return (
     <>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, borderBottomWidth: 1, borderBottomColor: C.line, marginTop: 14 }} contentContainerStyle={{ paddingHorizontal: PAD, gap: 22 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginTop: 16 }} contentContainerStyle={{ paddingHorizontal: PAD, gap: 8 }}>
         {tags.map((t) => {
           const on = t.id === tag;
           return (
-            <Pressable key={t.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => { setTag(t.id); setShown(PAGE); }} style={{ minHeight: 44, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: on ? C.ink : 'transparent', marginBottom: -1 }}>
-              <T style={{ fontSize: 14, fontWeight: on ? '700' : '400', color: on ? C.ink : C.sub }}>{t.label}</T>
+            <Pressable
+              key={t.id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              onPress={() => {
+                setTag(t.id);
+                setShown(PAGE);
+              }}
+              hitSlop={{ top: 4, bottom: 4 }}
+              style={{ height: 36, paddingHorizontal: 16, borderRadius: R.pill, justifyContent: 'center', backgroundColor: on ? C.ink : C.card }}
+            >
+              <T style={{ fontSize: 13, fontWeight: on ? '600' : '400', color: on ? '#FFFFFF' : C.sub }}>{t.label}</T>
             </Pressable>
           );
         })}
@@ -187,7 +194,7 @@ function Calendar({ s }: { s: Snapshot }) {
               accessibilityRole="button"
               accessibilityLabel={`${ym.m + 1} 月 ${c.day} 日${log ? '，有记录' : ''}`}
               onPress={() => setDay(c.dateKey!)}
-              style={{ width: '13.6%', height: 62, backgroundColor: log ? C.card : C.bg, borderWidth: 2, borderColor: ring }}
+              style={{ width: '13.6%', height: 62, borderRadius: R.small, overflow: 'hidden', backgroundColor: log ? C.card : C.bg, borderWidth: 2, borderColor: ring }}
             >
               <T style={{ position: 'absolute', left: 3, top: 1, fontSize: 10, color: isFuture ? C.muted : C.ink, fontWeight: c.dateKey === s.todayKey ? '700' : '400', zIndex: 1 }}>{c.day}</T>
               {log ? <OutfitBoard items={itemsOf(s, log.itemIds)} tryonUri={log.photoUri ?? tryonFor(s, log.itemIds)} compact style={{ position: 'absolute', left: 4, right: 4, top: 15, bottom: 2, backgroundColor: 'transparent' }} /> : null}
@@ -195,7 +202,7 @@ function Calendar({ s }: { s: Snapshot }) {
           );
         })}
       </View>
-      <View style={{ marginTop: 18, marginHorizontal: PAD, padding: 16, backgroundColor: C.card, minHeight: 124, flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+      <View style={{ marginTop: 18, marginHorizontal: PAD, padding: 16, borderRadius: R.card, backgroundColor: C.card, minHeight: 124, flexDirection: 'row', gap: 16, alignItems: 'center' }}>
         {selLog ? (
           <>
             <OutfitBoard items={itemsOf(s, selLog.itemIds)} tryonUri={tryonFor(s, selLog.itemIds)} compact style={{ width: 64, height: 92, backgroundColor: '#FFFFFF' }} />
@@ -260,7 +267,6 @@ export default function OutfitsPage() {
   return (
     <Screen>
       <PageHeader
-        eyebrow="OUTFITS"
         title="穿搭"
         right={
           <Segmented

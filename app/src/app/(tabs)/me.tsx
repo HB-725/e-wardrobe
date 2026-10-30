@@ -19,12 +19,11 @@ import { userSources, wipeEverything } from '@/state/actions';
 import { BackupError, createBackup, readBackupInfo, restoreBackup } from '@/state/backup';
 import { BACKUP_SUPPORTED, pickBackupFile, pickNewBackupFile } from '@/platform/backupStorage';
 import { ArchiveError } from '@/state/archive';
-import { PHOTO_NOTICE } from '@/state/consent';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot } from '@/state/snapshot';
 import { askAsync, confirmAsync, notify } from '@/ui/dialogs';
 import { Btn, Chip, Loading, PageHeader, ProgressBar, Row, Screen, SectionTitle, Sheet, Switch, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 import { Silhouette } from '@/ui/visuals';
 
 const CAPS = [1, 3, 5, 10, 20, 0];
@@ -38,9 +37,9 @@ function appVersion(): string {
   return native && Application.nativeBuildVersion ? `v${v} (${Application.nativeBuildVersion})` : `v${v}`;
 }
 const QUALITY: { id: QualityLevel; label: string; sub: string }[] = [
-  { id: 'economy', label: '省钱', sub: '全部用低画质，最便宜' },
-  { id: 'standard', label: '标准', sub: '商品图低画质，形象和上身效果中画质' },
-  { id: 'high', label: '高清', sub: '画质最好，费用约为标准的 3–4 倍' },
+  { id: 'economy', label: '省钱', sub: '最便宜' },
+  { id: 'standard', label: '标准', sub: '推荐' },
+  { id: 'high', label: '高清', sub: '约 3 倍费用' },
 ];
 const IDLE = [14, 30, 60, 90, 180];
 
@@ -238,9 +237,9 @@ export default function MePage() {
 
   return (
     <Screen>
-      <PageHeader eyebrow="PROFILE" title="我的" />
+      <PageHeader title="我的" />
       <View style={{ marginTop: 18, marginHorizontal: PAD, flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-        <View style={{ width: 96, height: 132, backgroundColor: C.card, padding: a.frontUri ? 0 : 18 }}>
+        <View style={{ width: 96, height: 132, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card, padding: a.frontUri ? 0 : 18 }}>
           {a.frontUri ? <Image source={{ uri: a.frontUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" /> : <Silhouette />}
         </View>
         <View style={{ flex: 1, gap: 6 }}>
@@ -253,7 +252,7 @@ export default function MePage() {
             <T style={{ fontSize: 18, fontWeight: '700' }}>{s.prefs.nickname || '点击设置昵称'}</T>
           </Tap>
           <T v="caption" style={{ color: a.status === 'failed' ? C.danger : C.sub }}>
-            {a.status === 'ready' ? '个人形象已建立 · 正面和背面' : a.status === 'processing' ? '形象生成中…' : a.status === 'failed' ? `形象生成失败：${a.error ?? ''}` : '还没有建立个人形象'}
+            {a.status === 'ready' ? '形象已建立' : a.status === 'processing' ? '形象生成中…' : a.status === 'failed' ? `形象生成失败：${a.error ?? ''}` : '还没有建立个人形象'}
           </T>
           <Btn label={a.status === 'none' ? '建立形象' : a.status === 'failed' ? '重新建立' : '更新形象'} kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push('/avatar')} />
         </View>
@@ -261,13 +260,13 @@ export default function MePage() {
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>身材数据</SectionTitle>
-        <Row label="身高 · 体重 · 体型" value={body ? '已填写 · 仅自己可见' : '未填写'} onPress={() => router.push('/avatar?step=2')} />
-        <Row label="合身笔记" value={fitCount ? `已记录 ${fitCount} 件` : '拍镜子照片时自动记录'} last />
+        <Row label="身高 · 体重 · 体型" value={body ? '已填写' : '未填写'} onPress={() => router.push('/avatar?step=2')} />
+        <Row label="合身笔记" value={fitCount ? `已记录 ${fitCount} 件` : '暂无'} last />
       </View>
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle style={{ marginBottom: 10 }}>AI 服务</SectionTitle>
-        <View style={{ padding: 16, backgroundColor: C.card, gap: 12 }}>
+        <View style={{ padding: 16, borderRadius: R.card, backgroundColor: C.card, gap: 12 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <T>本月花费（估算）</T>
             <T style={{ fontSize: 22, fontWeight: '700' }}>
@@ -298,7 +297,6 @@ export default function MePage() {
         <SectionTitle>偏好</SectionTitle>
         <Row
           label="镜子照片自动记一次穿着"
-          sub="识别到的单品穿着次数 +1"
           value={
             <Switch
               label="镜子照片自动记一次穿着"
@@ -315,30 +313,27 @@ export default function MePage() {
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>数据</SectionTitle>
-        <Row label={busy === 'export' ? '正在导出…' : '导出衣橱到 Excel'} value=".xlsx" onPress={busy ? undefined : exportExcel} />
-        <Row label={busy === 'import' ? '正在导入…' : '从 Excel 导入'} value="按导出文件的列名" onPress={busy ? undefined : importExcel} last={!BACKUP_SUPPORTED} />
+        <Row label={busy === 'export' ? '正在导出…' : '导出到 Excel'} onPress={busy ? undefined : exportExcel} />
+        <Row label={busy === 'import' ? '正在导入…' : '从 Excel 导入'} onPress={busy ? undefined : importExcel} last={!BACKUP_SUPPORTED} />
         {BACKUP_SUPPORTED ? (
           <>
-            <Row label={busy === 'backup' ? `正在备份… ${progress}` : '完整备份（含照片）'} sub="生成一个备份文件，存到手机或网盘，换手机时恢复" onPress={busy ? undefined : backup} />
-            <Row label={busy === 'restore' ? `正在恢复… ${progress}` : '从备份恢复'} sub="选择之前的 .wardrobe 备份文件" onPress={busy ? undefined : restore} last />
+            <Row label={busy === 'backup' ? `正在备份… ${progress}` : '完整备份（含照片）'} onPress={busy ? undefined : backup} />
+            <Row label={busy === 'restore' ? `正在恢复… ${progress}` : '从备份恢复'} onPress={busy ? undefined : restore} last />
           </>
         ) : null}
       </View>
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>隐私</SectionTitle>
-        <Row label="照片与身材数据" value="只保存在这台手机上" />
-        <Row label="发送给 AI 的内容" value="仅在生成时发送给 OpenAI" onPress={() => notify('照片如何处理', PHOTO_NOTICE)} />
-        <Row label="用于模型训练" value="OpenAI 默认不用 API 数据训练" />
+        <Row label="隐私政策" onPress={() => router.push('/privacy')} />
         <Row label={busy === 'wipe' ? '正在删除…' : '永久删除我的全部数据'} danger onPress={busy ? undefined : wipe} last />
       </View>
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
         <SectionTitle>关于</SectionTitle>
         <Row label="版本" value={appVersion()} />
-        <Row label="隐私政策" onPress={() => router.push('/privacy')} />
         <Row label="反馈问题" value="GitHub" onPress={() => Linking.openURL(FEEDBACK_URL).catch(() => app.toast('无法打开浏览器'))} />
-        <Row label="举报不当的 AI 生成内容" sub="生成的图片冒犯、不雅或明显不对时告诉我们" onPress={report} />
+        <Row label="举报不当的 AI 生成内容" onPress={report} />
         <Row label="开源许可" onPress={() => setSheet('licenses')} last />
       </View>
       <T v="caption" style={{ textAlign: 'center', marginTop: 20 }}>
@@ -357,7 +352,7 @@ export default function MePage() {
       </Modal>
       <Sheet visible={sheet === 'cap'} onClose={() => setSheet(null)} title="每月花费上限">
         <T v="small" style={{ color: C.sub }}>
-          达到上限后，新的 AI 任务会暂停，已有的衣服和穿搭不受影响。按 OpenAI 的价格估算，实际以账单为准。
+          到上限后 AI 暂停；按估算价格计算，以 OpenAI 账单为准。
         </T>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {CAPS.map((c) => (
@@ -425,7 +420,7 @@ export default function MePage() {
           maxLength={16}
           placeholder="你的昵称"
           placeholderTextColor={C.faint}
-          style={{ height: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: C.muted, fontSize: 15, color: C.ink }}
+          style={{ height: 46, paddingHorizontal: 14, borderRadius: R.input, backgroundColor: C.card, fontSize: 15, color: C.ink }}
         />
         <Btn
           label="保存"

@@ -17,7 +17,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         {error.message}
       </Text>
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Text accessibilityRole="button" onPress={retry} style={{ flex: 1, textAlign: 'center', paddingVertical: 14, backgroundColor: C.ink, color: '#FFFFFF', fontSize: 14 }}>
+        <Text accessibilityRole="button" onPress={retry} style={{ flex: 1, textAlign: 'center', paddingVertical: 14, borderRadius: 999, overflow: 'hidden', backgroundColor: C.ink, color: '#FFFFFF', fontSize: 14 }}>
           重试
         </Text>
         <Text
@@ -26,7 +26,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
             router.replace('/');
             retry();
           }}
-          style={{ flex: 1, textAlign: 'center', paddingVertical: 14, borderWidth: 1, borderColor: C.ink, color: C.ink, fontSize: 14 }}
+          style={{ flex: 1, textAlign: 'center', paddingVertical: 14, borderRadius: 999, overflow: 'hidden', backgroundColor: C.card, color: C.ink, fontSize: 14 }}
         >
           回到今天
         </Text>

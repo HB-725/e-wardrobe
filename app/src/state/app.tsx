@@ -13,7 +13,7 @@ import type { Selection } from '@/domain/outfit';
 import { openAppDb } from '@/platform/db';
 import { nativeImages } from '@/platform/images';
 import { getApiKey } from '@/platform/secrets';
-import { C } from '@/ui/theme';
+import { C, R } from '@/ui/theme';
 
 interface AppValue {
   db: Db;
@@ -85,7 +85,7 @@ function Toast({ message }: { message: string | null }) {
   return (
     <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 20, right: 20, bottom: 100 + insets.bottom, alignItems: 'center', opacity }}>
       {message ? (
-        <View accessibilityLiveRegion="polite" style={{ backgroundColor: C.ink, paddingHorizontal: 16, paddingVertical: 10, maxWidth: 360 }}>
+        <View accessibilityLiveRegion="polite" style={{ backgroundColor: C.ink, borderRadius: R.pill, paddingHorizontal: 18, paddingVertical: 10, maxWidth: 360 }}>
           <Text style={{ color: '#FFFFFF', fontSize: 13, lineHeight: 19, textAlign: 'center' }}>{message}</Text>
         </View>
       ) : null}

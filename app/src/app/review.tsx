@@ -10,7 +10,7 @@ import { loadSnapshot, type Snapshot } from '@/state/snapshot';
 import { confirmAsync, notify } from '@/ui/dialogs';
 import { type Form, formOf, formProblems, ItemForm, patchOf } from '@/ui/ItemForm';
 import { Btn, Loading, NavHeader, Screen, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { C, PAD, R } from '@/ui/theme';
 
 /** Ready items first, then failed, then still generating; oldest first within a group. */
 function queueOf(s: Snapshot): Item[] {
@@ -140,7 +140,7 @@ export default function ReviewPage() {
       />
       <View style={{ flexDirection: 'row', gap: 8, paddingTop: 16, paddingHorizontal: PAD }}>
         <View style={{ flex: 1, gap: 6 }}>
-          <View style={{ aspectRatio: 2 / 3, backgroundColor: C.card }}>
+          <View style={{ aspectRatio: 2 / 3, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card }}>
             {isRegen && cur.catalogUri ? (
               <Image source={{ uri: cur.catalogUri }} style={{ flex: 1 }} contentFit="cover" />
             ) : cur.originalUri ? (
@@ -150,7 +150,7 @@ export default function ReviewPage() {
           <T v="caption">{isRegen && cur.catalogUri ? '现在的标准图' : '原图'}</T>
         </View>
         <View style={{ flex: 1, gap: 6 }}>
-          <View style={{ aspectRatio: 2 / 3, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ aspectRatio: 2 / 3, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
             {chosen ? (
               <Image source={{ uri: chosen }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
             ) : cur.status === 'processing' ? (
@@ -176,7 +176,7 @@ export default function ReviewPage() {
             候选
           </T>
           {cur.candidates.map((c, i) => (
-            <Pressable key={c} accessibilityRole="button" accessibilityLabel={`方案 ${i + 1}`} accessibilityState={{ selected: i === pick }} onPress={() => setPick(i)} style={{ width: 44, height: 66, backgroundColor: C.card, borderWidth: 2, borderColor: i === pick ? C.ink : 'transparent' }}>
+            <Pressable key={c} accessibilityRole="button" accessibilityLabel={`方案 ${i + 1}`} accessibilityState={{ selected: i === pick }} onPress={() => setPick(i)} style={{ width: 44, height: 66, borderRadius: R.small, overflow: 'hidden', backgroundColor: C.card, borderWidth: 2, borderColor: i === pick ? C.ink : 'transparent' }}>
               <Image source={{ uri: c }} style={{ flex: 1 }} contentFit="cover" />
             </Pressable>
           ))}
@@ -184,11 +184,11 @@ export default function ReviewPage() {
         </View>
       ) : null}
       {checks.length > 0 ? (
-        <View style={{ marginTop: 16, marginHorizontal: PAD, paddingVertical: 14, paddingHorizontal: 16, backgroundColor: C.card, gap: 8 }}>
+        <View style={{ marginTop: 16, marginHorizontal: PAD, paddingVertical: 14, paddingHorizontal: 16, borderRadius: R.card, backgroundColor: C.card, gap: 8 }}>
           <T style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>保真检查</T>
           {checks.map((k, i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ width: 18, height: 18, backgroundColor: k.ok ? C.ok : C.warn, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 18, height: 18, borderRadius: R.pill, backgroundColor: k.ok ? C.ok : C.warn, alignItems: 'center', justifyContent: 'center' }}>
                 <T style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{k.ok ? '✓' : '!'}</T>
               </View>
               <T style={{ flex: 1, fontSize: 13 }}>{k.label}</T>
@@ -197,7 +197,6 @@ export default function ReviewPage() {
               </T>
             </View>
           ))}
-          {checks.some((k) => !k.ok) ? <T style={{ fontSize: 11, color: C.sub }}>有差别可以换一个方案、重新生成，或只存原图。</T> : null}
         </View>
       ) : null}
       <ItemForm item={cur} form={f} onChange={set} style={{ paddingTop: 12, paddingHorizontal: PAD }} />

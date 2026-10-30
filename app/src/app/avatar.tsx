@@ -15,8 +15,8 @@ import { usePhotoConsent } from '@/state/consent';
 import { useSafe } from '@/state/useSafe';
 import { confirmAsync } from '@/ui/dialogs';
 import { Icon } from '@/ui/Icon';
-import { Btn, Chip, Loading, NavHeader, PrivacyNote, ProgressBar, Screen, T, Tap } from '@/ui/kit';
-import { C, PAD } from '@/ui/theme';
+import { Btn, Chip, Loading, NavHeader, ProgressBar, Screen, T, Tap } from '@/ui/kit';
+import { C, PAD, R } from '@/ui/theme';
 
 const SHOTS = ['正面', '侧面', '背面'];
 const BUILDS = [
@@ -137,7 +137,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
     <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: PAD }}>
       {['照片', '身材', '生成'].map((l, i) => (
         <View key={l} style={{ flex: 1, gap: 6 }}>
-          <View style={{ height: 3, backgroundColor: i + 1 <= step ? C.ink : C.line }} />
+          <View style={{ height: 4, borderRadius: R.pill, backgroundColor: i + 1 <= step ? C.ink : C.line }} />
           <T style={{ fontSize: 12, color: i + 1 === step ? C.ink : C.sub, fontWeight: i + 1 === step ? '700' : '400' }}>
             {i + 1} · {l}
           </T>
@@ -154,19 +154,16 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
       <View style={{ padding: PAD, paddingTop: 16, gap: 16 }}>
         <View style={{ gap: 6 }}>
           <T v="h2">拍 3 张全身照</T>
-          <T v="body" style={{ color: C.sub }}>
-            AI 会根据这些照片生成你的形象，以后所有衣服都穿在它身上。
-          </T>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {SHOTS.map((label, i) => (
             <View key={label} style={{ flex: 1, gap: 6 }}>
               {photos[i] ? (
-                <Tap accessibilityLabel={`重拍${label}`} onPress={() => take(i, true)} style={{ height: 200, backgroundColor: C.card }}>
+                <Tap accessibilityLabel={`重拍${label}`} onPress={() => take(i, true)} style={{ height: 200, borderRadius: R.tile, overflow: 'hidden', backgroundColor: C.card }}>
                   <Image source={{ uri: photos[i]! }} style={{ flex: 1 }} contentFit="cover" />
                 </Tap>
               ) : (
-                <Tap accessibilityLabel={`拍${label}`} onPress={() => take(i, true)} style={{ height: 200, borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.ink, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Tap accessibilityLabel={`拍${label}`} onPress={() => take(i, true)} style={{ height: 200, borderRadius: R.tile, borderWidth: 1.5, borderStyle: 'dashed', borderColor: C.muted, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                   <Icon name="camera" size={26} strokeWidth={1.5} />
                   <T style={{ fontSize: 12 }}>拍{label}</T>
                 </Tap>
@@ -182,13 +179,13 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
             </View>
           ))}
         </View>
-        <View style={{ padding: 16, backgroundColor: C.card, gap: 8 }}>
-          <T style={{ fontSize: 13, fontWeight: '700' }}>拍好的小技巧</T>
-          <T v="small">· 穿贴身的衣服，AI 才看得清身材轮廓</T>
-          <T v="small">· 从头到脚完整入镜，手臂微微张开</T>
-          <T v="small">· 光线均匀，背景越简单越好</T>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {['贴身衣服', '全身入镜', '光线均匀'].map((t) => (
+            <View key={t} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: R.pill, backgroundColor: C.card }}>
+              <T style={{ fontSize: 12, color: C.sub }}>{t}</T>
+            </View>
+          ))}
         </View>
-        <PrivacyNote text="生成时发送给 OpenAI，照片和结果只保存在这台手机上" />
       </View>
     );
     footer = (
@@ -208,7 +205,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
           placeholder="必填"
           placeholderTextColor={C.faint}
           accessibilityLabel={label}
-          style={{ height: 46, paddingHorizontal: 12, borderWidth: 1, borderColor: C.muted, fontSize: 15, color: C.ink }}
+          style={{ height: 46, paddingHorizontal: 14, borderRadius: R.input, backgroundColor: C.card, fontSize: 15, color: C.ink }}
         />
       </View>
     );
@@ -217,9 +214,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
       <View style={{ padding: PAD, paddingTop: 16, gap: 14 }}>
         <View style={{ gap: 6 }}>
           <T v="h2">身材数据</T>
-          <T v="body" style={{ color: C.sub }}>
-            让形象的比例更接近你。只保存在这台手机上，界面上只显示「已填写」。
-          </T>
+          <T v="caption">仅保存在本机</T>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {input('身高 (cm)', height, setHeight)}
@@ -236,7 +231,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
             ))}
           </View>
         </View>
-        <T v="caption">生成正面和背面两张形象，预计 {formatUsd(cost)}，大约 1 分钟。</T>
+        <T v="caption">生成正面和背面 · 约 {formatUsd(cost)}</T>
       </View>
     );
     footer =
@@ -270,7 +265,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
         <View style={{ gap: 6 }}>
           <T v="h2">{ready ? '看看像不像你' : failed ? '生成失败' : '正在生成你的形象'}</T>
           <T v="body" style={{ color: failed ? C.danger : C.sub }}>
-            {ready && avatar.error ? `重新生成失败：${avatar.error}。下面是之前的形象，仍然可以使用。` : ready ? '不像的话可以换几张照片重新生成。' : failed ? (avatar.error ?? '请稍后重试') : '大约需要 1 分钟，可以先离开这个页面，完成后会自动更新。'}
+            {ready && avatar.error ? `重新生成失败：${avatar.error}。下面是之前的形象，仍然可以使用。` : ready ? '不像可以换照片重新生成' : failed ? (avatar.error ?? '请稍后重试') : '生成中，约 1 分钟，可以先离开'}
           </T>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -279,7 +274,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
             { uri: ready ? avatar.backUri : null, label: '背面' },
           ].map((v) => (
             <View key={v.label} style={{ flex: 1, gap: 4 }}>
-              <View style={{ aspectRatio: 2 / 3, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ aspectRatio: 2 / 3, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
                 {v.uri ? <Image source={{ uri: v.uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : processing ? <ActivityIndicator color={C.ink} /> : null}
               </View>
               <T style={{ fontSize: 11, color: C.sub }}>{v.label}</T>
@@ -287,7 +282,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
           ))}
         </View>
         {processing && blocked ? (
-          <View style={{ backgroundColor: '#FBF1E3', padding: 12, gap: 8 }}>
+          <View style={{ backgroundColor: '#FBF1E3', borderRadius: R.card, padding: 12, gap: 8 }}>
             <T style={{ fontSize: 13 }}>AI 已暂停：{describeAiError(new AiError(blocked as AiErrorKind, ''))}</T>
             <Btn label="去处理" kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(blocked))} />
           </View>
