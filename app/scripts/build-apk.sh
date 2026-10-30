@@ -4,6 +4,8 @@
 # Release signing: export EW_KEYSTORE, EW_KEYSTORE_PASSWORD and EW_KEY_ALIAS (or EW_SIGNING_ENV=path/to/signing.env).
 # Without them the APK is signed with the debug key (testing only; it cannot update a release-signed install).
 # ARCHS overrides the CPU architectures (default arm64-v8a; add armeabi-v7a for old 32-bit phones).
+# BUNDLE=1 builds an Android App Bundle (.aab) for Google Play instead (default ARCHS arm64-v8a,armeabi-v7a;
+# Play serves each phone only its own architecture). Sign it with the same release key: it becomes the upload key.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 SDK="${ANDROID_HOME:-$HOME/android-sdk}"
@@ -59,5 +61,10 @@ if [ -n "${EW_SIGNING_ENV:-}" ]; then set -a; . "$EW_SIGNING_ENV"; set +a; fi
 if [ -n "${EW_KEYSTORE:-}" ]; then export EW_KEYSTORE="$(realpath "$EW_KEYSTORE")"; echo "Signing with $EW_KEYSTORE"; else echo "WARNING: no EW_KEYSTORE, signing with the debug key"; fi
 EXPO_OFFLINE=1 CI=1 npx expo prebuild --platform android --no-install --clean
 echo "sdk.dir=$SDK" > android/local.properties
-(cd android && ./gradlew assembleRelease -PreactNativeArchitectures="${ARCHS:-arm64-v8a}" --no-daemon --console=plain)
-ls -la android/app/build/outputs/apk/release/
+if [ -n "${BUNDLE:-}" ]; then
+  (cd android && ./gradlew bundleRelease -PreactNativeArchitectures="${ARCHS:-arm64-v8a,armeabi-v7a}" --no-daemon --console=plain)
+  ls -la android/app/build/outputs/bundle/release/
+else
+  (cd android && ./gradlew assembleRelease -PreactNativeArchitectures="${ARCHS:-arm64-v8a}" --no-daemon --console=plain)
+  ls -la android/app/build/outputs/apk/release/
+fi
