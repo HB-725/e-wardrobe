@@ -284,7 +284,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
         {processing && blocked ? (
           <View style={{ backgroundColor: '#FBF1E3', borderRadius: R.card, padding: 12, gap: 8 }}>
             <T style={{ fontSize: 13 }}>AI 已暂停：{describeAiError(new AiError(blocked as AiErrorKind, ''))}</T>
-            <Btn label="去处理" kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(blocked))} />
+            <Btn label="去处理" kind="outline" onCard height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(blocked))} />
           </View>
         ) : processing ? (
           <ProgressBar value={Math.min(0.95, elapsed / 70)} />

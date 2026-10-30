@@ -227,7 +227,7 @@ function Calendar({ s }: { s: Snapshot }) {
         ) : (
           <View style={{ flex: 1, gap: 10 }}>
             <T style={{ fontSize: 13, color: C.sub }}>{selLabel} · 这天没有记录</T>
-            {!future && candidates.length > 0 ? <Btn label="补记这天穿了什么" kind="outline" height={40} style={{ alignSelf: 'flex-start' }} onPress={() => setPick(true)} /> : null}
+            {!future && candidates.length > 0 ? <Btn label="补记这天穿了什么" kind="outline" onCard height={40} style={{ alignSelf: 'flex-start' }} onPress={() => setPick(true)} /> : null}
           </View>
         )}
       </View>

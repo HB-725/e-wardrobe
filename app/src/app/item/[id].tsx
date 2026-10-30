@@ -140,12 +140,13 @@ export default function ItemPage() {
         {!item.originalUri && !item.catalogUri ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <T v="caption">这件还没有照片</T>
-            <Btn label="添加照片" kind="outline" onPress={addPhoto} style={{ paddingHorizontal: 24 }} />
+            <Btn label="添加照片" kind="outline" onCard onPress={addPhoto} style={{ paddingHorizontal: 24 }} />
           </View>
         ) : null}
         {hasStd && item.originalUri ? (
-          <View style={{ position: 'absolute', alignSelf: 'center', bottom: 14, backgroundColor: '#FFFFFF', padding: 0 }}>
+          <View style={{ position: 'absolute', alignSelf: 'center', bottom: 14 }}>
             <Segmented
+              onCard
               options={[
                 { id: 'std', label: '标准图' },
                 { id: 'raw', label: '原图' },

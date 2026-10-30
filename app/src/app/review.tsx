@@ -159,7 +159,7 @@ export default function ReviewPage() {
                 <T v="caption" style={{ textAlign: 'center' }}>
                   {s.blocked ? describeAiError(new AiError(s.blocked as AiErrorKind, '')) : '正在生成标准图\n大约 20 秒'}
                 </T>
-                {s.blocked ? <Btn label="去处理" kind="outline" height={36} onPress={() => router.push(blockedRoute(s.blocked))} /> : null}
+                {s.blocked ? <Btn label="去处理" kind="outline" onCard height={36} onPress={() => router.push(blockedRoute(s.blocked))} /> : null}
               </View>
             ) : (
               <T v="caption" style={{ textAlign: 'center', padding: 12, color: cur.status === 'failed' ? C.danger : C.sub }}>

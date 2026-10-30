@@ -115,11 +115,6 @@ export default function PhotoPage() {
             <T v="caption">正在拍大片，大约 30 秒</T>
           </View>
         ) : null}
-        {!current && !busy ? (
-          <View style={{ position: 'absolute', left: 12, top: 12, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.scrim }}>
-            <T style={{ color: '#FFFFFF', fontSize: 11 }}>选好场景，点下方「生成」</T>
-          </View>
-        ) : null}
       </View>
       {shots.length > 1 ? (
         <ScrollView horizontal style={{ marginTop: 10 }} contentContainerStyle={{ paddingHorizontal: PAD, gap: 6 }}>
@@ -133,7 +128,7 @@ export default function PhotoPage() {
               style={{ width: 44, height: 66, borderRadius: R.small, overflow: 'hidden', borderWidth: 2, borderColor: u === current ? C.ink : 'transparent' }}
             >
               <Image source={{ uri: u }} style={{ flex: 1 }} contentFit="cover" />
-              {saved.has(u) ? <View style={{ position: 'absolute', right: 2, bottom: 2, width: 8, height: 8, backgroundColor: C.ok }} /> : null}
+              {saved.has(u) ? <View style={{ position: 'absolute', right: 2, bottom: 2, width: 8, height: 8, borderRadius: 4, backgroundColor: C.ok }} /> : null}
             </Pressable>
           ))}
         </ScrollView>
@@ -143,9 +138,11 @@ export default function PhotoPage() {
           <Chip key={sc.id} label={sc.label} on={sc.id === scene} onPress={() => setScene(sc.id)} />
         ))}
       </ScrollView>
-      <T v="caption" style={{ marginTop: 12, marginHorizontal: PAD }}>
-        {items.map((i) => i.name).join(' · ')} — 每张约 {formatUsd(cost)}
-      </T>
+      {items.length ? (
+        <T v="caption" style={{ marginTop: 12, marginHorizontal: PAD }}>
+          {items.map((i) => i.name).join(' · ')}
+        </T>
+      ) : null}
       {items.length === 0 ? (
         <View style={{ margin: PAD, gap: 8 }}>
           <T v="small">先在试衣间选好要穿的衣服，再来拍大片。</T>
@@ -166,7 +163,7 @@ export default function PhotoPage() {
       {error ? (
         <View style={{ margin: PAD, padding: 12, borderRadius: R.card, backgroundColor: '#FBF1E3', gap: 8 }}>
           <T style={{ fontSize: 13 }}>{error.text}</T>
-          {error.kind ? <Btn label="去处理" kind="outline" height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(error.kind))} /> : null}
+          {error.kind ? <Btn label="去处理" kind="outline" onCard height={36} style={{ alignSelf: 'flex-start' }} onPress={() => router.push(blockedRoute(error.kind))} /> : null}
         </View>
       ) : null}
     </Screen>

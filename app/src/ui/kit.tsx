@@ -53,6 +53,7 @@ export function Btn({
   height = 48,
   icon,
   testID,
+  onCard,
 }: {
   label: string;
   onPress?: () => void;
@@ -63,6 +64,8 @@ export function Btn({
   height?: number;
   icon?: IconName;
   testID?: string;
+  /** The button sits on a gray or tinted panel: secondary kinds use a white fill so they still read as buttons. */
+  onCard?: boolean;
 }) {
   const primary = kind === 'primary';
   const fg = primary ? '#FFFFFF' : kind === 'danger' || kind === 'dangerGhost' ? C.danger : C.ink;
@@ -83,7 +86,7 @@ export function Btn({
           justifyContent: 'center',
           borderRadius: R.pill,
           // Secondary buttons are a soft filled pill rather than a black outline.
-          backgroundColor: primary ? C.ink : kind === 'outline' ? C.card : C.bg,
+          backgroundColor: primary ? C.ink : onCard ? '#FFFFFF' : kind === 'outline' ? C.card : C.bg,
           borderWidth: kind === 'danger' ? 1 : 0,
           borderColor: C.danger,
           opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
@@ -208,9 +211,20 @@ export function SourceBadge({ source }: { source: FieldSource | undefined }) {
   );
 }
 
-export function Segmented<K extends string>({ options, value, onChange }: { options: { id: K; label: string }[]; value: K; onChange: (k: K) => void }) {
+export function Segmented<K extends string>({
+  options,
+  value,
+  onChange,
+  onCard,
+}: {
+  options: { id: K; label: string }[];
+  value: K;
+  onChange: (k: K) => void;
+  /** Placed over a gray picture or panel. */
+  onCard?: boolean;
+}) {
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: C.card, padding: 3, borderRadius: R.pill }}>
+    <View style={{ flexDirection: 'row', backgroundColor: onCard ? 'rgba(255,255,255,0.92)' : C.card, padding: 3, borderRadius: R.pill }}>
       {options.map((o) => {
         const on = o.id === value;
         return (

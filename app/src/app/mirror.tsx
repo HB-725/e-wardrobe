@@ -173,11 +173,11 @@ export default function MirrorPage() {
               <T style={{ fontSize: 13 }}>识别失败：{phase.error}</T>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {phase.needsKey ? (
-                  <Btn label="去处理" kind="outline" height={36} onPress={() => router.push(blockedRoute(phase.needsKey))} />
+                  <Btn label="去处理" kind="outline" onCard height={36} onPress={() => router.push(blockedRoute(phase.needsKey))} />
                 ) : phase.retryable ? (
-                  <Btn label="重试" kind="outline" height={36} onPress={() => void match(phase.photo)} />
+                  <Btn label="重试" kind="outline" onCard height={36} onPress={() => void match(phase.photo)} />
                 ) : null}
-                <Btn label="手动选择" kind="outline" height={36} onPress={() => setManual(true)} />
+                <Btn label="手动选择" kind="outline" onCard height={36} onPress={() => setManual(true)} />
               </View>
             </View>
           ) : null}
