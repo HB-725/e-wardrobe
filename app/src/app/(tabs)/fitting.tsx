@@ -198,7 +198,7 @@ export default function FittingPage() {
       <View style={{ flex: 1, flexDirection: 'row', gap: 8, marginTop: 20, marginHorizontal: PAD, marginBottom: 16 }}>
         <View style={{ flex: 194, gap: 8 }}>
           <View style={{ flex: 1, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card }}>
-            <Stage avatarUri={avatarReady ? avatarUri : null} items={worn} tryonUri={tryon?.uri ?? null} busy={busy} style={{ flex: 1 }} />
+            <Stage avatarUri={avatarReady ? avatarUri : null} items={worn} tryonUri={tryon?.uri ?? null} busy={busy && s.avatar.status !== 'processing'} style={{ flex: 1 }} />
             {s.avatar.status === 'processing' ? (
               <View style={{ position: 'absolute', left: 8, top: 8, borderRadius: R.pill, backgroundColor: C.scrim, paddingHorizontal: 10, paddingVertical: 4 }}>
                 <Text style={{ color: '#FFFFFF', fontSize: 11 }}>形象生成中…</Text>
@@ -258,7 +258,8 @@ export default function FittingPage() {
           <View style={{ width: 48, paddingVertical: 6, alignItems: 'center', gap: 6 }}>
             {cats.map((c) => {
               const on = c.id === cat;
-              const has = !!sel[c.id];
+              // From worn, not sel: a garment moved to another category no longer counts here.
+              const has = worn.some((i) => i.slot === c.id);
               return (
                 <Pressable
                   key={c.id}

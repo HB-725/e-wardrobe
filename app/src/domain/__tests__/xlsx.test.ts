@@ -70,6 +70,16 @@ describe('xlsx from other generators', () => {
     expect(serialToDateKey(44000, true)).toBe('2024-06-19'); // = 1900-system serial 45462
   });
 
+  it('keeps shared-string indexes when an entry or a rich-text run is self-closing', () => {
+    const bytes = zipSync({
+      'xl/workbook.xml': strToU8(`<workbook xmlns="${ns}"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>`),
+      'xl/_rels/workbook.xml.rels': strToU8('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'),
+      'xl/sharedStrings.xml': strToU8(`<sst xmlns="${ns}"><si/><si><t>名称</t></si><si><r><t/></r><r><t>夹克</t></r></si></sst>`),
+      'xl/worksheets/sheet1.xml': strToU8(`<worksheet xmlns="${ns}"><sheetData><row r="1"><c r="A1" t="s"><v>1</v></c><c r="B1" t="s"><v>0</v></c></row><row r="2"><c r="A2" t="s"><v>2</v></c></row></sheetData></worksheet>`),
+    });
+    expect(readXlsx(bytes).sheets[0].rows).toEqual([['名称', ''], ['夹克']]);
+  });
+
   it('refuses parts that unpack to an unreasonable size', () => {
     const big = new Uint8Array(31 * 1024 * 1024).fill(32);
     const bytes = zipSync({ 'xl/workbook.xml': strToU8('<workbook/>'), 'xl/worksheets/sheet1.xml': big }, { level: 1 });

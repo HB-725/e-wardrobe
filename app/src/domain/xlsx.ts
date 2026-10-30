@@ -146,7 +146,7 @@ const MAX_ROWS = 20_000;
 
 /** All text of <t> elements inside a fragment (rich text runs are joined; phonetic hints are dropped). */
 function texts(xml: string): string {
-  return [...xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>|<t\b[^>]*\/>/g)].map((m) => unesc(m[1] ?? '')).join('');
+  return [...xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t\b[^>]*?(?:\/>|>([\s\S]*?)<\/t>)/g)].map((m) => unesc(m[1] ?? '')).join('');
 }
 
 function colIndex(ref: string): number {
@@ -225,7 +225,7 @@ export function readXlsx(bytes: Uint8Array): { sheets: Sheet[]; date1904: boolea
     const target = attr(m[1], 'Target');
     if (id && target) rels.set(id, resolve('xl/workbook.xml', target));
   }
-  const shared = [...(text('xl/sharedStrings.xml') ?? '').matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>|<si\b[^>]*\/>/g)].map((m) => texts(m[1] ?? ''));
+  const shared = [...(text('xl/sharedStrings.xml') ?? '').matchAll(/<si\b[^>]*?(?:\/>|>([\s\S]*?)<\/si>)/g)].map((m) => texts(m[1] ?? ''));
   const sheets: Sheet[] = [];
   for (const m of wb.matchAll(/<sheet\b([^>]*)\/?>/g)) {
     const name = attr(m[1], 'name') ?? `Sheet${sheets.length + 1}`;

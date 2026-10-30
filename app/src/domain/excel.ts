@@ -219,18 +219,25 @@ export function decodeUtf8(bin: string): string | null {
   return parts.join('');
 }
 
-/** Reads the first sheet (or the one named 单品). Rows need at least 名称 and a recognisable 品类. */
+const HEADER_SEARCH_ROWS = 10;
+
+/** Reads the 单品 sheet, else the first sheet with a 名称 column. Rows need a 名称; 品类 may be guessed from 细类 or the name. */
 export function parseWorkbook(base64: string, fileName = 'import.xlsx'): ImportResult {
   const { sheets: book, date1904 } = readBook(base64, fileName);
-  const sheet = book.find((x) => x.name === '单品') ?? book[0];
-  if (!sheet || sheet.rows.length === 0) return { items: [], skipped: [], warnings: [] };
-  const header = sheet.rows[0].map((h) => String(h).trim());
-  const rows = sheet.rows.slice(1).map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i] ?? ''])) as Record<string, unknown>);
+  if (book.every((x) => x.rows.every((r) => r.every((c) => !str(c))))) return { items: [], skipped: [], warnings: [] };
+  // Hand-made sheets often have a title or a blank row above the headers; look a few rows down, 单品 sheet first.
+  const found = [...book.filter((x) => x.name === '单品'), ...book]
+    .map((x) => ({ sheet: x, at: x.rows.slice(0, HEADER_SEARCH_ROWS).findIndex((r) => r.some((c) => String(c).trim() === '名称')) }))
+    .find((x) => x.at >= 0);
+  if (!found) throw new SpreadsheetError('没找到「名称」列。表格第一行要写列名（名称、品类、颜色……），可以先「导出到 Excel」看看格式。');
+  const { sheet, at } = found;
+  const header = sheet.rows[at].map((h) => String(h).trim());
+  const rows = sheet.rows.slice(at + 1).map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i] ?? ''])) as Record<string, unknown>);
   const items: ImportedItem[] = [];
   const skipped: ImportResult['skipped'] = [];
   const warnings: ImportResult['warnings'] = [];
   rows.forEach((r, i) => {
-    const rowNo = i + 2; // header is row 1
+    const rowNo = at + i + 2; // spreadsheet row number (1-based, header at row at + 1)
     const name = str(r['名称']);
     if (!name) {
       if (Object.values(r).some((v) => str(v))) skipped.push({ row: rowNo, reason: '缺少名称' });

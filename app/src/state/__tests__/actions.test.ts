@@ -305,6 +305,20 @@ describe('spreadsheet edge cases', () => {
     expect(r.skipped).toEqual([{ row: 3, reason: '品类「杂物」无法识别' }]);
   });
 
+  it('finds the header row below a blank or title row and numbers rows from the sheet', () => {
+    const ws = XLSX.utils.aoa_to_sheet([['我的衣橱清单'], [], ['名称', '品类'], ['夹克', '外套'], ['', '鞋']]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    const r = parseWorkbook(XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }));
+    expect(r.items.map((i) => [i.name, i.slot])).toEqual([['夹克', 'outer']]);
+    expect(r.skipped).toEqual([{ row: 5, reason: '缺少名称' }]);
+  });
+
+  it('explains a sheet without a 名称 column instead of importing nothing', () => {
+    const csv = '衣服,类别\n夹克,外套\n';
+    expect(() => parseWorkbook(Buffer.from(csv, 'utf8').toString('base64'), 'x.csv')).toThrow(/名称/);
+  });
+
   it('rejects invalid UTF-8 and keeps valid 4-byte characters', () => {
     const bin = (bytes: number[]) => String.fromCharCode(...bytes);
     expect(decodeUtf8(bin([0xf0, 0x9f, 0x98, 0x80]))).toBe('😀');
