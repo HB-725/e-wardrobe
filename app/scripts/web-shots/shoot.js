@@ -15,10 +15,10 @@ const OUT=process.argv[2]; const only=process.argv[3];
     // fitting: put on outfit from outfits sheet
     await go('/outfits?demo=1'); await p.getByLabel('周末出门').first().click(); await shot('outfit-sheet');
     await p.getByText('在试衣间打开').click(); await shot('fitting-worn');
-    await p.getByLabel('向右转').click(); await shot('fitting-back');
+    await p.getByLabel('转到背面').click(); await shot('fitting-back');
     await go('/outfits?demo=1'); await p.getByText('日历').click(); await shot('calendar');
-    await go('/fitting?demo=1'); await p.getByLabel('上衣').click(); await p.getByLabel('牛津衬衫').click(); await p.getByLabel('下装').click(); await p.getByLabel('卡其休闲裤').click(); await p.getByLabel('鞋').click(); await p.getByLabel('乐福鞋').click(); await shot('fitting-collage');
-    await p.getByText('保存穿搭').click(); await shot('save-sheet');
+    await go('/fitting?demo=1'); for (const [c, it] of [['上衣','牛津衬衫'],['下装','卡其休闲裤'],['鞋','乐福鞋']]) { await p.getByRole('tab', { name: c }).click(); await p.getByLabel(it, { exact: true }).click(); } await shot('fitting-collage');
+    await p.getByLabel('保存穿搭').click(); await shot('save-sheet');
   }
   console.log('ERRORS', JSON.stringify(errs.slice(0,10)));
   await b.close();

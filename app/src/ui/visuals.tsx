@@ -111,12 +111,15 @@ export function Stage({
   items,
   tryonUri,
   busy,
+  cardArea = { top: '2%', right: 4, bottom: 60 },
   style,
 }: {
   avatarUri: string | null;
   items: Item[];
   tryonUri: string | null;
   busy?: boolean;
+  /** Where the instant-preview garment cards may go, clear of controls laid over the stage. */
+  cardArea?: { top: number | `${number}%`; right: number; bottom: number };
   style?: ViewStyle;
 }) {
   return (
@@ -128,8 +131,7 @@ export function Stage({
           {/* The figure fills the stage exactly as the AI try-on will; the chosen garments sit in a narrow column
               on the right edge at about the height they are worn, so nothing looks "worn" before the try-on. */}
           {avatarUri ? <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" /> : <Silhouette />}
-          {/* Ends above the turn buttons that the fitting room lays over the bottom of the stage. */}
-          <View style={{ position: 'absolute', right: 4, top: '2%', bottom: 60, width: 60 }}>
+          <View style={{ position: 'absolute', ...cardArea, width: 60 }}>
             {BANDS.map((slot) => {
               const it = items.find((x) => x.slot === slot);
               return (
