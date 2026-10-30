@@ -67,6 +67,12 @@ ai/engine.ts             只依赖 resolveRoute 和 AiProvider；按用途取模
 
 错误映射到现有 `AiErrorKind`：401/403 或 API_KEY_INVALID → auth；429 RESOURCE_EXHAUSTED（配额）→ quota，其余 429 → rate；连不上 → network；超时 → timeout；5xx → server；模型不存在 / 不支持 → model；`promptFeedback.blockReason` 或 `finishReason` 为 SAFETY / IMAGE_SAFETY / PROHIBITED_CONTENT → rejected；返回里没有图片或 JSON 解析失败 → bad_response。`auth`、`quota` 只暂停用到这个 Key 的任务。
 
+## 画面比例与风格一致
+
+- **比例**：商品图、形象、上身效果、大片都要 2:3（现在 OpenAI 用 1024×1536）。Gemini 没有尺寸参数，但有宽高比配置（`generationConfig.imageConfig.aspectRatio`，按官方文档的写法传 `"2:3"`），必须传，否则会出 1:1，衣橱网格和舞台会裁坏。不支持比例的模型，生成后用 #F1F1F2 底色补边到 2:3。
+- **商品图风格统一**：不同服务商画出来的风格不同，中途换商品图模型会让衣橱里新旧图不一致。商品图生成时，衣橱里已有标准图的话，额外传一张当风格参考（提示词说明只参考背景、光线、构图，不参考衣服本身）。切换商品图模型时提示：「新录入的衣服会用新模型，风格可能和已有的不同；可以在单品详情里重新生成」。
+- **上身效果缓存**：缓存键仍是 衣服组合 + 视角 + 形象版本，换模型不会让已生成的失效（省钱）。设置页切换上身效果模型时提示：「已生成的上身效果不会自动重画，可以点重新生成」。
+
 ## 费用
 
 - 每个已知模型有官方单价（实现时按 OpenAI、Google 的价格页核对后写进 `catalog.ts`）。Gemini 生图按输出 token 计价（一张图约 1290 token），用响应里的 `usageMetadata` 计算。
