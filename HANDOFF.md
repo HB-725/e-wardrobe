@@ -18,7 +18,7 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（107 个测试）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（109 个测试，1 个默认跳过）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
@@ -68,7 +68,7 @@
 - [x] 第九轮（0.5.1）：0.5.0 模拟器上完整备份 → 永久删除 → 恢复跑通；表格读写去掉 SheetJS（见上）；真人大片可选任意一张保存 / 分享、离开前提醒未保存或生成中；拍照保存中不能返回 / 关闭；
   试衣间换了品类的衣服不会重复出现；形象重新生成期间不能生成上身效果和大片，生成中的上身效果结果作废；形象页所有出口都确认未用的照片、身材数据随时可「只保存数据」；
   单品编辑的价格 / 日期无法识别时提示而不是清空；备份 / 恢复 / 删除时全屏遮罩
-- [ ] 视觉风格：另一个会话说用户觉得 UI「太方」，给了 S1 / S2 两个柔和方案，用户尚未在本会话确认，未改
+- [x] 视觉风格 S1（用户选定）：按钮 / 分类标签 / 徽标 / 提示条改为胶囊，卡片和图片圆角，统一用 `ui/theme.ts` 的 `R` 圆角值；标题去掉英文小字，各页说明文字精简。改前 / 改后截图（390、360 宽）已发给用户
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
 - [ ] 下一轮可做：商品图背景和 #F1F1F2 仍可能有轻微色差；8 角度；iOS
 - 说明：试过让商品图用透明背景（显示最好），但图像模型把透明像素当黑色，深色衣服在上身效果里会消失，所以保持不透明底色。
