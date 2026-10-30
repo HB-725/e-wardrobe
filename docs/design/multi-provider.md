@@ -7,6 +7,7 @@
 - 用户可以添加多个服务商的 API Key（第一期 OpenAI、Google Gemini），每个 Key 单独保存、验证、删除。
 - 每种用途单独选一个模型：商品图、个人形象、上身效果、真人大片（生图）和识别（自动填写、保真检查、镜子照片，视觉）。默认「自动」。
 - 可以混用，比如商品图用 Gemini（Nano Banana）、上身效果用 OpenAI。
+- 第一期范围：provider 接口、OpenAI 适配（现有代码搬过去）、Gemini 适配（按官方文档 + 单测）、「API 与模型」设置页（多个 Key、按用途选模型）。
 - 已有用户升级后无感：原来的 OpenAI Key、模型和同意记录自动迁过来。
 
 ## 数据结构
@@ -113,7 +114,7 @@ API 与模型
 ## 测试与验证
 
 - 单元测试：Gemini 请求体（多图 inline_data、responseModalities、responseSchema 转换）、响应解析（图片、JSON、usageMetadata）、错误分类，全部用 fake fetch；`resolveRoute` 的自动顺序和混用；迁移；engine 用 fake provider 跑通全部任务。
-- 真实 API：OpenAI 照常跑现有真实测试。Gemini 真实验证要等环境里加好 Gemini Key；没有 Key 之前只报告单元测试结果，不把模拟结果当成真实验证。
+- 真实 API：OpenAI 照常跑现有真实测试，确认拆分后行为不变。Gemini 这一期只把接口留好：按官方文档写请求和解析，用 fake fetch 单测覆盖；不做真实调用（用户确认不需要）。交付说明里会写明 Gemini 适配未经真实 API 验证。
 
 ## 不在第一期
 
