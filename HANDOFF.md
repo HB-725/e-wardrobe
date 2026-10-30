@@ -18,7 +18,7 @@
 - `app/` 页面（expo-router）；`ui/` 组件；`platform/` 原生 / web 适配；`dev/seedDemo.ts` 网页演示数据
 
 ## 验证方式
-- `cd app && npx jest`（132 个测试，1 个默认跳过）、`npx tsc --noEmit`、`npx expo lint`
+- `cd app && npx jest`（139 个测试，1 个默认跳过）、`npx tsc --noEmit`、`npx expo lint`
 - 真实 AI：`REAL_AI_DIR=<含 jacket/tee/jeans/sneakers/p_front/p_side/p_back.jpg 的目录> npx jest src/ai/__tests__/real.test.ts`（约 $0.20）。环境里 api.openai.com 由代理注入 Key，不需要设置环境变量。
 - UI：`npx expo export --platform web`，把 dist 和演示图片目录（/demo/*.jpg）用静态服务器提供，打开 `/?demo=1`（还有 `demo=empty`、`demo=noavatar`），用 Playwright 390×844 截图。
 
@@ -84,7 +84,7 @@
 - [ ] 试衣间重构：用户觉得右侧竖排分类放不下「毛呢大衣」这类细分名、托盘一列只有两件。另一个会话在设计画布上放了 F1（上下布局）/ F2（全屏舞台 + 底部抽屉）两个方案，等用户选，选定前不要改试衣间布局
 - [ ] 多家 AI 服务商（设计说明 `docs/design/multi-provider.md`，等用户确认）：已完成但**还没接入 App** 的部分——
   `src/ai/providers/gemini.ts`（Gemini 适配，按公开 REST 文档写，fake fetch 单测，未用真实 API 验证；ai.google.dev 在这个环境里访问不了）、
-  `src/ai/catalog.ts`（模型表、价格、自动顺序、按用途路由、未知价格返回 null）。剩下：Key 存储与迁移、engine 按用途取 provider、「API 与模型」页面、按服务商同意、隐私文案。
+  `src/ai/catalog.ts`（模型表、价格、自动顺序、按用途路由、未知价格返回 null）、`src/ai/keys.ts`（多个 Key、按服务商同意、0.5.x 单 Key 迁移，可中断续跑）。剩下：启动时跑迁移、engine 按用途取 provider、「API 与模型」页面、同意框和隐私文案。
   注意：Gemini 返回的多半是 PNG，接入时保存要用对扩展名
 - [ ] 试衣间布局：F2 实现在 c208718（已 revert），另一个会话在画布上加了 F3–F6，等用户选
 - [ ] 用户真机验证：AI 生成、相册多选、保存到相册、Excel 导入
