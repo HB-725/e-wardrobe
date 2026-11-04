@@ -31,6 +31,19 @@ describe('items', () => {
     expect((await listItems(db, ['active'])).map((i) => i.name)).toEqual(['牛仔夹克']);
   });
 
+  it('round-trips the crop source, crop box and detections', async () => {
+    const box = { x: 0.1, y: 0.2, w: 0.3, h: 0.4 };
+    const det = { box, selected: true, manual: false, edited: false, name: '卫裤', slot: 'bottom' as const, subcategory: null, colorName: '灰', colorHex: null, seasons: [], brand: null, size: null, material: null };
+    const a = await createItem(db, { name: 'a', slot: 'top', status: 'pick', originalUri: 'file:///p.jpg', detections: [det] });
+    expect(a.detections).toEqual([det]);
+    expect(a.crop).toBeNull();
+    expect(a.sourceUri).toBeNull();
+    const b = await updateItem(db, a.id, { sourceUri: 'file:///p.jpg', crop: box, detections: [] });
+    expect(b?.crop).toEqual(box);
+    expect(b?.sourceUri).toBe('file:///p.jpg');
+    expect((await updateItem(db, a.id, { crop: null }))?.crop).toBeNull();
+  });
+
   it('updates only known fields and bumps updated_at', async () => {
     const a = await createItem(db, { name: 'x', slot: 'top', status: 'processing' });
     const b = await updateItem(db, a.id, { name: 'y', status: 'review', id: 'hacked' } as never);
@@ -216,6 +229,15 @@ describe('misc', () => {
     expect(await dropTryonsWithItem(db, 'a')).toEqual(['file:///t1.png']);
     expect((await listJobs(db, ['queued'])).map((j) => j.refId)).toEqual(['ab+c|back']);
     expect(await getTryon(db, 'c+d', 'front', 'v')).toBe('file:///t2.png');
+  });
+
+  it('drops layered and made-up try-ons of an item too', async () => {
+    await putTryon(db, 'a+b~a>b', 'front', 'v', 'file:///layered.png');
+    await putTryon(db, 'a+b~mk:natural', 'front', 'v', 'file:///made.png');
+    await putTryon(db, 'b+c~mk:natural', 'front', 'v', 'file:///other.png');
+    await enqueueJob(db, 'tryon', 'x+b~mk:date|front');
+    expect((await dropTryonsWithItem(db, 'b')).sort()).toEqual(['file:///layered.png', 'file:///made.png', 'file:///other.png']);
+    expect(await listJobs(db, ['queued'])).toEqual([]);
   });
 
   it('sums spend for the month by kind', async () => {

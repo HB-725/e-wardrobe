@@ -1,18 +1,19 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Animated, AppState, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createOpenAiClient, type OpenAiClient } from '@/ai/client';
+import type { OpenAiClient } from '@/ai/client';
 import { cleanOrphanImages } from './actions';
 import { setAiBlocked } from '@/ai/config';
 import type { AiDeps } from '@/ai/engine';
 import type { ImageStore } from '@/ai/imageStore';
+import { addBuiltInKey, createClient, getKeySecret, migrateLegacyKey } from '@/ai/keys';
 import { JobRunner } from '@/ai/runner';
 import type { Db } from '@/db/db';
 import { wakeWaitingJobs } from '@/db/jobs';
-import type { Selection } from '@/domain/outfit';
+import { EMPTY_LOOK, type Look } from '@/domain/look';
 import { openAppDb } from '@/platform/db';
 import { nativeImages } from '@/platform/images';
-import { getApiKey } from '@/platform/secrets';
+import { secureSecrets } from '@/platform/secrets';
 import { C, R } from '@/ui/theme';
 
 interface AppValue {
@@ -25,9 +26,9 @@ interface AppValue {
   refresh(): void;
   toast(message: string): void;
   /** Garments currently on the avatar in the fitting room; shared so other pages can "去试穿". */
-  fitting: Selection;
-  setFitting(sel: Selection): void;
-  /** Re-read the API key after the user changes it. */
+  fitting: Look;
+  setFitting(look: Look): void;
+  /** Re-read the API keys after the user changes them, and resume the queue. */
   reloadKey(): Promise<void>;
 }
 
@@ -94,9 +95,9 @@ function Toast({ message }: { message: string | null }) {
 }
 
 /** A keystore problem must not stop the app from opening; it then simply behaves as if no key was saved. */
-async function readKey(): Promise<string | null> {
+async function readSecret(id: string): Promise<string | null> {
   try {
-    return await getApiKey();
+    return await getKeySecret(secureSecrets, id);
   } catch (e) {
     console.warn('secure store unavailable', e);
     return null;
@@ -110,18 +111,21 @@ interface Core {
   reloadKey(): Promise<void>;
 }
 
-/** Opens the database and wires the AI engine; the API key is read from secure storage and cached here. */
+/** Opens the database and wires the AI engine; API keys are read from secure storage once and cached here. */
 async function createCore(onChange: () => void): Promise<Core> {
   const db = await openAppDb();
-  const holder: { key: string | null; client: { key: string; client: OpenAiClient } | null } = { key: await readKey(), client: null };
+  // Before anything reads keys or consent: 0.5.x kept one OpenAI key and one consent flag. Retried next start if it fails.
+  await migrateLegacyKey(db, secureSecrets).catch((e) => console.warn('key migration failed', e));
+  const clients = new Map<string, OpenAiClient | null>();
   const ai: AiDeps = {
     db,
     images: nativeImages,
-    async getClient() {
-      const key = holder.key;
-      if (!key) return null;
-      if (holder.client?.key !== key) holder.client = { key, client: createOpenAiClient({ apiKey: key }) };
-      return holder.client.client;
+    async clientFor(key) {
+      if (!clients.has(key.id)) {
+        const secret = await readSecret(key.id);
+        clients.set(key.id, secret ? createClient(key.provider, secret) : null);
+      }
+      return clients.get(key.id)!;
     },
   };
   // A batch import finishes a job every few seconds; coalesce the queue's updates into one refresh.
@@ -134,18 +138,31 @@ async function createCore(onChange: () => void): Promise<Core> {
     }, 400);
   };
   const runner = new JobRunner(ai, { onChange: queueChanged });
-  return {
+  const core: Core = {
     db,
     ai,
     runner,
     async reloadKey() {
-      holder.key = await readKey();
+      clients.clear();
       // Whatever paused the queue may be fixed now; the runner sets it again if not.
       await setAiBlocked(db, null);
       runner.kick();
       onChange();
     },
   };
+  // Not awaited: it reads each provider's model list, and the app should open offline too. Retried next start if it
+  // fails. One after the other, since both write the same key list.
+  void (async () => {
+    let added = false;
+    for (const [provider, key] of [
+      ['openai', process.env.EXPO_PUBLIC_OPENAI_API_KEY],
+      ['gemini', process.env.EXPO_PUBLIC_GEMINI_API_KEY],
+    ] as const) {
+      added = (await addBuiltInKey(db, secureSecrets, provider, key).catch((e) => console.warn(`built-in ${provider} key not added`, e))) || added;
+    }
+    if (added) await core.reloadKey();
+  })();
+  return core;
 }
 
 export function AppProvider({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
@@ -153,7 +170,7 @@ export function AppProvider({ children, fallback }: { children: ReactNode; fallb
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [toastMsg, setToastMsg] = useState<{ text: string; at: number } | null>(null);
-  const [fitting, setFitting] = useState<Selection>({});
+  const [fitting, setFitting] = useState<Look>(EMPTY_LOOK);
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
   const toast = useCallback((text: string) => setToastMsg({ text, at: Date.now() }), []);

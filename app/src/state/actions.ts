@@ -1,13 +1,17 @@
+import { saveAiSettings } from '@/ai/config';
+import type { Route } from '@/ai/catalog';
 import type { ImageStore } from '@/ai/imageStore';
+import { getRoutes, saveRoutes } from '@/ai/keys';
 import { tryonRef } from '@/ai/engine';
 import type { Db } from '@/db/db';
 import { createItem, deleteItem, getItem, updateItem } from '@/db/items';
-import { deleteJobsFor, enqueueJob, latestJobFor, retryJob } from '@/db/jobs';
-import { createOutfit, deleteOutfit, findOutfitByItems, getOutfit, updateOutfit } from '@/db/outfits';
+import { deleteJobsFor, enqueueJob, latestJobFor, retryJob, updateJobPayload } from '@/db/jobs';
+import { createOutfit, deleteOutfit, findOutfitByItems, getOutfit, listOutfits, updateOutfit } from '@/db/outfits';
 import { avatarVersion, dropTryonsWithItem, getAvatar, getTryon, listTryonUris, referencedImages, saveAvatar, wipeAll } from '@/db/misc';
 import { deleteLogByDate, getLogByDate, logWear } from '@/db/wear';
-import { outfitKey } from '@/domain/outfit';
-import type { Avatar, Item, Outfit, TryonView, WearSource } from '@/domain/types';
+import type { Box } from '@/domain/crop';
+import { type Look, lookKey } from '@/domain/look';
+import type { Avatar, Item, Outfit, Slot, Styling, TryonView, WearSource } from '@/domain/types';
 
 export interface Ctx {
   db: Db;
@@ -55,17 +59,86 @@ export async function keepCurrent(ctx: Ctx, id: string, fields: Partial<Item> = 
   await updateItem(ctx.db, id, { ...fields, candidates: [], checks: [] });
 }
 
-/** Items waiting for the user: new garments in review, or wardrobe items with freshly regenerated candidates. */
+/** Items waiting for the user: new garments in review, photos to pick garments from, or wardrobe items with freshly regenerated candidates. */
 export function needsReview(it: Pick<Item, 'status' | 'candidates'>): boolean {
-  return it.status === 'review' || ((it.status === 'active' || it.status === 'archived') && it.candidates.length > 0);
+  return it.status === 'review' || it.status === 'pick' || ((it.status === 'active' || it.status === 'archived') && it.candidates.length > 0);
+}
+
+/** Deletes an image unless another item still uses it (the whole photo several garments were cut from). */
+async function removeUnshared(ctx: Ctx, uri: string | null, exceptId: string): Promise<void> {
+  if (!uri) return;
+  const r = await ctx.db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM items WHERE id != ? AND (source_uri = ? OR original_uri = ?)', [exceptId, uri, uri]);
+  if (!r?.n) await ctx.images.remove(uri);
+}
+
+const AI_FIELDS = ['name', 'slot', 'subcategory', 'colorName', 'colorHex', 'seasons', 'brand', 'size', 'material'] as const;
+
+/** Turns the chosen garments of a photo into items that each generate from their own crop; the photo's row goes. */
+export async function confirmPicks(ctx: Ctx, id: string): Promise<Item[]> {
+  const pick = await getItem(ctx.db, id);
+  if (!pick || pick.status !== 'pick' || !pick.originalUri) return [];
+  const chosen = pick.detections.filter((d) => d.selected);
+  if (chosen.length === 0) throw new Error('还没有选中衣服');
+  const created: Item[] = [];
+  for (const d of chosen) {
+    const { box, selected: _s, manual, edited, printText, ...fields } = d;
+    const originalUri = await ctx.images.crop(pick.originalUri, box, 'original');
+    const fieldSources = manual ? {} : Object.fromEntries(AI_FIELDS.filter((k) => fields[k] != null).map((k) => [k, 'ai' as const]));
+    const item = await createItem(ctx.db, { ...fields, status: 'processing', originalUri, sourceUri: pick.originalUri, crop: box, fieldSources });
+    // A box the user drew or moved far may hold a different garment than the AI described: recognise the crop.
+    await enqueueJob(ctx.db, 'catalog', item.id, { autofill: manual || edited ? 'crop' : 'skip', printText: printText ?? undefined });
+    created.push(item);
+  }
+  await deleteJobsFor(ctx.db, id);
+  await deleteItem(ctx.db, id); // the photo file stays: the new items' sourceUri
+  ctx.runner.kick();
+  return created;
+}
+
+/** Saves which garments of a photo are chosen and where their boxes are. */
+export async function setDetections(ctx: Ctx, id: string, detections: Item['detections']): Promise<void> {
+  await updateItem(ctx.db, id, { detections });
+}
+
+/** Re-cuts an item from its whole photo (or from its own photo if it was never cut); the next generation uses it. */
+export async function cropItem(ctx: Ctx, id: string, box: Box): Promise<void> {
+  const item = await getItem(ctx.db, id);
+  if (!item?.originalUri) return;
+  const source = item.sourceUri ?? item.originalUri;
+  const originalUri = await ctx.images.crop(source, box, 'original');
+  if (item.originalUri !== source) await ctx.images.remove(item.originalUri); // the previous crop, only ever this item's
+  await updateItem(ctx.db, id, { sourceUri: source, crop: box, originalUri });
+}
+
+export interface RegenerateOptions {
+  /** A model for this time only (or for good with `makeDefault`). */
+  model?: Route;
+  quality?: 'low' | 'medium' | 'high';
+  /** The owner's notes for the AI, this time only. */
+  hint?: string;
+  makeDefault?: boolean;
+}
+
+/** Saves what the user changed in the form first, so the new picture follows it (e.g. a corrected category). */
+export async function regenerateWith(ctx: Ctx, id: string, fields: Partial<Item>, opts: RegenerateOptions): Promise<void> {
+  const item = await getItem(ctx.db, id);
+  if (!item) return;
+  // The measured colour code describes the old colour name.
+  const colorChanged = fields.colorName !== undefined && fields.colorName !== item.colorName;
+  if (Object.keys(fields).length) await updateItem(ctx.db, id, colorChanged ? { ...fields, colorHex: null } : fields);
+  if (opts.makeDefault) {
+    if (opts.model) await saveRoutes(ctx.db, { ...(await getRoutes(ctx.db)), catalog: opts.model });
+    if (opts.quality) await saveAiSettings(ctx.db, { catalogQuality: opts.quality });
+  }
+  await regenerateItem(ctx, id, { model: opts.model, quality: opts.quality, hint: opts.hint?.trim() || undefined });
 }
 
 /** New candidates for an item. A wardrobe item stays usable meanwhile; the result shows up in review. */
-export async function regenerateItem(ctx: Ctx, id: string): Promise<void> {
+export async function regenerateItem(ctx: Ctx, id: string, extra: Record<string, unknown> = {}): Promise<void> {
   const item = await getItem(ctx.db, id);
   if (!item) return;
   if (item.status !== 'active' && item.status !== 'archived') await updateItem(ctx.db, id, { status: 'processing', error: null });
-  await enqueueJob(ctx.db, 'catalog', id, { regenerate: true });
+  await enqueueJob(ctx.db, 'catalog', id, { regenerate: true, ...extra });
   ctx.runner.kick();
 }
 
@@ -88,7 +161,8 @@ export async function removeItem(ctx: Ctx, id: string): Promise<void> {
   const item = await getItem(ctx.db, id);
   if (!item) return;
   await deleteJobsFor(ctx.db, id);
-  for (const uri of [item.originalUri, item.tagUri, item.catalogUri, ...item.candidates]) await ctx.images.remove(uri);
+  for (const uri of [item.tagUri, item.catalogUri, ...item.candidates]) await ctx.images.remove(uri);
+  for (const uri of [item.originalUri, item.sourceUri]) await removeUnshared(ctx, uri, id);
   await dropTryons(ctx, id);
   await deleteItem(ctx.db, id);
   // Outfits / days that only consisted of this item would be left empty.
@@ -138,13 +212,27 @@ export function displayUri(item: Pick<Item, 'catalogUri' | 'originalUri' | 'cand
 
 // ---------- outfits & wear ----------
 
-export async function saveOutfit(ctx: Ctx, input: { name: string; occasions: string[]; itemIds: string[] }): Promise<Outfit> {
-  const existing = await findOutfitByItems(ctx.db, input.itemIds);
+/** Categories of these garments, to tell upper-body layers from the rest. */
+async function slotsOf(db: Db, ids: string[]): Promise<(id: string) => Slot | undefined> {
+  const items = await Promise.all([...new Set(ids)].map((id) => getItem(db, id)));
+  const map = new Map(items.filter((x): x is Item => !!x).map((i) => [i.id, i.slot]));
+  return (id) => map.get(id);
+}
+
+/** Saving the same look twice updates it; the same garments layered, worn or made up differently are another outfit. */
+export async function saveOutfit(
+  ctx: Ctx,
+  input: { name: string; occasions: string[]; itemIds: string[]; styling?: Record<string, Styling>; makeup?: string | null },
+): Promise<Outfit> {
+  const styling = input.styling ?? {};
+  const slotOf = await slotsOf(ctx.db, input.itemIds);
+  const key = lookKey(input.itemIds, styling, slotOf, input.makeup);
+  const existing = (await listOutfits(ctx.db)).find((o) => lookKey(o.itemIds, o.styling, slotOf, o.makeup) === key);
   if (existing) {
     await updateOutfit(ctx.db, existing.id, { name: input.name.trim() || existing.name, occasions: input.occasions });
     return (await getOutfit(ctx.db, existing.id))!;
   }
-  return createOutfit(ctx.db, input);
+  return createOutfit(ctx.db, { ...input, styling });
 }
 
 export async function removeOutfit(ctx: Ctx, id: string): Promise<void> {
@@ -193,30 +281,55 @@ export async function startAvatar(ctx: Ctx, input: { photos: string[]; body: Pic
 }
 
 export interface TryonState {
+  /** With makeup chosen but not drawn yet, the same outfit without it (`missingMakeup`). */
   uri: string | null;
   status: 'none' | 'queued' | 'failed';
   error: string | null;
+  missingMakeup: boolean;
 }
 
-export async function tryonState(db: Db, itemIds: string[], view: TryonView): Promise<TryonState> {
-  if (itemIds.length === 0) return { uri: null, status: 'none', error: null };
+/** Makeup is drawn on the front only; from behind the look is the one without it. */
+const asSeen = (look: Look, view: TryonView): Look => (view === 'back' && look.makeup ? { ids: look.ids, styling: look.styling } : look);
+
+export async function tryonState(db: Db, look: Look, view: TryonView): Promise<TryonState> {
+  const lk = asSeen(look, view);
+  if (lk.ids.length === 0 && !lk.makeup) return { uri: null, status: 'none', error: null, missingMakeup: false };
   const avatar = await getAvatar(db);
-  const key = outfitKey(itemIds);
-  const uri = await getTryon(db, key, view, avatarVersion(avatar));
+  const slotOf = await slotsOf(db, lk.ids);
+  const key = lookKey(lk.ids, lk.styling, slotOf, lk.makeup);
+  const made = await getTryon(db, key, view, avatarVersion(avatar));
+  const plain = !made && lk.makeup && lk.ids.length ? await getTryon(db, lookKey(lk.ids, lk.styling, slotOf), view, avatarVersion(avatar)) : null;
+  const uri = made ?? plain;
+  const missingMakeup = !!lk.makeup && !made;
   const job = await latestJobFor(db, 'tryon', tryonRef(key, view));
   // A cached image stays on screen while a regeneration runs.
-  if (job && (job.status === 'queued' || job.status === 'running')) return { uri, status: 'queued', error: job.lastError };
-  if (uri) return { uri, status: 'none', error: null };
-  if (job && job.status === 'failed') return { uri: null, status: 'failed', error: job.lastError };
-  return { uri: null, status: 'none', error: null };
+  if (job && (job.status === 'queued' || job.status === 'running')) return { uri, status: 'queued', error: job.lastError, missingMakeup };
+  if (job && job.status === 'failed' && !made) return { uri, status: 'failed', error: job.lastError, missingMakeup };
+  return { uri, status: 'none', error: null, missingMakeup };
 }
 
-export async function requestTryon(ctx: Ctx, itemIds: string[], view: TryonView): Promise<void> {
-  const key = outfitKey(itemIds);
+/** From the try-on sheet: a model and quality for this time (or from now on), and notes for the AI. */
+export interface TryonOptions {
+  model?: Route;
+  quality?: 'low' | 'medium' | 'high';
+  hint?: string;
+  makeDefault?: boolean;
+}
+
+export async function requestTryon(ctx: Ctx, look: Look, view: TryonView, opts: TryonOptions = {}): Promise<void> {
+  const lk = asSeen(look, view);
+  if (opts.makeDefault) {
+    if (opts.model) await saveRoutes(ctx.db, { ...(await getRoutes(ctx.db)), tryon: opts.model });
+    if (opts.quality) await saveAiSettings(ctx.db, { tryonQuality: opts.quality });
+  }
+  const key = lookKey(lk.ids, lk.styling, await slotsOf(ctx.db, lk.ids), lk.makeup);
   const ref = tryonRef(key, view);
+  const payload = { itemIds: lk.ids, styling: lk.styling, makeup: lk.makeup, model: opts.model, quality: opts.quality, hint: opts.hint?.trim() || undefined };
   const job = await latestJobFor(ctx.db, 'tryon', ref);
-  if (job?.status === 'failed') await retryJob(ctx.db, job.id);
-  else await enqueueJob(ctx.db, 'tryon', ref, { itemIds });
+  if (job?.status === 'failed') {
+    await updateJobPayload(ctx.db, job.id, payload);
+    await retryJob(ctx.db, job.id);
+  } else await enqueueJob(ctx.db, 'tryon', ref, payload);
   ctx.runner.kick();
 }
 
@@ -235,10 +348,10 @@ export async function setItemPhoto(ctx: Ctx, id: string, uri: string): Promise<v
   const item = await getItem(ctx.db, id);
   if (!item) return;
   const originalUri = await ctx.images.importPhoto(uri, 'original');
-  await ctx.images.remove(item.originalUri);
+  for (const old of [item.originalUri, item.sourceUri]) await removeUnshared(ctx, old, id);
   // A wardrobe item stays usable; the new standard image waits in review. Others go back to generating.
   const keep = item.status === 'active' || item.status === 'archived';
-  await updateItem(ctx.db, id, { originalUri, ...(keep ? {} : { status: 'processing' as const }), error: null });
+  await updateItem(ctx.db, id, { originalUri, sourceUri: null, crop: null, ...(keep ? {} : { status: 'processing' as const }), error: null });
   await deleteJobsFor(ctx.db, id);
   // A job still running uses the old photo; it notices the change and drops its result, this one redoes it.
   await enqueueJob(ctx.db, 'catalog', id, {}, { evenIfRunning: true });

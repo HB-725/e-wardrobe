@@ -1,6 +1,9 @@
+import type { Box } from './crop';
+
 export type Slot = 'outer' | 'top' | 'bottom' | 'shoes' | 'bag' | 'accessory';
 
-export type ItemStatus = 'processing' | 'review' | 'active' | 'failed' | 'archived';
+/** `pick`: the photo shows several garments; the user chooses which ones to keep. */
+export type ItemStatus = 'processing' | 'review' | 'active' | 'failed' | 'archived' | 'pick';
 
 export type FieldSource = 'ai' | 'tag' | 'user';
 
@@ -11,6 +14,27 @@ export interface FidelityCheck {
 }
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
+
+/** One garment the AI found on a photo with several (an item in `pick`). */
+export interface Detection {
+  box: Box;
+  selected: boolean;
+  /** Drawn by the user: the fields below are placeholders until the crop is recognised. */
+  manual: boolean;
+  /** Moved far from the AI box, so the AI fields may describe something else. */
+  edited: boolean;
+  /** Text printed on it, for the catalog prompt; not stored on the item. */
+  printText?: string | null;
+  name: string;
+  slot: Slot;
+  subcategory: string | null;
+  colorName: string | null;
+  colorHex: string | null;
+  seasons: Season[];
+  brand: string | null;
+  size: string | null;
+  material: string | null;
+}
 
 export interface Item {
   id: string;
@@ -32,6 +56,12 @@ export interface Item {
   originalUri: string | null;
   catalogUri: string | null;
   tagUri: string | null;
+  /** The whole photo when `originalUri` is a crop of it; shared by every garment cut from it. */
+  sourceUri: string | null;
+  /** Where `originalUri` sits on `sourceUri`. */
+  crop: Box | null;
+  /** Garments found on the photo while the item is in `pick`. */
+  detections: Detection[];
   /** Generated catalog images waiting for the user to pick one (the review step). */
   candidates: string[];
   /** Fidelity checklist per candidate, same order as `candidates`. */
@@ -42,11 +72,21 @@ export interface Item {
   updatedAt: string;
 }
 
+/** How an upper-body layer is worn; unset leaves it to the picture. */
+export interface Styling {
+  open?: boolean;
+  tucked?: boolean;
+}
+
 export interface Outfit {
   id: string;
   name: string;
   occasions: string[];
+  /** Upper-body garments innermost first (see domain/look). */
   itemIds: string[];
+  styling: Record<string, Styling>;
+  /** See domain/makeup. */
+  makeup: string | null;
   createdAt: string;
 }
 

@@ -4,18 +4,21 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { BackHandler, ScrollView, View } from 'react-native';
 import { SLOT_LABEL, seasonsLabel } from '@/domain/catalog';
-import { selectionFromItems } from '@/domain/outfit';
+import { lookFrom, wear } from '@/domain/look';
 import { computeItemStats, currentDateKey, formatYuan } from '@/domain/stats';
 import type { Item } from '@/domain/types';
 import { latestJobFor } from '@/db/jobs';
-import { needsReview, recordWear, regenerateItem, saveItemEdits, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
+import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
+import { getAiSettings } from '@/ai/config';
+import { needsReview, recordWear, regenerateWith, saveItemEdits, removeItem, retryItem, setArchived, setItemPhoto } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { useSafe } from '@/state/useSafe';
 import { usePhotoConsent } from '@/state/consent';
 import { itemsOf, loadSnapshot, tryonFor } from '@/state/snapshot';
 import { confirmAsync, notify } from '@/ui/dialogs';
 import { formOf, formProblems, ItemForm, patchOf } from '@/ui/ItemForm';
-import { Banner, Btn, Loading, NavHeader, Screen, Segmented, SourceBadge, T, Tap } from '@/ui/kit';
+import { Banner, Btn, Loading, NavHeader, Row, Screen, Segmented, SourceBadge, T, Tap } from '@/ui/kit';
+import { RegenerateSheet } from '@/ui/RegenerateSheet';
 import { C, PAD, R } from '@/ui/theme';
 import { ItemImage, OutfitBoard } from '@/ui/visuals';
 
@@ -53,6 +56,8 @@ export default function ItemPage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<ReturnType<typeof formOf> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [regenOpen, setRegenOpen] = useState(false);
+  const settings = useData(getAiSettings);
   const safe = useSafe();
 
   // Android back leaves edit mode instead of the page (and the unsaved edits).
@@ -127,8 +132,49 @@ export default function ItemPage() {
   const sizeMat = [item.size, item.material].filter(Boolean).join(' · ');
   const price = [item.priceCents != null ? formatYuan(item.priceCents) : null, item.purchasedOn ? `${item.purchasedOn.slice(0, 4)} 年 ${Number(item.purchasedOn.slice(5, 7))} 月` : null].filter(Boolean).join(' · ');
 
+  const toggleArchived = async () => {
+    await setArchived(app, item.id, item.status !== 'archived');
+    app.refresh();
+  };
+  const toReview = () => router.push(`/review?id=${item.id}`);
+  // The everyday actions stay at the bottom of the screen; the rest are under 管理 at the end of the page.
+  const footer =
+    item.status === 'active' ? (
+      <>
+        <Btn
+          label="今天穿了它"
+          kind="outline"
+          style={{ flex: 1 }}
+          onPress={async () => {
+            const ids = new Set(s.todayLog?.itemIds ?? []);
+            ids.add(item.id);
+            await recordWear(app, { date: currentDateKey(), itemIds: [...ids], source: 'manual' });
+            app.refresh();
+            app.toast('已加到今天的穿着记录');
+          }}
+        />
+        <Btn
+          label="去试穿"
+          style={{ flex: 1 }}
+          onPress={() => {
+            app.setFitting(wear(app.fitting, item, (id) => s.byId.get(id)?.slot, 'replace').look);
+            router.navigate('/fitting');
+          }}
+        />
+      </>
+    ) : item.status === 'archived' ? (
+      <Btn label="放回衣橱" style={{ flex: 1 }} onPress={toggleArchived} />
+    ) : item.status === 'failed' ? (
+      <>
+        <Btn label="只存原图" kind="outline" style={{ flex: 1 }} onPress={toReview} />
+        <Btn label="重新生成标准图" style={{ flex: 1 }} onPress={safe(() => retryItem(app, item.id).then(app.refresh))} />
+      </>
+    ) : item.status === 'processing' || item.status === 'review' ? (
+      <Btn label="去确认 / 只存原图" style={{ flex: 1 }} onPress={toReview} />
+    ) : undefined;
+
   return (
-    <Screen>
+    <Screen footer={footer}>
       <NavHeader title="单品详情" right={<Tap onPress={startEdit} style={{ minWidth: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><T>编辑</T></Tap>} />
       <View style={{ height: 380, backgroundColor: C.bg, alignItems: 'center' }}>
         {showRaw && item.originalUri ? (
@@ -157,7 +203,11 @@ export default function ItemPage() {
           </View>
         ) : null}
       </View>
-      {needsReview(item) && item.status !== 'review' ? (
+      {s.blocked && (item.status === 'processing' || job?.status === 'queued' || job?.status === 'running') ? (
+        <View style={{ marginTop: 12 }}>
+          <Banner tone="warn" title="AI 已暂停" sub={describeAiError(new AiError(s.blocked as AiErrorKind, ''))} onPress={() => router.push(blockedRoute(s.blocked))} />
+        </View>
+      ) : needsReview(item) && item.status !== 'review' ? (
         <View style={{ marginTop: 12 }}>
           <Banner title="新的标准图生成好了" sub="去看看要不要换上" onPress={() => router.push(`/review?id=${item.id}`)} />
         </View>
@@ -226,12 +276,12 @@ export default function ItemPage() {
                 key={o.id}
                 accessibilityLabel={o.name}
                 onPress={() => {
-                  app.setFitting(selectionFromItems(itemsOf(s, o.itemIds).filter((x) => x.status === 'active')));
+                  app.setFitting(lookFrom(o.itemIds.filter((id) => s.byId.get(id)?.status === 'active'), o.styling, o.makeup));
                   router.navigate('/fitting');
                 }}
                 style={{ width: 110, gap: 6 }}
               >
-                <OutfitBoard items={itemsOf(s, o.itemIds)} tryonUri={tryonFor(s, o.itemIds)} compact style={{ width: 110, height: 150 }} />
+                <OutfitBoard items={itemsOf(s, o.itemIds)} tryonUri={tryonFor(s, o.itemIds, o.styling, o.makeup)} compact style={{ width: 110, height: 150 }} />
                 <T style={{ fontSize: 12 }} numberOfLines={1}>
                   {o.name}
                 </T>
@@ -240,60 +290,19 @@ export default function ItemPage() {
           </ScrollView>
         ) : null}
       </View>
-      <View style={{ paddingTop: 24, paddingHorizontal: PAD, gap: 10 }}>
-        {item.status === 'active' ? (
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Btn
-              label="去试穿"
-              style={{ flex: 1 }}
-              onPress={() => {
-                app.setFitting({ ...app.fitting, [item.slot]: item.id });
-                router.navigate('/fitting');
-              }}
-            />
-            <Btn
-              label="今天穿了它"
-              kind="outline"
-              style={{ flex: 1 }}
-              onPress={async () => {
-                const ids = new Set(s.todayLog?.itemIds ?? []);
-                ids.add(item.id);
-                await recordWear(app, { date: currentDateKey(), itemIds: [...ids], source: 'manual' });
-                app.refresh();
-                app.toast('已加到今天的穿着记录');
-              }}
-            />
-          </View>
-        ) : null}
-        {item.status === 'failed' ? <Btn label="重新生成标准图" onPress={safe(() => retryItem(app, item.id).then(app.refresh))} /> : null}
-        {item.status === 'processing' || item.status === 'failed' || item.status === 'review' ? (
-          <Btn label="去确认 / 只存原图" kind="outline" onPress={() => router.push(`/review?id=${item.id}`)} />
-        ) : null}
+      <View style={{ paddingTop: 28, paddingHorizontal: PAD }}>
+        <T v="caption" style={{ marginBottom: 4 }}>
+          管理
+        </T>
         {item.originalUri && (item.status === 'active' || item.status === 'archived') ? (
-          <Btn
-            label="重新生成标准图"
-            kind="outline"
-            onPress={async () => {
-              await regenerateItem(app, item.id);
-              app.refresh();
-              app.toast('生成好后会出现在「确认新单品」里');
-            }}
-          />
+          <Row label="重新生成标准图" sub="换模型、画质，或重新框选" onPress={settings ? () => setRegenOpen(true) : undefined} />
         ) : null}
-        {item.originalUri ? <Btn label="换一张照片" kind="ghost" height={44} onPress={addPhoto} /> : null}
-        <Btn
-          label={item.status === 'archived' ? '放回衣橱' : '收起（不再穿了）'}
-          kind="ghost"
-          height={44}
-          onPress={async () => {
-            await setArchived(app, item.id, item.status !== 'archived');
-            app.refresh();
-          }}
-        />
-        <Btn
+        {item.originalUri ? <Row label="换一张照片" onPress={addPhoto} /> : null}
+        {item.status !== 'archived' ? <Row label="收起（不再穿了）" sub="不出现在试衣间，衣橱的「已收起」里能找回" onPress={toggleArchived} /> : null}
+        <Row
           label="删除这件衣服"
-          kind="dangerGhost"
-          height={44}
+          danger
+          last
           onPress={async () => {
             if (!(await confirmAsync('删除这件衣服？', '照片、标准图会一起删除；包含它的穿搭和穿着记录里也会去掉它。'))) return;
             await removeItem(app, item.id);
@@ -301,6 +310,25 @@ export default function ItemPage() {
             router.back();
           }}
         />
+        {settings ? (
+          <RegenerateSheet
+            visible={regenOpen}
+            onClose={() => setRegenOpen(false)}
+            item={item}
+            routing={s.routing}
+            settings={settings}
+            onCrop={() => {
+              setRegenOpen(false);
+              router.push(`/crop?id=${item.id}&mode=item`);
+            }}
+            onSubmit={safe(async (opts) => {
+              setRegenOpen(false);
+              await regenerateWith(app, item.id, {}, opts);
+              app.refresh();
+              app.toast('生成好后会出现在「确认新单品」里');
+            })}
+          />
+        ) : null}
       </View>
     </Screen>
   );

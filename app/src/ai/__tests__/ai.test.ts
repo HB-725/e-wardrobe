@@ -1,15 +1,19 @@
 import { createTestDb } from '@/test/memoryDb';
 import type { Db } from '@/db/db';
+import type { Box } from '@/domain/crop';
 import type { Item } from '@/domain/types';
 import { createItem, getItem, updateItem } from '@/db/items';
-import { enqueueJob, listJobs } from '@/db/jobs';
-import { addUsage, getAvatar, getSetting, getTryon, monthSpend, saveAvatar, avatarVersion } from '@/db/misc';
-import { AiError, classify, createOpenAiClient, type FetchLike, type OpenAiClient, reasoningEffort } from '../client';
-import { getAiBlocked, getModelChoice, saveAiSettings, setPhotoConsent } from '../config';
-import { type AiDeps, applyAutofill, matchMirror, pickMirrorCandidates, tryonRef } from '../engine';
-import type { ImageStore } from '../imageStore';
-import { blockModel, EMPTY_CHOICE, imageCost, pickModels } from '../models';
-import type { AutofillResult } from '../prompts';
+import { enqueueJob, latestJobFor, listJobs } from '@/db/jobs';
+import { addUsage, getAvatar, getSetting, getTryon, monthSpend, putTryon, saveAvatar, avatarVersion, setSetting } from '@/db/misc';
+import { AUTO_ROUTES, type KeyEntry, type ProviderId } from '../catalog';
+import { AiError, classify, createOpenAiClient, type FetchLike, type ImageEditRequest, type OpenAiClient, reasoningEffort } from '../client';
+import { getAiBlocked, saveAiSettings } from '../config';
+import { outfitKey } from '@/domain/outfit';
+import { type AiDeps, applyAutofill, generatePhoto, matchMirror, pickMirrorCandidates, tryonRef } from '../engine';
+import { imageExt, type ImageStore } from '../imageStore';
+import { addKey, listKeys, markVerified, saveRoutes, setConsentFor } from '../keys';
+import { type AutofillResult, catalogPrompt, type DetectResult, photoPrompt, SCENES, tryonPrompt } from '../prompts';
+import { lookKey } from '@/domain/look';
 import { JobRunner } from '../runner';
 
 class MemoryImages implements ImageStore {
@@ -25,6 +29,11 @@ class MemoryImages implements ImageStore {
   }
   async importPhoto(uri: string, folder: string) {
     return this.saveBase64('cGhvdG8=', folder + uri.length);
+  }
+  crops: { uri: string; box: Box }[] = [];
+  async crop(uri: string, box: Box, folder: string) {
+    this.crops.push({ uri, box });
+    return this.saveBase64(`crop:${this.files.get(uri) ?? ''}`, folder);
   }
   async remove(uri: string | null | undefined) {
     if (uri) this.files.delete(uri);
@@ -45,12 +54,19 @@ const AUTOFILL: AutofillResult = {
   brand: null,
   size: 'M',
   material: '棉 100%',
+  printText: null,
   fromTag: ['size', 'material'],
 };
 
-type Call = { kind: 'image' | 'vision'; model: string; schemaName?: string; images: number; n?: number };
+const { isGarment: _g, ...GARMENT } = AUTOFILL;
+/** One garment filling the photo: behaves like the single-garment recognition before boxes existed. */
+const WHOLE: DetectResult = { garments: [{ ...GARMENT, box_2d: [0, 0, 1000, 1000] }] };
 
-function fakeClient(opts: { failImage?: (model: string, i: number) => AiError | null; models?: string[] } = {}): OpenAiClient & { calls: Call[] } {
+type Call = { kind: 'image' | 'vision'; model: string; schemaName?: string; images: number; n?: number; prompt?: string; quality?: string };
+
+type Fidelity = { candidates: { checks: { label: string; ok: boolean; note: string }[] }[] };
+type Outfit = { fullBody: boolean; problems: string[] };
+function fakeClient(opts: { failImage?: (model: string, i: number) => AiError | null; models?: string[]; detect?: DetectResult; fidelity?: Fidelity; outfit?: Outfit[]; image?: (call: number, i: number) => string } = {}): OpenAiClient & { calls: Call[] } {
   const calls: Call[] = [];
   let imageCalls = 0;
   return {
@@ -59,33 +75,47 @@ function fakeClient(opts: { failImage?: (model: string, i: number) => AiError | 
       return opts.models ?? ['gpt-image-1-mini', 'gpt-image-1', 'gpt-5.4-nano', 'gpt-4o-mini'];
     },
     async imageEdit(req) {
-      calls.push({ kind: 'image', model: req.model, images: req.images.length, n: req.n });
-      const err = opts.failImage?.(req.model, imageCalls++);
+      calls.push({ kind: 'image', model: req.model, images: req.images.length, n: req.n, prompt: req.prompt, quality: req.quality });
+      const call = imageCalls++;
+      const err = opts.failImage?.(req.model, call);
       if (err) throw err;
-      return { images: Array.from({ length: req.n ?? 1 }, (_, i) => `img${i}`), usage: { textIn: 30, imageIn: 256, out: 408 } };
+      return { images: Array.from({ length: req.n ?? 1 }, (_, i) => opts.image?.(call, i) ?? `img${i}`), usage: { textIn: 30, imageIn: 256, out: 408 } };
     },
     async visionJson<T>(req: { model: string; schemaName: string; images: string[] }) {
       calls.push({ kind: 'vision', model: req.model, schemaName: req.schemaName, images: req.images.length });
       let data: unknown;
       if (req.schemaName === 'garment') data = AUTOFILL;
+      else if (req.schemaName === 'detect') data = opts.detect ?? WHOLE;
       else if (req.schemaName === 'fidelity')
-        data = { candidates: [{ checks: [{ label: '主色', ok: true, note: '一致' }] }, { checks: [{ label: '主色', ok: false, note: '偏浅' }] }] };
+        data = opts.fidelity ?? { candidates: [{ checks: [{ label: '主色', ok: true, note: '一致' }] }, { checks: [{ label: '主色', ok: false, note: '偏浅' }] }] };
+      else if (req.schemaName === 'outfit') data = opts.outfit?.shift() ?? { fullBody: true, problems: [] };
       else data = { matches: [], unmatched: [] };
       return { data: data as T, usage: { in: 1000, out: 100 } };
     },
   };
 }
 
+const secretMap = new Map<string, string>();
+const secrets = { get: async (n: string) => secretMap.get(n) ?? null, set: async (n: string, v: string | null) => void (v ? secretMap.set(n, v) : secretMap.delete(n)) };
+
+/** A verified key with the fake client's models. */
+async function seedKey(provider: ProviderId = 'openai', models = ['gpt-image-1-mini', 'gpt-image-1', 'gpt-5.4-nano', 'gpt-4o-mini']): Promise<KeyEntry> {
+  const k = await addKey(db, secrets, provider, `${provider}-test-key`);
+  await markVerified(db, k.id, models);
+  return (await listKeys(db)).find((x) => x.id === k.id)!;
+}
+
 let db: Db;
 let images: MemoryImages;
 beforeEach(async () => {
   db = await createTestDb();
-  await setPhotoConsent(db);
+  await setConsentFor(db, 'openai');
+  await seedKey();
   images = new MemoryImages();
 });
 
 function deps(client: OpenAiClient | null): AiDeps {
-  return { db, images, getClient: async () => client };
+  return { db, images, clientFor: async () => client };
 }
 
 async function drain(runner: JobRunner) {
@@ -138,21 +168,6 @@ describe('client', () => {
   });
 });
 
-describe('models', () => {
-  it('picks the cheapest available models and falls back when one is blocked', () => {
-    const avail = ['gpt-4o', 'gpt-image-1', 'gpt-image-1-mini', 'gpt-4o-mini', 'gpt-5.4-nano'];
-    expect(pickModels(avail)).toEqual({ image: 'gpt-image-1-mini', vision: 'gpt-5.4-nano' });
-    const next = blockModel({ ...EMPTY_CHOICE, image: 'gpt-image-1-mini', vision: 'gpt-5.4-nano' }, 'gpt-5.4-nano', avail);
-    expect(next.vision).toBe('gpt-4o-mini');
-    expect(next.blocked).toEqual(['gpt-5.4-nano']);
-    expect(pickModels(['whisper-1'])).toEqual({ image: null, vision: null });
-  });
-
-  it('estimates image cost from usage', () => {
-    expect(imageCost('gpt-image-1-mini', { textIn: 32, imageIn: 256, out: 408 })).toBeCloseTo(0.00397, 4);
-  });
-});
-
 describe('autofill', () => {
   it('never overwrites fields the user typed and marks tag-read fields', async () => {
     const item = await createItem(db, { name: '我的夹克', slot: 'outer', status: 'processing', fieldSources: { name: 'user' } });
@@ -181,9 +196,9 @@ describe('runner', () => {
     expect(after.status).toBe('review');
     expect(after.name).toBe('牛仔夹克');
     expect(after.slot).toBe('outer');
-    expect(after.candidates).toHaveLength(2);
-    expect(after.checks[1][0]).toEqual({ label: '主色', ok: false, note: '偏浅' });
-    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['garment', 'image', 'fidelity']);
+    expect(after.candidates).toHaveLength(1);
+    expect(after.checks).toEqual([[{ label: '主色', ok: true, note: '一致' }]]);
+    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['detect', 'image', 'fidelity']);
     expect((await monthSpend(db)).totalUsd).toBeGreaterThan(0);
     expect(await listJobs(db, ['queued', 'running'])).toHaveLength(0);
   });
@@ -199,19 +214,20 @@ describe('runner', () => {
     const second = (await getItem(db, item.id))!.candidates;
     expect(second).not.toEqual(first);
     expect(images.files.has(first[0])).toBe(false);
-    expect(client.calls.filter((c) => c.schemaName === 'garment')).toHaveLength(1);
+    expect(client.calls.filter((c) => c.schemaName === 'detect')).toHaveLength(1);
   });
 
   it('pauses without a key and resumes once one is provided', async () => {
     const item = await newGarment();
-    let client: OpenAiClient | null = null;
-    const runner = new JobRunner({ db, images, getClient: async () => client }, noTimers);
+    const keys = await getSetting(db, 'ai.keys');
+    await setSetting(db, 'ai.keys', '[]');
+    const runner = new JobRunner(deps(fakeClient()), noTimers);
     await drain(runner);
     expect(await getAiBlocked(db)).toBe('no_key');
     const [job] = await listJobs(db, ['queued']);
     expect(job.attempts).toBe(0);
     expect((await getItem(db, item.id))!.status).toBe('processing');
-    client = fakeClient();
+    await setSetting(db, 'ai.keys', keys!);
     await drain(runner);
     expect((await getItem(db, item.id))!.status).toBe('review');
     expect(await getAiBlocked(db)).toBeNull();
@@ -222,14 +238,14 @@ describe('runner', () => {
     const client = fakeClient({ failImage: (m) => (m === 'gpt-image-1-mini' ? new AiError('model', 'deprecated') : null) });
     await drain(new JobRunner(deps(client), noTimers));
     expect(client.calls.filter((c) => c.kind === 'image').map((c) => c.model)).toEqual(['gpt-image-1-mini', 'gpt-image-1']);
-    expect((await getModelChoice(db)).blocked).toContain('gpt-image-1-mini');
+    expect((await listKeys(db))[0].blocked).toContain('gpt-image-1-mini');
   });
 
   it('retries transient failures with backoff, then marks the item failed', async () => {
     const item = await newGarment();
     let now = new Date(Date.now() + 1000);
     const client = fakeClient({ failImage: () => new AiError('server', '502') });
-    const runner = new JobRunner({ db, images, getClient: async () => client, now: () => now }, noTimers);
+    const runner = new JobRunner({ db, images, clientFor: async () => client, now: () => now }, noTimers);
     await drain(runner);
     let [job] = await listJobs(db, ['queued']);
     expect(job.attempts).toBe(1);
@@ -377,7 +393,7 @@ describe('review fixes', () => {
     const after = (await getItem(db, item.id))!;
     expect(after.status).toBe('active');
     expect(after.catalogUri).toBe('mem://c/old');
-    expect(after.candidates).toHaveLength(2);
+    expect(after.candidates).toHaveLength(1);
   });
 
   it('a failed regeneration leaves the item active', async () => {
@@ -433,7 +449,7 @@ describe('round 2 fixes', () => {
     expect(after.status).toBe('active');
     expect(after.name).toBe('旧名字');
     expect(after.colorName).toBe('靛蓝');
-    expect(after.candidates).toHaveLength(2);
+    expect(after.candidates).toHaveLength(1);
   });
 
   it('mirror matching sends the most-worn items first', async () => {
@@ -486,7 +502,7 @@ describe('paid results survive retries', () => {
     let n = 0;
     const client = fakeClient({ failImage: () => (++n === 2 ? new AiError('server', 'back failed') : null) });
     let now = new Date(Date.now() + 1000);
-    const runner = new JobRunner({ db, images, getClient: async () => client, now: () => now }, noTimers);
+    const runner = new JobRunner({ db, images, clientFor: async () => client, now: () => now }, noTimers);
     await drain(runner);
     expect((await getAvatar(db)).status).toBe('processing');
     now = new Date(now.getTime() + 60 * 60 * 1000);
@@ -513,6 +529,7 @@ describe('paid results survive retries', () => {
 describe('round 6 fixes', () => {
   it('sends nothing before the user agreed to photos going to OpenAI, and continues once they do', async () => {
     db = await createTestDb(); // no consent
+    await seedKey();
     const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://original/1.jpg' });
     await enqueueJob(db, 'catalog', item.id);
     const client = fakeClient();
@@ -521,7 +538,7 @@ describe('round 6 fixes', () => {
     expect(client.calls).toHaveLength(0);
     expect(await getAiBlocked(db)).toBe('consent');
     expect((await listJobs(db, ['queued']))[0].attempts).toBe(0);
-    await setPhotoConsent(db);
+    await setConsentFor(db, 'openai');
     await drain(runner);
     expect((await getItem(db, item.id))!.status).toBe('review');
   });
@@ -592,7 +609,7 @@ describe('offline', () => {
     client.visionJson = async () => {
       throw new AiError('network', 'Network request failed');
     };
-    const runner = new JobRunner({ db, images, getClient: async () => client, now: () => now }, noTimers);
+    const runner = new JobRunner({ db, images, clientFor: async () => client, now: () => now }, noTimers);
     for (let i = 0; i < 5; i++) {
       await drain(runner);
       now = new Date(now.getTime() + 61_000);
@@ -601,5 +618,402 @@ describe('offline', () => {
     expect(job.attempts).toBe(0);
     expect((await getItem(db, item.id))!.status).toBe('processing');
     expect(new AiError('timeout', '').retryable).toBe(true);
+  });
+});
+
+describe('multiple providers', () => {
+  it('sends each purpose to its own key, asks consent per provider and fits Gemini requests', async () => {
+    const g = await seedKey('gemini', ['gemini-2.5-flash-image', 'gemini-2.5-flash-lite']);
+    await saveRoutes(db, { ...AUTO_ROUTES, catalog: { keyId: g.id, model: 'gemini-2.5-flash-image' } });
+    await createItem(db, { name: '旧衣服', slot: 'top', status: 'active', catalogUri: 'mem://catalog/old' });
+    const item = await createItem(db, { name: '新衣服', slot: 'top', status: 'processing', originalUri: 'mem://original/1.jpg' });
+    await enqueueJob(db, 'catalog', item.id);
+    const openai = fakeClient();
+    const gemini = fakeClient();
+    const sent: ImageEditRequest[] = [];
+    const edit = gemini.imageEdit.bind(gemini);
+    gemini.imageEdit = async (req) => {
+      sent.push(req);
+      return edit(req);
+    };
+    const runner = new JobRunner({ db, images, clientFor: async (k) => (k.provider === 'gemini' ? gemini : openai) }, noTimers);
+    await drain(runner);
+    // Recognition stays on OpenAI (agreed); the Gemini catalog image waits for its own consent.
+    expect(openai.calls.map((c) => c.schemaName)).toEqual(['detect']);
+    expect(gemini.calls).toHaveLength(0);
+    expect(await getAiBlocked(db)).toBe('consent');
+    await setConsentFor(db, 'gemini');
+    await drain(runner);
+    expect((await getItem(db, item.id))!.status).toBe('review');
+    expect(openai.calls.filter((c) => c.kind === 'image')).toHaveLength(0);
+    // The photo plus an existing catalog image as style reference; no quality setting, which Gemini does not have.
+    expect(sent[0]).toMatchObject({ model: 'gemini-2.5-flash-image', quality: undefined, size: '1024x1536' });
+    expect(sent[0].images).toHaveLength(2);
+    expect(sent[0].prompt).toContain('style reference');
+  });
+
+  it('re-reads a stale model list and does not hold unknown prices against the cap', async () => {
+    await setSetting(db, 'ai.keys', '[]');
+    const k = await seedKey('openai', ['gpt-image-9', 'gpt-5.4-nano']);
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://original/1.jpg' });
+    await enqueueJob(db, 'catalog', item.id);
+    const client = fakeClient({ models: ['gpt-image-9', 'gpt-5.4-nano'] });
+    await drain(new JobRunner(deps(client), noTimers));
+    // Only the two recognition calls are priced: 2 × (1000 × $0.2 + 100 × $1.25) / 1M.
+    expect((await monthSpend(db)).totalUsd).toBeCloseTo(0.00065, 8);
+    expect(client.calls.find((c) => c.kind === 'image')?.model).toBe('gpt-image-9');
+
+    await markVerified(db, k.id, ['gpt-image-9', 'gpt-5.4-nano'], '2020-01-01T00:00:00Z');
+    await enqueueJob(db, 'catalog', item.id, { regenerate: true });
+    const newer = fakeClient({ models: ['gpt-image-9', 'gpt-image-1-mini', 'gpt-5.4-nano'] });
+    await drain(new JobRunner(deps(newer), noTimers));
+    expect((await listKeys(db))[0].models).toContain('gpt-image-1-mini');
+    expect(newer.calls.find((c) => c.kind === 'image')?.model).toBe('gpt-image-1-mini');
+  });
+
+  it('pauses with no_key when no key can do a purpose', async () => {
+    await setSetting(db, 'ai.keys', '[]');
+    await seedKey('openai', ['gpt-5.4-nano']);
+    const item = await createItem(db, { name: 'x', slot: 'top', status: 'processing', originalUri: 'mem://original/1.jpg' });
+    await enqueueJob(db, 'catalog', item.id, { regenerate: true });
+    await drain(new JobRunner(deps(fakeClient()), noTimers));
+    expect(await getAiBlocked(db)).toBe('no_key');
+  });
+
+  it('names saved images after the data they hold', () => {
+    expect(imageExt('iVBORw0KGgo=')).toBe('png');
+    expect(imageExt('/9j/4AAQ')).toBe('jpg');
+    expect(imageExt('UklGRiQA')).toBe('webp');
+  });
+});
+
+describe('garments on a photo', () => {
+  const tee = { ...GARMENT, name: '黑色T恤', slot: 'top' as const, box_2d: [100, 250, 450, 750] };
+  const pants = { ...GARMENT, name: '灰色卫裤', slot: 'bottom' as const, box_2d: [430, 300, 1000, 700] };
+
+  async function photo(extra: Partial<Item> = {}) {
+    const originalUri = await images.saveBase64('cGhvdG8=', 'original');
+    const item = await createItem(db, { name: '新衣服', slot: 'top', status: 'processing', originalUri, ...extra });
+    await enqueueJob(db, 'catalog', item.id);
+    return item;
+  }
+
+  it('makes one catalog candidate by default; a miss is for the regenerate panel', async () => {
+    // 44 garments on 2026-11-05: the second candidate beat the first 3 times, so it is not worth half the cost.
+    const item = await photo();
+    const client = fakeClient();
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls.find((c) => c.kind === 'image')!.n).toBe(1);
+    expect((await getItem(db, item.id))!.candidates).toHaveLength(1);
+  });
+
+  it('crops a single small garment and generates from the crop', async () => {
+    const item = await photo();
+    const client = fakeClient({ detect: { garments: [pants] } });
+    await drain(new JobRunner(deps(client), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('review');
+    expect(after.name).toBe('灰色卫裤');
+    expect(after.sourceUri).toBe(item.originalUri);
+    expect(after.originalUri).not.toBe(item.originalUri);
+    expect(images.files.get(after.originalUri!)).toBe('crop:cGhvdG8=');
+    expect(after.crop!.y).toBeCloseTo(0.43 - 0.57 * 0.06);
+    expect(images.crops).toHaveLength(1);
+    expect(after.candidates).toHaveLength(1);
+  });
+
+  it('does not crop a garment that fills the photo', async () => {
+    const item = await photo();
+    await drain(new JobRunner(deps(fakeClient({ detect: { garments: [{ ...tee, box_2d: [20, 20, 980, 980] }] } })), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.crop).toBeNull();
+    expect(after.originalUri).toBe(item.originalUri);
+    expect(images.crops).toHaveLength(0);
+  });
+
+  it('waits for the user to pick when there are several garments, without generating', async () => {
+    const item = await photo();
+    const client = fakeClient({ detect: { garments: [tee, pants, { ...pants, name: '小点', box_2d: [0, 0, 10, 10] }] } });
+    await drain(new JobRunner(deps(client), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('pick');
+    expect(after.detections.map((d) => d.name)).toEqual(['黑色T恤', '灰色卫裤']);
+    expect(after.detections.every((d) => !d.selected && !d.manual)).toBe(true);
+    expect(client.calls.map((c) => c.kind)).toEqual(['vision']);
+    expect(await listJobs(db, ['queued', 'running'])).toHaveLength(0);
+  });
+
+  it('a pair of shoes listed as two is one garment, cut as one', async () => {
+    const item = await photo();
+    const left = { ...GARMENT, name: '白色板鞋', slot: 'shoes' as const, box_2d: [600, 200, 900, 480] };
+    const right = { ...left, box_2d: [600, 520, 900, 800] };
+    await drain(new JobRunner(deps(fakeClient({ detect: { garments: [left, right] } })), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('review');
+    expect(after.name).toBe('白色板鞋');
+    expect(images.crops).toHaveLength(1);
+    expect(after.crop!.x).toBeLessThan(0.2);
+    expect(after.crop!.x + after.crop!.w).toBeGreaterThan(0.8);
+  });
+
+  it('a print on a garment is not a garment of its own', async () => {
+    const item = await photo();
+    const print = { ...GARMENT, name: '彩色印花', slot: 'accessory' as const, box_2d: [200, 400, 300, 600] };
+    await drain(new JobRunner(deps(fakeClient({ detect: { garments: [tee, print] } })), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('review');
+    expect(after.name).toBe('黑色T恤');
+  });
+
+  it('a logo or cuff listed as a second garment of the same kind is part of the first', async () => {
+    const item = await photo();
+    const hoodie = { ...GARMENT, name: '黑色卫衣', slot: 'top' as const, box_2d: [50, 100, 950, 900] };
+    const cuff = { ...GARMENT, name: '袖口图标卫衣', slot: 'top' as const, box_2d: [800, 700, 940, 890] };
+    await drain(new JobRunner(deps(fakeClient({ detect: { garments: [hoodie, cuff] } })), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('review');
+    expect(after.name).toBe('黑色卫衣');
+  });
+
+  it('puts the candidate that passed every check first', async () => {
+    await saveAiSettings(db, { candidates: 2 });
+    const item = await photo();
+    const fidelity = { candidates: [{ checks: [{ label: '印花', ok: false, note: '字样不同' }] }, { checks: [{ label: '印花', ok: true, note: '一致' }] }] };
+    await drain(new JobRunner(deps(fakeClient({ fidelity })), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.candidates.map((u) => images.files.get(u))).toEqual(['img1', 'img0']);
+    expect(after.checks.map((c) => c[0].ok)).toEqual([true, false]);
+  });
+
+  it('tells the image model the exact print text', async () => {
+    await photo();
+    const client = fakeClient({ detect: { garments: [{ ...tee, printText: 'OET GRUNN', box_2d: [20, 20, 980, 980] }] } });
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls.find((c) => c.kind === 'image')!.prompt).toContain('OET GRUNN');
+  });
+
+  it('a wardrobe item with a new outfit photo takes the garment of its own category', async () => {
+    const item = await photo({ name: '旧裤子', slot: 'bottom', status: 'active', catalogUri: 'mem://c/old', fieldSources: { name: 'user' } });
+    await drain(new JobRunner(deps(fakeClient({ detect: { garments: [tee, pants] } })), noTimers));
+    const after = (await getItem(db, item.id))!;
+    expect(after.status).toBe('active');
+    expect(after.slot).toBe('bottom');
+    expect(after.crop!.y).toBeGreaterThan(0.3);
+    expect(after.candidates).toHaveLength(1);
+  });
+
+  it('regenerates with the model, quality and notes picked for this time', async () => {
+    const item = await createItem(db, { name: '外套', slot: 'outer', status: 'review', originalUri: 'mem://o/1', candidates: ['mem://c/a'] });
+    const key = (await listKeys(db))[0];
+    await enqueueJob(db, 'catalog', item.id, { regenerate: true, model: { keyId: key.id, model: 'gpt-image-1' }, quality: 'high', hint: '颜色更浅' });
+    const client = fakeClient();
+    await drain(new JobRunner(deps(client), noTimers));
+    const call = client.calls.find((c) => c.kind === 'image')!;
+    expect(call.model).toBe('gpt-image-1');
+    expect(call.quality).toBe('high');
+    expect(call.prompt).toContain('颜色更浅');
+    expect(client.calls.some((c) => c.schemaName === 'detect' || c.schemaName === 'garment')).toBe(false);
+  });
+
+  it('a box the user drew is recognised on its own', async () => {
+    const item = await createItem(db, { name: '新衣服', slot: 'top', status: 'processing', originalUri: 'mem://o/crop' });
+    await enqueueJob(db, 'catalog', item.id, { autofill: 'crop' });
+    const client = fakeClient();
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['garment', 'image', 'fidelity']);
+    expect((await getItem(db, item.id))!.name).toBe('牛仔夹克');
+  });
+
+  it('tells the image model to keep wear as it is and never to invent text', () => {
+    const p = catalogPrompt('top', '卫衣');
+    expect(p).toContain('fading');
+    expect(p).toContain('illegible');
+    expect(p).not.toContain('complete parts that were hidden');
+  });
+
+  it('puts the owner notes last in the catalog prompt', () => {
+    const p = catalogPrompt('top', 'T恤', undefined, '  保留胸前小标 ');
+    expect(p.endsWith('follow them: 保留胸前小标')).toBe(true);
+    expect(catalogPrompt('top', 'T恤')).not.toContain('Notes from the owner');
+  });
+});
+
+describe('layered try-ons', () => {
+  it('words one top under one jacket as before, and spells out longer layering and styling', () => {
+    const plain = tryonPrompt([{ slot: 'bottom' }, { slot: 'top' }, { slot: 'outer' }]);
+    expect(plain).toContain('The outerwear is worn over the top.');
+    expect(plain).not.toContain('innermost');
+    const layered = tryonPrompt([{ slot: 'shoes' }, { slot: 'top' }, { slot: 'top', styling: { open: true, tucked: false } }, { slot: 'outer' }, { slot: 'outer', styling: { open: false } }]);
+    expect(layered).toContain('Upper-body layers from innermost to outermost: image 3 (top), then image 4 (top), then image 5 (outerwear piece), then image 6 (outerwear piece).');
+    expect(layered).toContain('The garment in image 4 is worn open (unbuttoned / unzipped) and worn untucked.');
+    expect(layered).toContain('The garment in image 6 is worn closed (buttoned / zipped up).');
+    expect(layered).not.toContain('The outerwear is worn over the top.');
+    expect(tryonPrompt([{ slot: 'top', styling: { tucked: true } }, { slot: 'bottom' }])).toContain('The garment in image 2 is tucked into the bottoms.');
+  });
+
+  it('draws the layers in the order and styling of the look', async () => {
+    const avatar = await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', status: 'ready' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'mem://catalog/tee' });
+    const jacket = await createItem(db, { name: 'J', slot: 'outer', status: 'active', catalogUri: 'mem://catalog/j' });
+    const shirt = await createItem(db, { name: 'S', slot: 'top', status: 'active', catalogUri: 'mem://catalog/s' });
+    const jeans = await createItem(db, { name: 'P', slot: 'bottom', status: 'active', catalogUri: 'mem://catalog/p' });
+    const ids = [tee.id, jacket.id, jeans.id, shirt.id];
+    const styling = { [shirt.id]: { open: true } };
+    const slots = new Map([tee, jacket, shirt, jeans].map((i) => [i.id, i.slot]));
+    const key = lookKey(ids, styling, (id) => slots.get(id));
+    const client = fakeClient();
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: ids, styling });
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(await getTryon(db, key, 'front', avatarVersion(avatar))).toMatch(/^mem:\/\/tryon\//);
+    const prompt = client.calls.filter((c) => c.kind === 'image').at(-1)?.prompt ?? '';
+    // Jeans first (feet up), then the upper body in the look's order: tee, jacket, shirt over the jacket.
+    expect(prompt).toContain('image 2: bottoms');
+    expect(prompt).toContain('Upper-body layers from innermost to outermost: image 3 (top), then image 4 (outerwear piece), then image 5 (top).');
+    expect(prompt).toContain('The garment in image 5 is worn open');
+  });
+});
+
+describe('accessories, makeup and the try-on sheet', () => {
+  it('asks for every accessory together', () => {
+    const p = tryonPrompt([{ slot: 'top' }, { slot: 'accessory' }, { slot: 'accessory' }]);
+    expect(p).toContain('Wear all 2 accessories (images 3, 4) together');
+    expect(tryonPrompt([{ slot: 'top' }, { slot: 'accessory' }])).not.toContain('Wear all');
+    expect(photoPrompt([{ slot: 'top' }], SCENES[0], 'a bold red lipstick')).toContain('The person wears a bold red lipstick; only the makeup differs');
+  });
+
+  /** A vision fake that answers the face check with `same` in turn. */
+  function faceAnswers(client: ReturnType<typeof fakeClient>, same: boolean[]) {
+    const orig = client.visionJson.bind(client);
+    let i = 0;
+    client.visionJson = async <T,>(req: Parameters<OpenAiClient['visionJson']>[0]) => {
+      if (req.schemaName !== 'face_check') return orig<T>(req);
+      client.calls.push({ kind: 'vision', model: req.model, schemaName: req.schemaName, images: req.images.length });
+      return { data: { samePerson: same[i++] ?? false, note: '' } as T, usage: { in: 1000, out: 20 } };
+    };
+  }
+
+  async function setup() {
+    const avatar = await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', status: 'ready' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'mem://catalog/tee' });
+    const key = lookKey([tee.id], {}, () => 'top');
+    return { avatar, tee, key, made: lookKey([tee.id], {}, () => 'top', 'redlip') };
+  }
+
+  it('draws the outfit first, then only the makeup, checked against the user\'s face', async () => {
+    const { avatar, tee, key, made } = await setup();
+    const client = fakeClient();
+    faceAnswers(client, [true]);
+    await enqueueJob(db, 'tryon', tryonRef(made, 'front'), { itemIds: [tee.id], styling: {}, makeup: 'redlip' });
+    await drain(new JobRunner(deps(client), noTimers));
+    // The dressed front is checked against the garments; the made-up face against the user's own.
+    expect(client.calls.map((c) => `${c.kind}:${c.schemaName ?? ''}:${c.images}`)).toEqual(['image::2', 'vision:outfit:2', 'image::2', 'vision:face_check:2']);
+    expect(client.calls[2].prompt).toContain('Apply makeup to the person in image 1: classic retro makeup');
+    expect(client.calls[2].prompt).toContain('Image 2 shows the same person without makeup');
+    expect(await getTryon(db, key, 'front', avatarVersion(avatar))).toMatch(/^mem:\/\/tryon\//);
+    expect(await getTryon(db, made, 'front', avatarVersion(avatar))).toMatch(/^mem:\/\/tryon\//);
+  });
+
+  it('redraws the makeup once when the face changed, then gives up without saving it', async () => {
+    const { avatar, tee, key, made } = await setup();
+    await putPlain(key, avatar);
+    const client = fakeClient();
+    faceAnswers(client, [false, true]);
+    await enqueueJob(db, 'tryon', tryonRef(made, 'front'), { itemIds: [tee.id], styling: {}, makeup: 'redlip' });
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls.filter((c) => c.kind === 'image').length).toBe(2);
+    expect(await getTryon(db, made, 'front', avatarVersion(avatar))).not.toBeNull();
+
+    const other = fakeClient();
+    faceAnswers(other, [false, false]);
+    const ref = tryonRef(lookKey([tee.id], {}, () => 'top', 'smoky'), 'front');
+    await enqueueJob(db, 'tryon', ref, { itemIds: [tee.id], styling: {}, makeup: 'smoky' });
+    await drain(new JobRunner(deps(other), noTimers));
+    expect(other.calls.filter((c) => c.kind === 'image').length).toBe(2);
+    expect(await latestJobFor(db, 'tryon', ref)).toMatchObject({ status: 'failed', lastError: '化妆后看起来不像你了，这次没有保存，可以再试一次' });
+  });
+
+  async function putPlain(key: string, avatar: Awaited<ReturnType<typeof saveAvatar>>) {
+    await putTryon(db, key, 'front', avatarVersion(avatar), 'mem://tryon/plain');
+  }
+
+  it('puts makeup on the avatar itself when nothing is worn', async () => {
+    const avatar = await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', status: 'ready' });
+    const client = fakeClient();
+    faceAnswers(client, [true]);
+    const key = lookKey([], {}, () => undefined, 'natural');
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: [], styling: {}, makeup: 'natural' });
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls.map((c) => `${c.kind}:${c.images}`)).toEqual(['image:1', 'vision:2']);
+    expect(client.calls[0].prompt).not.toContain('Image 2');
+    expect(await getTryon(db, key, 'front', avatarVersion(avatar))).not.toBeNull();
+  });
+
+  it('uses the model, quality and notes chosen on the sheet', async () => {
+    const { tee, key } = await setup();
+    const k = (await listKeys(db))[0];
+    const client = fakeClient();
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: [tee.id], styling: {}, model: { keyId: k.id, model: 'gpt-image-1' }, quality: 'high', hint: '袖子卷起' });
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls[0]).toMatchObject({ model: 'gpt-image-1', quality: 'high' });
+    expect(client.calls[0].prompt).toMatch(/Notes from the user, follow them: 袖子卷起$/);
+  });
+});
+
+describe('outfit checks', () => {
+  async function dressed() {
+    const avatar = await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', status: 'ready' });
+    const a = await createItem(db, { name: '白T恤', slot: 'top', status: 'active', catalogUri: 'mem://catalog/a' });
+    const b = await createItem(db, { name: '牛仔裤', slot: 'bottom', status: 'active', catalogUri: 'mem://catalog/b' });
+    return { avatar, ids: [a.id, b.id], key: outfitKey([a.id, b.id]) };
+  }
+
+  it('redraws a front try-on once when the check finds a problem, naming it', async () => {
+    const { avatar, ids, key } = await dressed();
+    const client = fakeClient({ outfit: [{ fullBody: false, problems: ['牛仔裤变成了短裤'] }, { fullBody: true, problems: [] }] });
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: ids });
+    await drain(new JobRunner(deps(client), noTimers));
+    const drawn = client.calls.filter((c) => c.kind === 'image');
+    expect(drawn).toHaveLength(2);
+    expect(drawn[1].prompt).toContain('牛仔裤变成了短裤');
+    expect(client.calls.filter((c) => c.schemaName === 'outfit')).toHaveLength(2);
+    expect(await getTryon(db, key, 'front', avatarVersion(avatar))).toMatch(/^mem:\/\/tryon\//);
+  });
+
+  it('keeps the better of the two drawings, not the last one', async () => {
+    const { avatar, ids, key } = await dressed();
+    const client = fakeClient({
+      outfit: [{ fullBody: true, problems: ['印花偏小'] }, { fullBody: false, problems: ['牛仔裤变成了短裤'] }],
+      image: (call) => `draft${call}`,
+    });
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: ids });
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls.filter((c) => c.kind === 'image')).toHaveLength(2);
+    expect(images.files.get((await getTryon(db, key, 'front', avatarVersion(avatar)))!)).toBe('draft0');
+  });
+
+  it('keeps a front try-on that passes the check after one drawing', async () => {
+    const { ids, key } = await dressed();
+    const client = fakeClient();
+    await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: ids });
+    await drain(new JobRunner(deps(client), noTimers));
+    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['image', 'outfit']);
+  });
+
+  it('draws the photo from the dressed front when there is one, and checks it the same way', async () => {
+    const { avatar, ids, key } = await dressed();
+    await putTryon(db, key, 'front', avatarVersion(avatar), 'mem://tryon/front');
+    const client = fakeClient({ outfit: [{ fullBody: true, problems: ['裤子变短了'] }, { fullBody: true, problems: [] }] });
+    await generatePhoto(deps(client), ids, 'street');
+    const drawn = client.calls.filter((c) => c.kind === 'image');
+    expect(drawn).toHaveLength(2);
+    expect(drawn[0].prompt).toContain('already wearing');
+    expect(drawn[1].prompt).toContain('裤子变短了');
+  });
+
+  it('draws the photo from the plain avatar when no try-on is cached', async () => {
+    const { ids } = await dressed();
+    const client = fakeClient();
+    await generatePhoto(deps(client), ids, 'street');
+    expect(client.calls.find((c) => c.kind === 'image')!.prompt).not.toContain('already wearing');
   });
 });

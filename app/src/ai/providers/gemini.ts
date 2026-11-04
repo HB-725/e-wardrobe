@@ -147,18 +147,20 @@ export function createGeminiClient(opts: { apiKey: string; fetch?: FetchLike; ba
     }
   }
 
-  async function generateImage(req: ImageEditRequest): Promise<{ image: string; usage: ImageUsage }> {
+  /** An answer without an image (blocked, text only) is still billed, so its usage comes back with the error. */
+  async function generateImage(req: ImageEditRequest): Promise<{ image: string | null; usage: ImageUsage; error: AiError | null }> {
     const r = await call<GenerateResponse>('POST', `/models/${encodeURIComponent(req.model)}:generateContent`, {
       contents: [{ role: 'user', parts: [{ text: req.prompt }, ...req.images.map(inline)] }],
       generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: ASPECT[req.size ?? '1024x1536'] } },
     });
+    const u = r.usageMetadata ?? {};
+    const usage = { textIn: u.promptTokenCount ?? 0, imageIn: 0, out: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0) };
     const refused = refusal(r);
-    if (refused) throw new AiError('rejected', refused);
+    if (refused) return { image: null, usage, error: new AiError('rejected', refused) };
     // Thinking image models may also return draft images marked as thoughts; only the final one counts.
     const part = (r.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought && p.inlineData?.data).pop();
-    if (!part?.inlineData?.data) throw new AiError('bad_response', 'no image returned');
-    const u = r.usageMetadata ?? {};
-    return { image: part.inlineData.data, usage: { textIn: u.promptTokenCount ?? 0, imageIn: 0, out: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0) } };
+    if (!part?.inlineData?.data) return { image: null, usage, error: new AiError('bad_response', 'no image returned') };
+    return { image: part.inlineData.data, usage, error: null };
   }
 
   return {
@@ -182,9 +184,13 @@ export function createGeminiClient(opts: { apiKey: string; fetch?: FetchLike; ba
 
     async imageEdit(req) {
       // One image per call: candidateCount is not available for image output, so candidates are separate requests.
-      const results = await Promise.all(Array.from({ length: Math.max(1, req.n ?? 1) }, () => generateImage(req)));
+      // One refused candidate must not throw away the others that were paid for.
+      const settled = await Promise.allSettled(Array.from({ length: Math.max(1, req.n ?? 1) }, () => generateImage(req)));
+      const results = settled.map((s) => (s.status === 'fulfilled' ? s.value : { image: null, usage: { textIn: 0, imageIn: 0, out: 0 }, error: s.reason as unknown }));
+      const images = results.map((x) => x.image).filter((x): x is string => !!x);
+      if (images.length === 0) throw results[0].error;
       return {
-        images: results.map((x) => x.image),
+        images,
         usage: results.reduce<ImageUsage>((a, x) => ({ textIn: a.textIn + x.usage.textIn, imageIn: 0, out: a.out + x.usage.out }), { textIn: 0, imageIn: 0, out: 0 }),
       };
     },

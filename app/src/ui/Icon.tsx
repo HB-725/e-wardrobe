@@ -17,7 +17,14 @@ export type IconName =
   | 'flash'
   | 'play'
   | 'check'
-  | 'info';
+  | 'info'
+  | 'turn'
+  | 'refresh'
+  | 'sparkle'
+  | 'bookmark'
+  | 'person'
+  | 'grip'
+  | 'lipstick';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   today: (
@@ -83,6 +90,35 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <Path d="M12 11v5M12 8h.01" />
     </>
   ),
+  turn: (
+    <>
+      <Path d="M20 12a8 8 0 1 1-2.3-5.6" />
+      <Path d="M20 4v4h-4" />
+    </>
+  ),
+  refresh: (
+    <>
+      <Path d="M4 12a8 8 0 0 1 13.7-5.7L20 8" />
+      <Path d="M20 4v4h-4" />
+      <Path d="M20 12a8 8 0 0 1-13.7 5.7L4 16" />
+      <Path d="M4 20v-4h4" />
+    </>
+  ),
+  sparkle: (
+    <>
+      <Path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+      <Path d="M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z" />
+    </>
+  ),
+  bookmark: <Path d="M6 4h12v16l-6-4-6 4z" />,
+  lipstick: <Path d="M8 21h8v-8H8zM9.5 13V9h5v4M10.5 9V5.5L13.5 3v6" />,
+  person: (
+    <>
+      <Circle cx={12} cy={5} r={2.5} />
+      <Path d="M12 8.5v6.5M7.5 11h9M12 15l-3 6M12 15l3 6" />
+    </>
+  ),
+  grip: <Path d="M5 8h14M5 12h14M5 16h14" />,
 };
 
 export function Icon({ name, size = 24, color = C.ink, strokeWidth = 1.7 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {

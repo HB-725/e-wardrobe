@@ -1,14 +1,17 @@
-import { setPhotoConsent } from '@/ai/config';
+import { getAiSettings } from '@/ai/config';
+import { getRoutes, setConsentFor } from '@/ai/keys';
+import { withBox } from '@/domain/crop';
+import type { Detection } from '@/domain/types';
 import * as XLSX from 'xlsx';
 import { createTestDb } from '@/test/memoryDb';
 import type { Db } from '@/db/db';
 import { createItem, getItem, listItems } from '@/db/items';
-import { enqueueJob, listJobs } from '@/db/jobs';
+import { enqueueJob, latestJobFor, listJobs } from '@/db/jobs';
 import { listOutfits } from '@/db/outfits';
 import { getLogByDate, listLogs } from '@/db/wear';
 import { buildWorkbook, decodeUtf8, isDuplicate, parseWorkbook } from '@/domain/excel';
 import type { ImageStore } from '@/ai/imageStore';
-import { addFitNote, addGarments, confirmItem, keepCurrent, keepOriginal, recordWear, removeItem, saveOutfit, tryonState, undoWear, userSources } from '../actions';
+import { addFitNote, addGarments, confirmItem, confirmPicks, cropItem, keepCurrent, regenerateWith, keepOriginal, recordWear, removeItem, requestTryon, saveOutfit, tryonState, undoWear, userSources } from '../actions';
 import { avatarVersion, putTryon, saveAvatar } from '@/db/misc';
 import { outfitKey } from '@/domain/outfit';
 import { tryonRef } from '@/ai/engine';
@@ -26,6 +29,9 @@ class Images implements ImageStore {
   async importPhoto(_u: string, folder: string) {
     return `mem://${folder}/${++this.n}`;
   }
+  async crop(_u: string, _box: unknown, folder: string) {
+    return `mem://${folder}/crop${++this.n}`;
+  }
   async remove(u: string | null | undefined) {
     if (u) this.removed.push(u);
   }
@@ -39,7 +45,7 @@ const ctx = () => ({ db, images, runner: { kick: () => (kicks += 1) } });
 
 beforeEach(async () => {
   db = await createTestDb();
-  await setPhotoConsent(db);
+  await setConsentFor(db, 'openai');
   images = new Images();
   kicks = 0;
 });
@@ -251,9 +257,90 @@ describe('try-on state', () => {
     const a = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'file:///a.jpg' });
     const key = outfitKey([a.id]);
     await putTryon(db, key, 'front', avatarVersion(avatar), 'file:///t.jpg');
-    expect(await tryonState(db, [a.id], 'front')).toEqual({ uri: 'file:///t.jpg', status: 'none', error: null });
+    expect(await tryonState(db, { ids: [a.id], styling: {} }, 'front')).toEqual({ uri: 'file:///t.jpg', status: 'none', error: null, missingMakeup: false });
     await enqueueJob(db, 'tryon', tryonRef(key, 'front'), { itemIds: [a.id] });
-    expect(await tryonState(db, [a.id], 'front')).toMatchObject({ uri: 'file:///t.jpg', status: 'queued' });
+    expect(await tryonState(db, { ids: [a.id], styling: {} }, 'front')).toMatchObject({ uri: 'file:///t.jpg', status: 'queued' });
+  });
+
+  it('caches each layering and styling of the same garments separately, and the plain one under its old key', async () => {
+    const avatar = await saveAvatar(db, { frontUri: 'file:///f.jpg', status: 'ready' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'file:///tee.jpg' });
+    const shirt = await createItem(db, { name: 'S', slot: 'top', status: 'active', catalogUri: 'file:///shirt.jpg' });
+    const jacket = await createItem(db, { name: 'J', slot: 'outer', status: 'active', catalogUri: 'file:///j.jpg' });
+    await putTryon(db, outfitKey([tee.id, jacket.id]), 'front', avatarVersion(avatar), 'file:///old.jpg');
+    expect((await tryonState(db, { ids: [tee.id, jacket.id], styling: {} }, 'front')).uri).toBe('file:///old.jpg');
+    expect((await tryonState(db, { ids: [tee.id, jacket.id], styling: { [jacket.id]: { open: true } } }, 'front')).uri).toBeNull();
+    await requestTryon(ctx(), { ids: [tee.id, shirt.id, jacket.id], styling: { [shirt.id]: { tucked: true } } }, 'front');
+    const job = await latestJobFor(db, 'tryon', tryonRef(`${outfitKey([tee.id, shirt.id, jacket.id])}~${tee.id}>${shirt.id}:t>${jacket.id}`, 'front'));
+    expect(job?.payload).toEqual({ itemIds: [tee.id, shirt.id, jacket.id], styling: { [shirt.id]: { tucked: true } } });
+  });
+});
+
+describe('outfits keep layer order and styling', () => {
+  it('saves, reads back and tells looks apart by order and styling', async () => {
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active' });
+    const shirt = await createItem(db, { name: 'S', slot: 'top', status: 'active' });
+    const a = await saveOutfit(ctx(), { name: 'A', occasions: [], itemIds: [tee.id, shirt.id], styling: { [shirt.id]: { open: true } } });
+    expect(a.itemIds).toEqual([tee.id, shirt.id]);
+    expect(a.styling).toEqual({ [shirt.id]: { open: true } });
+    const again = await saveOutfit(ctx(), { name: 'A2', occasions: ['work'], itemIds: [tee.id, shirt.id], styling: { [shirt.id]: { open: true } } });
+    expect(again.id).toBe(a.id);
+    const swapped = await saveOutfit(ctx(), { name: 'B', occasions: [], itemIds: [shirt.id, tee.id] });
+    expect(swapped.id).not.toBe(a.id);
+    expect((await listOutfits(db)).find((o) => o.id === swapped.id)?.itemIds).toEqual([shirt.id, tee.id]);
+  });
+
+  it('keeps the makeup, and the same garments made up differently are another outfit', async () => {
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active' });
+    const plain = await saveOutfit(ctx(), { name: 'A', occasions: [], itemIds: [tee.id] });
+    expect(plain.makeup).toBeNull();
+    const made = await saveOutfit(ctx(), { name: 'B', occasions: [], itemIds: [tee.id], makeup: 'date' });
+    expect(made.id).not.toBe(plain.id);
+    expect((await listOutfits(db)).find((o) => o.id === made.id)?.makeup).toBe('date');
+    expect((await saveOutfit(ctx(), { name: 'B2', occasions: [], itemIds: [tee.id], makeup: 'date' })).id).toBe(made.id);
+  });
+});
+
+describe('makeup and generation options', () => {
+  it('shows the outfit without makeup until the made-up one exists, and the back without it', async () => {
+    const avatar = await saveAvatar(db, { frontUri: 'file:///f.jpg', backUri: 'file:///b.jpg', status: 'ready' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'file:///tee.jpg' });
+    const key = outfitKey([tee.id]);
+    await putTryon(db, key, 'front', avatarVersion(avatar), 'file:///plain.jpg');
+    await putTryon(db, key, 'back', avatarVersion(avatar), 'file:///back.jpg');
+    const look = { ids: [tee.id], styling: {}, makeup: 'natural' };
+    expect(await tryonState(db, look, 'front')).toEqual({ uri: 'file:///plain.jpg', status: 'none', error: null, missingMakeup: true });
+    expect(await tryonState(db, look, 'back')).toEqual({ uri: 'file:///back.jpg', status: 'none', error: null, missingMakeup: false });
+    await putTryon(db, `${key}~mk:natural`, 'front', avatarVersion(avatar), 'file:///made.jpg');
+    expect(await tryonState(db, look, 'front')).toMatchObject({ uri: 'file:///made.jpg', missingMakeup: false });
+    // Makeup alone goes on the avatar.
+    expect(await tryonState(db, { ids: [], styling: {}, makeup: 'natural' }, 'front')).toMatchObject({ uri: null, missingMakeup: true });
+  });
+
+  it('sends the makeup and the sheet\'s choices with the job, drops makeup for the back, and can keep them', async () => {
+    await saveAvatar(db, { frontUri: 'file:///f.jpg', backUri: 'file:///b.jpg', status: 'ready' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'file:///tee.jpg' });
+    const key = outfitKey([tee.id]);
+    const look = { ids: [tee.id], styling: {}, makeup: 'natural' };
+    const model = { keyId: 'k1', model: 'gpt-image-1-mini' };
+    await requestTryon(ctx(), look, 'front', { model, quality: 'high', hint: ' 袖子卷起 ' });
+    expect((await latestJobFor(db, 'tryon', tryonRef(`${key}~mk:natural`, 'front')))?.payload).toEqual({ itemIds: [tee.id], styling: {}, makeup: 'natural', model, quality: 'high', hint: '袖子卷起' });
+    await requestTryon(ctx(), look, 'back', { makeDefault: true, model, quality: 'medium' });
+    expect((await latestJobFor(db, 'tryon', tryonRef(key, 'back')))?.payload).toEqual({ itemIds: [tee.id], styling: {}, model, quality: 'medium' });
+    expect((await getRoutes(db)).tryon).toEqual(model);
+    expect((await getAiSettings(db)).tryonQuality).toBe('medium');
+  });
+
+  it('retries a failed try-on with the new choices', async () => {
+    await saveAvatar(db, { frontUri: 'file:///f.jpg', status: 'ready' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'file:///tee.jpg' });
+    const ref = tryonRef(outfitKey([tee.id]), 'front');
+    const job = await enqueueJob(db, 'tryon', ref, { itemIds: [tee.id] });
+    await db.runAsync("UPDATE jobs SET status = 'failed' WHERE id = ?", [job.id]);
+    await requestTryon(ctx(), { ids: [tee.id], styling: {} }, 'front', { hint: '更合身' });
+    const again = await latestJobFor(db, 'tryon', ref);
+    expect(again).toMatchObject({ id: job.id, status: 'queued' });
+    expect(again?.payload).toMatchObject({ hint: '更合身' });
   });
 });
 
@@ -337,5 +424,74 @@ describe('item form validation', () => {
     expect(formProblems({ ...formOf(item), price: '¥99.5', purchasedOn: '2024年3月' })).toEqual([]);
     expect(patchOf(item, { ...formOf(item), price: '', purchasedOn: '' })).toMatchObject({ priceCents: null, purchasedOn: null });
     expect(normalizeDate('2025-02-31')).toBeNull();
+  });
+});
+
+describe('garments picked from a photo', () => {
+  const det = (name: string, extra: Partial<Detection> = {}): Detection => ({
+    box: { x: 0.1, y: 0.1, w: 0.5, h: 0.4 }, selected: true, manual: false, edited: false, name, slot: 'top', subcategory: null,
+    colorName: '黑色', colorHex: '#111111', seasons: ['summer'], brand: null, size: null, material: null, ...extra,
+  });
+
+  it('turns the chosen garments into items cut from the shared photo', async () => {
+    const pick = await createItem(db, {
+      name: '新衣服', slot: 'top', status: 'pick', originalUri: 'mem://original/photo',
+      detections: [det('T恤', { printText: 'OET GRUNN' }), det('卫裤', { slot: 'bottom', edited: true }), det('包', { selected: false })],
+    });
+    await enqueueJob(db, 'catalog', pick.id);
+    const made = await confirmPicks(ctx(), pick.id);
+    expect(made.map((i) => [i.name, i.slot, i.sourceUri, i.status])).toEqual([
+      ['T恤', 'top', 'mem://original/photo', 'processing'],
+      ['卫裤', 'bottom', 'mem://original/photo', 'processing'],
+    ]);
+    expect(made[0].originalUri).toMatch(/crop/);
+    expect(made[0].fieldSources.name).toBe('ai');
+    expect(await getItem(db, pick.id)).toBeNull();
+    const jobs = await listJobs(db, ['queued']);
+    expect(jobs.map((j) => [j.refId, j.payload.autofill, j.payload.printText])).toEqual([
+      [made[0].id, 'skip', 'OET GRUNN'],
+      [made[1].id, 'crop', undefined],
+    ]);
+    expect(images.removed).toEqual([]);
+
+    // The photo goes only with the last garment cut from it.
+    await removeItem(ctx(), made[0].id);
+    expect(images.removed).not.toContain('mem://original/photo');
+    await removeItem(ctx(), made[1].id);
+    expect(images.removed).toContain('mem://original/photo');
+  });
+
+  it('refuses to confirm with nothing chosen', async () => {
+    const pick = await createItem(db, { name: 'x', slot: 'top', status: 'pick', originalUri: 'mem://p', detections: [det('a', { selected: false })] });
+    await expect(confirmPicks(ctx(), pick.id)).rejects.toThrow('还没有选中衣服');
+  });
+
+  it('marks a box moved far from the AI box as edited', () => {
+    const d = det('a');
+    expect(withBox(d, { ...d.box, x: 0.12 }).edited).toBe(false);
+    expect(withBox(d, { x: 0.5, y: 0.5, w: 0.3, h: 0.3 }).edited).toBe(true);
+    expect(withBox(det('b', { manual: true }), { x: 0.5, y: 0.5, w: 0.3, h: 0.3 }).edited).toBe(false);
+  });
+
+  it('re-cuts an item and keeps the whole photo', async () => {
+    const it = await createItem(db, { name: 'x', slot: 'top', status: 'review', originalUri: 'mem://original/whole' });
+    await cropItem(ctx(), it.id, { x: 0, y: 0.5, w: 1, h: 0.5 });
+    const once = (await getItem(db, it.id))!;
+    expect(once.sourceUri).toBe('mem://original/whole');
+    expect(once.crop).toEqual({ x: 0, y: 0.5, w: 1, h: 0.5 });
+    await cropItem(ctx(), it.id, { x: 0, y: 0, w: 1, h: 0.5 });
+    expect(images.removed).toEqual([once.originalUri]);
+    expect((await getItem(db, it.id))!.sourceUri).toBe('mem://original/whole');
+  });
+
+  it('regenerates with the form saved first and the chosen options', async () => {
+    const it = await createItem(db, { name: 'T恤', slot: 'top', status: 'review', colorName: '黑色', colorHex: '#111111', originalUri: 'mem://o' });
+    await regenerateWith(ctx(), it.id, { slot: 'bottom', name: '卫裤', colorName: '灰色' }, { model: { keyId: 'k1', model: 'gpt-image-1' }, quality: 'medium', hint: ' 颜色浅一点 ', makeDefault: true });
+    const after = (await getItem(db, it.id))!;
+    expect([after.slot, after.name, after.colorName, after.colorHex]).toEqual(['bottom', '卫裤', '灰色', null]);
+    const [job] = await listJobs(db, ['queued']);
+    expect(job.payload).toEqual({ regenerate: true, model: { keyId: 'k1', model: 'gpt-image-1' }, quality: 'medium', hint: '颜色浅一点' });
+    expect((await getRoutes(db)).catalog).toEqual({ keyId: 'k1', model: 'gpt-image-1' });
+    expect((await getAiSettings(db)).catalogQuality).toBe('medium');
   });
 });

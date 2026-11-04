@@ -1,6 +1,6 @@
 # 多家 AI 服务商：设计说明（第一期 OpenAI + Google Gemini）
 
-状态：待确认，确认后再动代码。
+状态：已确认，第一期已实现（2026-10-30，见 HANDOFF.md）。
 
 ## 目标
 
@@ -49,8 +49,9 @@ interface ModelInfo {                              // 代码里的已知模型�
 
 | 用途 | 顺序 |
 | --- | --- |
-| 生图（四种） | gpt-image-1-mini → gemini-2.5-flash-image 系列 → gpt-image-1.5 / gpt-image-1 → 其他探测到的 Gemini 生图模型 |
-| 识别 | gpt-5.4-nano → gemini-2.5-flash-lite / flash → 其他 OpenAI 小模型 |
+| 商品图 | gemini-3.1-flash-lite-image → gpt-image-2 → gpt-image-1.5 → gemini-3.1-flash-image → gemini-2.5-flash-image → gpt-image-1-mini → gpt-image-1（2026-11-05 用 9 张实拍比了 9 个模型：mini 任何画质都丢做旧、水洗、logo；3.1 Flash-Lite 最还原且背景干净，$0.034/张） |
+| 形象 / 上身效果 / 大片 | gpt-image-1-mini → gemini-2.5-flash-image → gemini-3.1-flash-lite-image → gemini-3.1-flash-image → gpt-image-1.5 / gpt-image-1 / gpt-image-2 → 其他探测到的 Gemini 生图模型 |
+| 识别 | gpt-5.4-nano → gemini-3.1-flash-lite → 3.5-flash-lite → 2.5-flash-lite（老 Key 才有）→ 3-flash-preview → 其他 OpenAI 小模型 |
 
 Gemini 模型不写死：`v1beta/models` 里 `supportedGenerationMethods` 含 `generateContent` 的，名字或说明表明能输出图片的（如 `*-image*`）算生图，其余 flash / flash-lite 算识别；以实际列表为准。
 

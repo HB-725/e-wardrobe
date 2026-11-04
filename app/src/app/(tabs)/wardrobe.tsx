@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { memo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { SLOTS } from '@/domain/catalog';
+import { wear } from '@/domain/look';
 import { wearRank } from '@/domain/stats';
 import type { Item, Slot } from '@/domain/types';
 import { retryItem } from '@/state/actions';
@@ -31,7 +32,7 @@ const Tile = memo(function Tile({ item: it, on, wears, onPress }: { item: Item; 
     >
       <ItemImage item={it} style={{ flex: 1 }} />
       {it.status === 'active' ? (
-        <T style={{ position: 'absolute', right: 4, bottom: 4, fontSize: 10, color: C.sub, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: R.pill, overflow: 'hidden', paddingHorizontal: 6 }}>×{wears}</T>
+        <T style={{ position: 'absolute', right: 4, bottom: 4, fontSize: 10, color: C.sub, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: R.pill, overflow: 'hidden', paddingHorizontal: 6 }}>{wears ? `已穿 ${wears} 次` : '没穿过'}</T>
       ) : null}
       {it.status === 'review' || it.status === 'failed' ? (
         <View style={{ position: 'absolute', left: 4, top: 4, paddingHorizontal: 7, paddingVertical: 1, borderRadius: R.pill, backgroundColor: it.status === 'failed' ? C.danger : C.ink }}>
@@ -42,10 +43,11 @@ const Tile = memo(function Tile({ item: it, on, wears, onPress }: { item: Item; 
   );
 });
 
-const STATUS_ORDER: Record<Item['status'], number> = { review: 0, failed: 1, processing: 2, active: 3, archived: 4 };
+const STATUS_ORDER: Record<Item['status'], number> = { pick: 0, review: 0, failed: 1, processing: 2, active: 3, archived: 4 };
 
 function visibleItems(s: Snapshot, cat: Cat): Item[] {
-  const list = s.items.filter((i) => (cat === 'archived' ? i.status === 'archived' : i.status !== 'archived' && (cat === 'all' || i.slot === cat)));
+  // A photo still waiting for the user to pick its garments is not a garment yet; it is reached from Today / review.
+  const list = s.items.filter((i) => i.status !== 'pick' && (cat === 'archived' ? i.status === 'archived' : i.status !== 'archived' && (cat === 'all' || i.slot === cat)));
   return list.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
 }
 
@@ -58,6 +60,8 @@ function subtitle(s: Snapshot, it: Item): string {
   switch (it.status) {
     case 'review':
       return '待确认';
+    case 'pick':
+      return '待选择';
     case 'processing':
       return s.blocked ? '已暂停' : '正在生成标准图…';
     case 'failed':
@@ -94,11 +98,12 @@ export default function WardrobePage() {
     if (sel.status === 'review' || sel.status === 'processing') router.push(`/review?id=${sel.id}`);
     else if (sel.status === 'failed') void retryItem(app, sel.id).then(app.refresh, (e) => app.toast(String(e)));
     else if (sel.status === 'active') {
-      app.setFitting({ ...app.fitting, [sel.slot]: sel.id });
+      // Trying one on swaps out the same kind of garment rather than layering it.
+      app.setFitting(wear(app.fitting, sel, (id) => s.byId.get(id)?.slot, 'replace').look);
       router.push('/fitting');
     } else if (sel.status === 'archived') router.push(`/item/${sel.id}`);
   };
-  const ctaLabel = sel ? { review: '去确认', failed: '重试', active: '去试穿', processing: '查看', archived: '查看' }[sel.status] : '';
+  const ctaLabel = sel ? { pick: '去选择', review: '去确认', failed: '重试', active: '去试穿', processing: '查看', archived: '查看' }[sel.status] : '';
 
   return (
     <Screen scroll={false}>

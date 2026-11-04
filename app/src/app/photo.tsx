@@ -5,7 +5,8 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { AiError, blockedRoute, describeAiError } from '@/ai/client';
 import { getAiSettings, qualityFor } from '@/ai/config';
 import { generatePhoto } from '@/ai/engine';
-import { estimateImageCost, formatUsd } from '@/ai/models';
+import { estimateFor } from '@/ai/catalog';
+import { formatEstimate } from '@/ai/models';
 import { SCENES } from '@/ai/prompts';
 import { avatarUsable } from '@/db/misc';
 import { saveImageToLibrary, shareImage } from '@/platform/files';
@@ -58,14 +59,16 @@ export default function PhotoPage() {
   const current = shots[Math.min(pick, shots.length - 1)] ?? null;
   // A new avatar is being made: a photo now would show the old one.
   const remaking = s.avatar.status === 'processing';
-  const cost = estimateImageCost(null, { inputImages: items.length + 1, quality: qualityFor(settings.quality, 'photo') });
+  const cost = estimateFor(s.routing, 'photo', { inputImages: items.length + 1, quality: qualityFor(settings.quality, 'photo') });
 
   const run = async () => {
     if (!(await consent())) return;
     setBusy(true);
     setError(null);
     try {
-      const uri = await generatePhoto(app.ai, ids, scene);
+      // The garments come in the fitting room's layer order; how each is worn and the makeup come from there too.
+      const styling = Object.fromEntries(Object.entries(app.fitting.styling).filter(([id]) => ids.includes(id)));
+      const uri = await generatePhoto(app.ai, ids, scene, styling, app.fitting.makeup);
       if (!mounted.current) return void app.images.remove(uri);
       setShots((x) => {
         setPick(x.length);
@@ -98,7 +101,7 @@ export default function PhotoPage() {
             />
           </>
         ) : (
-          <Btn label={`生成 · 约 ${formatUsd(cost)}`} style={{ flex: 1 }} loading={busy} disabled={items.length === 0 || !avatarUsable(s.avatar) || remaking} onPress={run} />
+          <Btn label={`生成 · ${formatEstimate(cost)}`} style={{ flex: 1 }} loading={busy} disabled={items.length === 0 || !avatarUsable(s.avatar) || remaking} onPress={run} />
         )
       }
     >

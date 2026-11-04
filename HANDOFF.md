@@ -81,29 +81,69 @@
 - 窄屏检查（0.5.2）：网页 320 宽全部页面无 console 错误；模拟器 `wm density 560`（约 308dp）今天、试衣间可用。试衣间托盘每列 2 件、名字截断，留给改版解决
 - Play 上架资料在 `docs/store/README.md`（商品详情文字、数据安全答案、分级、受众、App access 说明、发布步骤）；`BUNDLE=1 scripts/build-apk.sh` 出 AAB；
   商店截图 `VW=360 VH=640 DPR=3 node scripts/web-shots/shoot.js <目录>`（1080×1920）。隐私政策网址要等 PR 合并到 main（或放到别的公开网址）；新个人开发者账号需要 12 人 14 天封闭测试
-- [ ] 试衣间重构：用户觉得右侧竖排分类放不下「毛呢大衣」这类细分名、托盘一列只有两件。另一个会话在设计画布上放了 F1（上下布局）/ F2（全屏舞台 + 底部抽屉）两个方案，等用户选，选定前不要改试衣间布局
+- [x] 试衣间重构：已按用户定稿做完（见下面「试衣间 F2 + 叠穿」）
 ## 待决事项和下一步（2026-10-30 收尾，用户改为在自己电脑上本地继续）
 
-最新安装包仍是 **0.5.2**（versionCode 8）：APK SHA-256 `7a3a738eeba0bb9d1d5579ace82d47579d43c1e4917198503960646f021a1cd0`，Play 用 AAB SHA-256 `2acd06ce66d91d281877959fd60e9ba0fbfaaca943fa01521d7ff44a722374f1`。b19e5b9 之后的提交只新增了还没接入的文件，App 行为没变。
+最新正式签名的安装包仍是 **0.5.2**（versionCode 8；0.6.0 只有测试签名的包）：APK SHA-256 `7a3a738eeba0bb9d1d5579ace82d47579d43c1e4917198503960646f021a1cd0`，Play 用 AAB SHA-256 `2acd06ce66d91d281877959fd60e9ba0fbfaaca943fa01521d7ff44a722374f1`。b19e5b9 之后的提交只新增了还没接入的文件，App 行为没变。
 
-- [ ] **试衣间布局待用户选**：画布 https://claude.ai/artifact/3zpeTSFattB9rStC2iq7aq 最上排 F1–F6。「F2 改」（全屏舞台 + 底部抽屉）已实现在 c208718，后来 revert（5f31eed），选 F2 或混搭时可以 `git revert 5f31eed` 再改；它用 RN Animated + PanResponder 做抽屉，web 和 Android 都能用。
-- [ ] **多层叠穿**（上衣 / 外套可多件并排序，配饰可多条，建议上限约 8 件）和 **妆容**（只在脸部区域做遮罩局部编辑 + 视觉模型比对是否同一人，不像就重来）：方案待用户决定。
-- [ ] **多家 AI 服务商**：用户已确认 `docs/design/multi-provider.md`（会话最后通过提问确认「按这个做」）。
-  - 已完成、已测试、**还没接入**：`src/ai/providers/gemini.ts`（Gemini 适配，按公开 REST 写，fake fetch 单测，未用真实 API 验证——用户说不需要；ai.google.dev 在云端环境里访问不了）、
-    `src/ai/catalog.ts`（模型表、价格、自动顺序、按用途路由、未知价格返回 null）、`src/ai/keys.ts`（多个 Key 只存 SecureStore、按服务商同意、0.5.x 单 Key 迁移，可中断续跑）、`platform/secrets*.ts` 的 `secureSecrets`。
-  - 待办：
-    1. Gemini `imageEdit` 在 n>1 时改用 `Promise.allSettled`：至少一张成功就返回成功的（usage 累加成功的，失败那次响应里若有 usageMetadata 也计入），全部失败才抛第一个错误；补一条「2 次里 1 次 SAFETY」的测试。
-    2. engine 接入：`AiDeps.getClient` 换成 `clientFor(key)`，每个任务按用途 `resolveRoute`（商品图 / 形象 / 上身效果 / 大片 / 识别）；过期 Key 重新探测模型；模型不可用时 `blockModelForKey` 后重试；`callCost` 未知价格记 0（不计入上限）；只在支持的模型上传画质；Gemini 返回 PNG，保存时按内容选扩展名（`/9j/` jpg、`iVBOR` png、`UklGR` webp），备份恢复也要认 png；Gemini 商品图额外传一张已有标准图当风格参考。
-    3. 启动时先跑 `migrateLegacyKey`，**再**把 `hasPhotoConsent` 改成读按服务商的同意（顺序反了老用户会被要求重新同意）。
-    4. 「我的 → API 与模型」页面（多个 Key、添加 / 详情 / 重新验证 / 改名 / 删除、按用途选模型、换模型时的提示、画质只在支持时显示）；按钮上的「约 $x」按实际路由估算，未知价格显示「价格未知」。
-    5. 同意框按服务商、`describeAiError` 里的「OpenAI」改成通用说法、App 内隐私页、PRIVACY.md、`docs/store/README.md` 改成「发送给你选择的 AI 服务商（OpenAI / Google）」；备份不能带 Key（`ai.keys` 只是描述，恢复后没有密钥的条目要丢掉或标成需要重新填）；「永久删除」要删掉所有 `ai.key.*`。
+- [x] **试衣间 F2 + 叠穿**（2026-11-02；计划 `docs/superpowers/plans/2026-11-02-fitting-room-f2-layers.md`；定稿在画布 https://claude.ai/artifact/3zpeTSFattB9rStC2iq7aq 的「精简版 · 做法 B」和「F2 整套」）：
+  - 全屏人物 + 右侧圆形按钮（转身 / 生成或重新生成上身效果，先确认价格 / 保存穿搭 / 生成大片）+ 底部抽屉。抽屉收起是一排「已穿 | 分类」+ 一排衣服，上拉 60% 高：分类按细类分组成 3 列网格，「已穿」变成穿着顺序（拖动换里外、敞开 / 扣好、塞进 / 放外面、× 脱下）。人物旁不再贴衣服小卡（`Stage` 只画人，生成中有一道扫光）。
+  - 叠穿：`domain/look.ts` 的 `Look { ids, styling }` 取代 `Selection`；上衣和外套合称上身，最多 5 层，从里到外存放。同类再点一件叠到最外面，底部提示「改成换掉」；下装 / 鞋 / 包 / 配饰直接换。衣橱、单品详情的「去试穿」换掉同类最外面那件；穿搭「在试衣间打开」按保存的顺序和穿法，默认打开「已穿」。
+  - 存储：迁移 4 给 `outfit_items` 加 `position`、`styling`；同样衣服但顺序或穿法不同算不同穿搭。上身效果缓存键 `lookKey`：一件上衣在一件外套里面且没设穿法时和以前的 `outfitKey` 一样（旧缓存可用，网页上实测从穿搭打开直接显示旧图），否则后面加 `~顺序:穿法`。试穿任务 payload 带 `itemIds`（顺序）和 `styling`。
+  - 提示词：`tryonPrompt` / `photoPrompt` 收到每件的 slot 和穿法，两层以上或有穿法时写明从里到外的层次和每层穿法；一上衣 + 一外套无穿法时保留原来验证过的那句。背面提示词三层以上时说明层次。**叠穿效果没有用真实 API 测过。**
+  - 验证：jest 168 个 + 3 个真实 API 跳过，tsc、lint 通过；网页 `?demo=1` 走过空状态、叠加提示和改成换掉、已穿行、穿着顺序（拖动、穿法）、生成确认和生成中、背面、保存、拖抽屉、没有形象、空分类。
+- [x] **配饰多条、妆容、试衣间生成面板、详情页暂停提示**（2026-11-02，本地，未提交、未发包）：
+  - 配饰：`wear` 里配饰是加上去不是替换，最多 `MAX_ACCESSORIES` = 4 件；同类加第二件时底部提示「X 和 Y 一起戴 · 改成换掉 Y」。「去试穿」（`replace`）也是加，满 4 件才换掉最后一件；已经穿着的衣服再「去试穿」不会被脱下（以前会）。提示词两件以上配饰时写「全部一起戴，各戴在该戴的位置」。
+  - 妆容：`domain/makeup.ts` 六个预设 + `custom:用户的话`；`Look.makeup`，穿搭表加 `outfits.makeup`（迁移 5），同样衣服不同妆容算不同穿搭。缓存键末尾 `~mk:预设或哈希`。生成时先要（或先画）没化妆的正面，再对这张图做一次只改妆容的编辑（`makeupPrompt`，第二张图给原本的形象），然后用识别模型比对形象和结果是不是同一个人（`FACE_*`），不像重画一次，两次都不像就失败、不保存（「化妆后看起来不像你了…」）。没穿衣服时直接在形象上化。背面不画妆容（用没化妆的背面）。大片的提示词也带妆容。**没有做遮罩**：OpenAI 的遮罩要带透明通道的 PNG，本机没有能编码的库，而且 gpt-image 的遮罩只是参考；Gemini 不支持遮罩。真实 Key 测过之后如果衣服或背景被改动，再考虑加。
+  - 生成面板：试衣间的生成确认弹窗换成 `TryonSheet`（和商品图「重新生成」共用 `GenOptions`）：选模型（每行价格，背面 / 妆容按要几次生图加起来）、画质、补充要求（快捷项 + 输入，放在提示词最后）、「以后上身效果都用这个模型和画质」（存 `routes.tryon` 和 `ai.settings.tryonQuality`，在「我的 → 画质」改档位时清掉）。任务 payload 带 `model` / `quality` / `hint`；失败的任务重试时换成新的选择。
+  - 单品详情：任务因 AI 暂停卡住时显示「AI 已暂停」横幅，点了去处理。
+  - 修了叠穿那一轮留下的漏洞：删除衣服时 `dropTryonsWithItem` 按 `idsOfKey` 匹配，叠穿（`~a>b`）和妆容（`~mk:`）的上身效果缓存和排队任务也会清掉。
+  - 衣橱格子右下角从「×N」改成「已穿 N 次」/「没穿过」（×N 容易看成有 N 件）。
+  - 单品详情：「今天穿了它 | 去试穿」固定在屏幕底部（收起的是「放回衣橱」，失败的是「只存原图 | 重新生成标准图」，生成中 / 待确认是「去确认 / 只存原图」）；重新生成、换照片、收起、删除放到页面最后的「管理」列表。
+  - 试衣间另外三种思路（G1 装备栏、G2 拼图先行、G3 整套优先）画在设计画布「另外三种思路」一组，等用户选；代码还是精简版 B。
+  - 网页演示加了三件配饰（`demo/beanie|scarf|watch.jpg` 是画的插图，不是 AI 图）。
+  - 验证：jest 182 个 + 3 个真实 API 跳过，tsc、lint 通过；网页 `?demo=1` 走过配饰三件、妆容面板、选妆容后未生成、生成面板、化妆生成中和完成、详情页暂停横幅，所有试衣间截图重拍。Android 模拟器（测试签名包，测完已卸载）：Excel 导入 7 件、五个圆形按钮、两件配饰一起戴和提示、保存带三件配饰的穿搭（迁移 5）。模拟器上没有形象，所以妆容面板和生成面板只在网页上看过。**妆容和叠穿都没用真实 API 测过。**
+- [x] **多家 AI 服务商（OpenAI + Gemini）已接入**（2026-10-30，本地会话；未发包、未上模拟器 / 真机）：
+  - engine 按用途 `resolveRoute`（商品图 / 形象 / 上身效果 / 大片 / 识别），`AiDeps.clientFor(key)`；模型 3 天未验证就重新探测（同时清空拉黑）；模型不可用时 `blockModelForKey` 后换下一个；`callCost` 价格未知记 0，不计入上限；只在支持画质的模型上传 quality；Gemini 商品图额外传一张已有标准图当风格参考（`STYLE_REF_NOTE`）。
+  - Gemini `imageEdit` n>1 用 `Promise.allSettled`：有一张成功就返回，失败那次的 usage 也计入；全失败才抛第一个错误。
+  - `saveBase64` 按内容定扩展名（`imageExt`：png / webp / jpg），备份恢复认 png。
+  - 启动先 `migrateLegacyKey`，同意改为按服务商（`hasConsentFor` / `pendingConsent`），同意框、/consent 页写明是哪家。
+  - 「我的 → API 与模型」（`app/apikey.tsx`：Key 列表、详情底部弹窗＝重新验证 / 改名 / 删除、按用途选模型）、添加 Key（`app/addkey.tsx`）；按钮上的「约 $x」按实际路由估算，未知显示「价格未知」；画质行在所选生图模型都不支持时隐藏；花费上限说明列出价格未知的模型。
+  - 文案：`describeAiError`、runner、隐私页、PRIVACY.md、`docs/store/README.md` 改成「你选择的 AI 服务商（OpenAI / Google）」。`ai.keys` / `ai.routes` / `ai.keysMigrated` 是设备设置：不进备份、恢复不覆盖；「永久删除」先删所有 `ai.key.*` 再清库。
+  - 验证：jest 144 个（1 个真实 API 默认跳过），tsc、lint 通过；网页导出 `?demo=1` 看过「我的」「API 与模型」、选模型弹窗、Key 详情、添加 Key（含 Gemini 页签），无 console 错误。
+  - **还没做**：Gemini 适配仍未用真实 API 验证；`auth` / `quota` 仍暂停整个队列（设计里是只暂停用到这个 Key 的任务）；不支持宽高比的模型补边到 2:3 没做（Gemini 走 `imageConfig.aspectRatio`）。下次发包前在模拟器上跑一遍 0.5.2 → 新版覆盖安装，确认老 Key 和同意自动迁移。
+- [x] **0.6.0 测试包**（versionCode 9，测试签名，本机 Mac 打包，通过 Tailscale 发到用户手机）：本机没有正式签名文件，不能覆盖 0.5.2；用户把 `signing.env` 和 `ewardrobe-release.jks` 放到本机后用 `EW_SIGNING_ENV=... ` 重打。另修了底部导航贴近手势条（`10 + insets.bottom`）、建立形象的「相册」改成按钮。
+- [x] **照片里选单品 + 自由裁剪 + 重新生成可调**（2026-10-30，设计 `docs/superpowers/specs/2026-10-30-garment-pick-crop-design.md`，计划 `docs/superpowers/plans/2026-10-30-garment-pick-crop.md`）：
+  - 识别改为 `DETECT_*`：一次调用返回每件衣服的 `box_2d`（0–1000）和字段。1 件：框留 6% 边、占照片不到 80% 就自动裁剪后生成；≥2 件：单品进 `pick` 状态（不生图），确认页里点圆点 / 名字选、「调整框」「自己框一件」（全屏 `app/crop.tsx`），`confirmPicks` 每件裁剪成新单品（共用 `source_uri`）。衣橱里的单品换照片、带吊牌的单品不进 `pick`，取同品类那件。
+  - `items` 新列 `source_uri` / `crop` / `detections`（迁移 3）；来源照片最后一个引用删掉时才删文件；备份带 `source_uri`。原图长边 1600 → 2048。
+  - 「重新生成」面板（`ui/RegenerateSheet.tsx`，确认页和单品详情页共用）：调整框选、这次用的模型（每行价格）、画质、补充要求（快捷项 + 输入框，放在提示词最后）、「以后商品图都用这个」（存路由和 `ai.settings.catalogQuality`；在「我的 → 画质」改档位时清掉）。点之前先保存表单，颜色名改了就清掉颜色值，所以「改成下装再重新生成」现在会按下装画。
+  - 验证：jest 160 个 + 3 个真实 API 默认跳过；tsc、lint 通过；网页 `?demo=1` 看过待选择页（4 件、选 2 件、录入后各自裁剪）、重新生成面板、裁剪页。Android 模拟器上（新架构）走过：相册导入 → 只存原图 → 详情页重新生成面板 → 调整框选 → 拖四个角 → 完成后原图换成裁剪图，再打开框还在。
+  - 拖框用 react-native-gesture-handler 的 `usePanGesture`（`runOnJS`）：PanResponder 在 Android 新架构下触摸进不来。裁剪页左右留 56pt，角不能落在系统返回手势的边缘区。
+  - **还没做**：OpenAI 框的准确度没用真实 Key 测过（`OPENAI_API_KEY=sk-... npx jest src/ai/__tests__/detect.real.test.ts` 会对比 gpt-5.4-nano / mini 并打印花费）；识别出的单品和衣橱已有的比对；接 Gemini 识别。（试衣间生图面板已在 2026-11-02 做了，见上。）
+- [x] **内置 Key 的测试包 + 两家真实 API 验证 + 保真修正**（2026-11-04/05，本地，未提交）：
+  - 测试包内置用户的 OpenAI 和 Gemini Key：`app/.env.local`（git 忽略，不要提交）里 `EXPO_PUBLIC_OPENAI_API_KEY` / `EXPO_PUBLIC_GEMINI_API_KEY`，启动时 `addBuiltInKey`（`ai/keys.ts`）各加一次：删掉不会再加回，换了新 Key 才再加。Gemini 的 Key 可能是 `AQ.` 开头，添加页的格式检查放宽。拿到 APK 的人能取出 Key，只能自己用，不能上架。0.6.0 测试包（versionCode 9，测试签名，可覆盖手机上的测试包）已通过 Taildrop 发到手机。
+  - Google 对新 Key 不再提供 gemini-2.5-flash-lite / 2.5-flash / 2.5-pro（404「no longer available to new users」，模型列表里仍列着）；2.5-flash-image 还能用。「自动」识别顺序改为 3.1-flash-lite → 3.5-flash-lite → 2.5-flash-lite（老 Key）→ 3-flash-preview；价目表补上 3.x（含 3.1 / 3 Pro 生图）。不传 thinkingConfig：lite 默认不思考，`thinkingBudget: 0` 在 3.5-flash-lite 报 400。
+  - 识别：提示词写明一双鞋算一件、印花不是衣物；`tidyGarments`（`domain/crop.ts`）合并挨着的两只鞋、丢掉落在衣服里的「配饰」。
+  - 商品图：识别多读 `printText`（不存库；选单品路径走任务 payload）喂给生图提示词；核对提示词点名领型 / 袖长 / 裤腿宽、文字逐字对；候选按核对失败数排序，第一张是默认选中的。
+  - 试穿正面和大片：生成后用识别模型核对（`OUTFIT_*`：全身完整、每件对得上），不对就带着问题重画一次，两稿里留问题少的那张（第一版留最后一稿，实测重画把长裤画成短裤反而被留下）。大片有试穿正面图时从它出发（`photoPrompt` 的 `dressed`），只换场景。试穿提示词加了「头顶到鞋都在画面里」。
+  - `real.test.ts` 可选 `REAL_AI_PROVIDER=openai|gemini` 和 `REAL_AI_KEY`，照片里多件时自动选最大的那件，报告带每次调用的模型、花费和核对的回答。两家各用 4 张 Wikimedia Commons 实拍图跑了两轮（改前、改后，共约 $1.9）：改后两家都不再把鞋拆成两件、印花拆成配饰；T 恤文字 OpenAI 两张候选一对一错，排序把对的放前面；Gemini 不再裁头，识别费用记上了；OpenAI 的牛仔外套、牛仔裤两张候选核对全不过（颜色偏浅，像素取色那条还没做）。**「留较好一稿」的改动还没再用真实 API 验证。**
+  - 验证：jest 197 个 + 3 个真实 API 跳过，tsc、lint 通过。
+- [x] **用户 9 张实拍当样本：商品图保真对比，商品图改走 gpt-image-1.5 / Gemini**（2026-11-05，本地，未提交）：
+  - 新测试 `catalog.real.test.ts`：只跑录入（识别、裁剪、商品图、核对），目录里每张照片一件，多件时自动取最大的那件；`REAL_AI_QUALITY` / `REAL_AI_MODEL` 可以指定画质和模型做对照。公共部分抽到 `src/test/realApi.ts`（curl 版 fetch、磁盘图片仓；裁剪用 macOS `sips` 真裁，以前电脑上是整张照片冒充裁剪）。样本图只在会话临时目录，没进仓库。
+  - 结果（每件 2 张候选）：gpt-image-1-mini 低画质 9 件 8 件核对全不过，中画质也差不多，做旧、水洗、logo 文字、颜色全丢；gpt-image-1.5 低画质（$0.045/件）和 Gemini 2.5 Flash Image（$0.08/件）都保住了褪色、雪花水洗、灯芯绒领、侧拉链。Gemini 把硬壳冲锋衣画成羽绒服、背景不是统一 #F1F1F2；1.5 有一张 T 恤画成 V 领（核对抓到）。两家的 Lacoste 小字都不对。
+  - 接着又比了 5 个模型（每件 1 张）：gpt-image-1.5 中画质 $0.60、gpt-image-2 低 $0.14、Gemini 3.1 Flash-Lite Image $0.41、3.1 Flash Image $0.82、3 Pro Image $1.67（9 件含识别和核对）。目测：**Gemini 3.1 Flash-Lite 最还原且背景干净、衣服占满画面**；3.1 Flash 和 3 Pro 质感略好但贵 2–5 倍，还会在 Carhartt 胸口多画字；gpt-image-2 低和 1.5 低差不多（1.5 中画质没有更好，还把 T 恤画成 V 领）；Gemini 2.5 背景不平、衣服偏小；mini 任何画质都不行。所有模型都写不对很小的印花文字。
+  - 改动：每件商品图默认只生成 **1 张**（`candidates: 1`；44 件里第二张只赢 3 次），不满意走「重新生成」。商品图单独一个顺序 `CATALOG_ORDER`：Gemini 3.1 Flash-Lite → gpt-image-2 → gpt-image-1.5 → Gemini 3.1 Flash → Gemini 2.5 → mini → gpt-image-1；形象 / 上身 / 大片仍走便宜的 `AUTO_ORDER`。识别再补两条：同类框落在更大的同类框里（袖口 logo 被当成第二件卫衣）丢掉；提示词写明吊牌、洗标、衣架、包装不是衣物。
+  - 新测试 `referee.real.test.ts`：同一个视觉模型给多个 run 的商品图打分。用 gpt-5.4-mini 一次看 10 张图时分数挤在 5 分上下、和目测不符（mini 中画质的 drew 卫衣丢了褪色却得 8 分），**结论没有采用它**，以目测和各 run 自己的核对为准；要用的话改成一次只比一张。
+  - 没解决：很小的印花文字；穿搭照自动取最大一件的测试逻辑会选错（手机上是用户自己选）。
+  - 商品图提示词改为「保真优先」：说明这是用户自己的、可能穿过洗过的衣服，褪色 / 水洗 / 裂纹印花 / 毛边 / 起球原样保留，不要画成新的、不要改色调；藏起来的部分只按这件该有的样子补、不加东西；文字和 logo 逐字照抄，太小看不清就画成同位置同大小的模糊痕迹而不是编字。识别提示词补「搭在椅子、沙发上的毯子、围巾不算」。用 Gemini 3.1 Flash-Lite 和 gpt-image-2 各 9 件新旧对照：drew 卫衣的晒褪和毛边、Kith 毛衣的雪花水洗更接近原图，其他持平，花费不变。
+  - 验证：jest 201 个 + 5 个真实 API 跳过，tsc、lint 通过；今天真实 API 共约 $6.5。
 - [ ] 上架：隐私政策网址要等 PR 合并到 main（或把 PRIVACY.md 放到别的公开网址）；新个人开发者账号需要 12 人 14 天封闭测试。
 
 ## 本地构建（用户自己的电脑）
 
 - 需要 Node 22、JDK 17、Android SDK（platform 37、build-tools 37、NDK 27.1）。`cd app && npm ci`，然后：
   - 开发：`npx expo start`（Expo Go 不含所有原生模块，建议 `npx expo run:android` 装开发版）。
-  - 检查：`npx tsc --noEmit`、`npx expo lint`、`npx jest`（139 个测试，1 个真实 API 测试默认跳过）。
+  - 检查：`npx tsc --noEmit`、`npx expo lint`、`npx jest`（182 个测试，3 个真实 API 测试默认跳过）。
   - 正式包：`EW_SIGNING_ENV=/path/to/signing.env scripts/build-apk.sh`（APK）或加 `BUNDLE=1`（Play 用 AAB）。`signing.env` 和 `ewardrobe-release.jks` 已交给用户保管，**不在仓库里**；脚本里装 SDK、写 Gradle 镜像那几步是给云端 Linux 机器用的，本机已装好 SDK 时可以跳过。
 - 每次发新版：`app/app.json` 的 `version` 和 `android.versionCode` 加一。
 

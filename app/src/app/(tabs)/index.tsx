@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, type ScrollViewInstance, View } from 'react-native';
 import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
+import { type Look, lookFrom, lookFromGarments } from '@/domain/look';
 import { todaySuggestions } from '@/domain/outfit';
 import { currentDateKey, dateParts, idleItems, weekOf } from '@/domain/stats';
 import type { Item } from '@/domain/types';
@@ -23,6 +24,8 @@ interface Card {
   outfitId: string | null;
   name: string;
   items: Item[];
+  /** Garments in the outfit's own order (layers) and how they are worn, to find its try-on. */
+  look: Look;
   badge: string | null;
 }
 
@@ -35,13 +38,17 @@ function buildCards(s: Snapshot): Card[] {
     outfitId: sg.outfit.id,
     name: sg.outfit.name,
     items: itemsOf(s, sg.outfit.itemIds),
+    look: lookFrom(sg.outfit.itemIds, sg.outfit.styling, sg.outfit.makeup),
     badge: sg.badge,
   }));
   // Whatever was logged today goes first, even if it was not a saved outfit.
   if (s.todayLog) {
     const i = cards.findIndex((c) => c.outfitId && c.outfitId === s.todayLog!.outfitId);
     if (i > 0) cards.unshift(...cards.splice(i, 1));
-    if (i < 0) cards.unshift({ key: 'today', outfitId: null, name: '今天的穿搭', items: itemsOf(s, s.todayLog.itemIds), badge: null });
+    if (i < 0) {
+      const items = itemsOf(s, s.todayLog.itemIds);
+      cards.unshift({ key: 'today', outfitId: null, name: '今天的穿搭', items, look: lookFromGarments(items), badge: null });
+    }
   }
   // The longest-unworn few are suggestion enough; the full library is on the Outfits tab.
   return cards.slice(0, MAX_CARDS);
@@ -143,7 +150,7 @@ function Onboarding({ s }: { s: Snapshot }) {
         </T>
       </View>
       <View style={{ marginTop: 18, marginHorizontal: PAD }}>
-        {!s.hasKey ? <Step n="00" title="填写 OpenAI API Key" sub="录入一件约 $0.01" onPress={() => router.push('/apikey')} /> : null}
+        {!s.hasKey ? <Step n="00" title="添加 API Key" sub="OpenAI 或 Google Gemini · 录入一件约 $0.01" onPress={() => router.push('/addkey')} /> : null}
         <Step n="01" title={`录入衣服${hasItems ? ` · 已录入 ${s.items.length} 件` : ''}`} sub="可从相册批量导入">
           <View style={{ paddingLeft: 30, gap: 8 }}>
             <Btn label="从相册批量导入" onPress={() => router.push('/capture?mode=batch')} />
@@ -245,7 +252,7 @@ export default function TodayPage() {
                   }}
                   style={{ width: CARD_W, height: 316, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card, opacity: i === idx ? 1 : 0.55 }}
                 >
-                  <OutfitBoard items={c.items} tryonUri={tryonFor(s, c.items.map((x) => x.id))} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 64, borderRadius: 0 }} />
+                  <OutfitBoard items={c.items} tryonUri={tryonFor(s, c.look.ids, c.look.styling, c.look.makeup)} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 64, borderRadius: 0 }} />
                   {c.badge ? (
                     <T style={{ position: 'absolute', left: 12, top: 12, fontSize: 11, color: C.sub, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: R.pill, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 2 }}>{c.badge}</T>
                   ) : null}

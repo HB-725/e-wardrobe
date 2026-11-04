@@ -9,7 +9,7 @@ import { createOutfit } from '@/db/outfits';
 import { logWear } from '@/db/wear';
 import { outfitKey } from '@/domain/outfit';
 import { toDateKey } from '@/domain/stats';
-import type { Item } from '@/domain/types';
+import type { Detection, Item } from '@/domain/types';
 
 const img = (n: string) => `/demo/${n}.jpg`;
 
@@ -33,6 +33,9 @@ export async function seedDemo(db: Db, variant: string): Promise<void> {
   const skirt = await mk({ name: '百褶半裙', slot: 'bottom', subcategory: '半裙', colorName: '炭灰', colorHex: '#3A3A3C', seasons: ['autumn', 'winter'], catalogUri: img('skirt') }, 120);
   const loafers = await mk({ name: '乐福鞋', slot: 'shoes', subcategory: '皮鞋', colorName: '深棕', colorHex: '#4A3426', seasons: ['spring', 'autumn', 'winter'], catalogUri: img('loafers') }, 110);
   const tote = await mk({ name: '帆布托特包', slot: 'bag', subcategory: '托特包', colorName: '米色', colorHex: '#D6C9B0', seasons: ['spring', 'summer', 'autumn'], catalogUri: img('tote') }, 100);
+  await mk({ name: '红色针织毛线帽', slot: 'accessory', subcategory: '帽子', colorName: '砖红', colorHex: '#B84A35', seasons: ['autumn', 'winter'], catalogUri: img('beanie') }, 95);
+  await mk({ name: '格纹羊毛围巾', slot: 'accessory', subcategory: '围巾', colorName: '藏蓝', colorHex: '#2F4C6E', seasons: ['autumn', 'winter'], catalogUri: img('scarf') }, 90);
+  await mk({ name: '银色钢带手表', slot: 'accessory', subcategory: '手表', colorName: '银色', colorHex: '#B9BCC1', seasons: ['spring', 'summer', 'autumn', 'winter'], catalogUri: img('watch') }, 85);
   await createItem(db, {
     name: '连帽羽绒服',
     slot: 'outer',
@@ -52,15 +55,33 @@ export async function seedDemo(db: Db, variant: string): Promise<void> {
     fieldSources: { name: 'ai', colorName: 'ai', subcategory: 'ai' },
   });
 
+  // An outfit photo waiting for the user to pick which garments to keep.
+  const found = (name: string, slot: Item['slot'], colorName: string, box: Detection['box'], selected = false): Detection => ({
+    box, selected, manual: false, edited: false, name, slot, subcategory: null, colorName, colorHex: null, seasons: [], brand: null, size: null, material: null,
+  });
+  await createItem(db, {
+    name: '新衣服',
+    slot: 'top',
+    status: 'pick',
+    originalUri: img('tryon_front'),
+    detections: [
+      found('军绿夹克', 'outer', '军绿', { x: 0.26, y: 0.18, w: 0.47, h: 0.38 }, true),
+      found('白色T恤', 'top', '白色', { x: 0.44, y: 0.21, w: 0.11, h: 0.33 }),
+      found('黑色长裤', 'bottom', '黑色', { x: 0.33, y: 0.51, w: 0.32, h: 0.39 }),
+      found('白色板鞋', 'shoes', '白色', { x: 0.32, y: 0.87, w: 0.34, h: 0.1 }),
+    ],
+  });
+
   if (variant === 'big') await seedBig(db, daysAgo, [jacket, tee, jeans, sneakers, coat, shirt, knit, chinos, skirt, loafers, tote]);
   if (variant === 'noavatar') return;
   await saveAvatar(db, { frontUri: img('avatar_front'), backUri: img('avatar_back'), sourceUris: [], heightCm: 175, weightKg: 64, build: 'slim', status: 'ready' });
   await setSetting(db, 'prefs', JSON.stringify({ nickname: '小林', mirrorAutoLog: true, idleDays: 30 }));
-  await setSetting(db, 'ai.keyLast4', '8F2A');
-  await setSetting(db, 'ai.models', JSON.stringify({ image: 'gpt-image-1-mini', vision: 'gpt-5.4-nano', blocked: [], probedAt: new Date().toISOString() }));
+  const now = new Date().toISOString();
+  await setSetting(db, 'ai.keys', JSON.stringify([{ id: 'demo', provider: 'openai', label: 'OpenAI', last4: '8F2A', addedAt: now, verifiedAt: now, models: ['gpt-image-1-mini', 'gpt-5.4-nano'], blocked: [] }]));
 
-  const weekend = await createOutfit(db, { name: '周末出门', occasions: ['weekend'], itemIds: [jacket.id, tee.id, jeans.id, sneakers.id] });
-  const work = await createOutfit(db, { name: '秋日通勤', occasions: ['work'], itemIds: [coat.id, shirt.id, chinos.id, loafers.id, tote.id] });
+  // Tops before outerwear: upper-body garments are stored innermost first.
+  const weekend = await createOutfit(db, { name: '周末出门', occasions: ['weekend'], itemIds: [tee.id, jacket.id, jeans.id, sneakers.id] });
+  const work = await createOutfit(db, { name: '秋日通勤', occasions: ['work'], itemIds: [shirt.id, coat.id, chinos.id, loafers.id, tote.id] });
   const skirtLook = await createOutfit(db, { name: '裙装约会', occasions: ['date', 'work'], itemIds: [knit.id, skirt.id, loafers.id, tote.id] });
   const casual = await createOutfit(db, { name: '轻松卫衣日', occasions: ['weekend', 'travel'], itemIds: [knit.id, jeans.id, sneakers.id] });
   const key = outfitKey(weekend.itemIds);
@@ -72,7 +93,6 @@ export async function seedDemo(db: Db, variant: string): Promise<void> {
   ];
   for (const [d, o] of plan) await logWear(db, { date: daysAgo(d), itemIds: o.itemIds, outfitId: o.id, source: 'outfit' });
   // A small spend history for the Me page.
-  const now = new Date().toISOString();
   for (const [kind, usd] of [['catalog', 0.012], ['catalog', 0.014], ['avatar', 0.045], ['tryon', 0.032], ['photo', 0.032], ['mirror', 0.002]] as const) {
     await db.runAsync('INSERT INTO usage (id, kind, model, cost_usd, created_at) VALUES (?, ?, ?, ?, ?)', [Math.random().toString(36).slice(2), kind, 'demo', usd, now]);
   }

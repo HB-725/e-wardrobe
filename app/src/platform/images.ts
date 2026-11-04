@@ -1,7 +1,8 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import type { ImageFolder, ImageStore } from '@/ai/imageStore';
+import { type ImageExt, imageExt, type ImageFolder, type ImageStore } from '@/ai/imageStore';
 import { newId } from '@/db/db';
+import { toPixels } from '@/domain/crop';
 
 const ROOT = 'images';
 
@@ -47,7 +48,7 @@ function isCacheFile(uri: string): boolean {
 }
 
 /** Writes raw image bytes (restored from a backup) into app storage. */
-export async function saveImageBytes(bytes: Uint8Array, folder: ImageFolder, ext: 'jpg' | 'webp'): Promise<string> {
+export async function saveImageBytes(bytes: Uint8Array, folder: ImageFolder, ext: ImageExt): Promise<string> {
   const file = new File(folderDir(folder), `${newId()}.${ext}`);
   file.create({ overwrite: true });
   try {
@@ -73,8 +74,8 @@ export const nativeImages: ImageStore = {
     return `data:image/${alpha ? 'webp' : 'jpeg'};base64,${r.base64}`;
   },
 
-  async saveBase64(b64, folder, ext = 'jpg') {
-    const file = new File(folderDir(folder), `${newId()}.${ext}`);
+  async saveBase64(b64, folder) {
+    const file = new File(folderDir(folder), `${newId()}.${imageExt(b64)}`);
     file.create({ overwrite: true });
     try {
       await file.write(b64, { encoding: 'base64' });
@@ -87,7 +88,8 @@ export const nativeImages: ImageStore = {
   },
 
   async importPhoto(uri, folder) {
-    const r = await render(uri, 1600, false);
+    // Garment photos keep more pixels: the AI may later get only a crop of them (one garment of an outfit photo).
+    const r = await render(uri, folder === 'original' ? 2048 : 1600, false);
     const dest = new File(folderDir(folder), `${newId()}.jpg`);
     await new File(r.uri).move(dest);
     // Camera shots and picker copies land in the cache; do not leave a second copy behind.
@@ -99,6 +101,25 @@ export const nativeImages: ImageStore = {
         // ignore
       }
     }
+    return dest.uri;
+  },
+
+  async crop(uri, box, folder) {
+    const r = await withDecodeSlot(async () => {
+      const full = await ImageManipulator.manipulate(uri, { maxWidth: 4096, maxHeight: 4096 }).renderAsync();
+      try {
+        const ref = await ImageManipulator.manipulate(full).crop(toPixels(box, full.width, full.height)).renderAsync();
+        try {
+          return await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.9 });
+        } finally {
+          ref.release();
+        }
+      } finally {
+        full.release();
+      }
+    });
+    const dest = new File(folderDir(folder), `${newId()}.jpg`);
+    await new File(r.uri).move(dest);
     return dest.uri;
   },
 

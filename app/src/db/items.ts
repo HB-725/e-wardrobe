@@ -1,4 +1,5 @@
-import type { FidelityCheck, FieldSource, Item, ItemStatus, Season, Slot } from '@/domain/types';
+import type { Box } from '@/domain/crop';
+import type { Detection, FidelityCheck, FieldSource, Item, ItemStatus, Season, Slot } from '@/domain/types';
 import { type Db, newId, nowIso, parseJson, type SqlParam } from './db';
 
 interface ItemRow {
@@ -21,6 +22,9 @@ interface ItemRow {
   original_uri: string | null;
   catalog_uri: string | null;
   tag_uri: string | null;
+  source_uri: string | null;
+  crop: string | null;
+  detections: string;
   candidates: string;
   checks: string;
   field_sources: string;
@@ -50,6 +54,9 @@ function fromRow(r: ItemRow): Item {
     originalUri: r.original_uri,
     catalogUri: r.catalog_uri,
     tagUri: r.tag_uri,
+    sourceUri: r.source_uri,
+    crop: parseJson<Box | null>(r.crop, null),
+    detections: parseJson<Detection[]>(r.detections, []),
     candidates: parseJson<string[]>(r.candidates, []),
     checks: parseJson<FidelityCheck[][]>(r.checks, []),
     fieldSources: parseJson<Partial<Record<keyof Item, FieldSource>>>(r.field_sources, {}),
@@ -79,17 +86,21 @@ const COLUMNS: Partial<Record<keyof Item, string>> = {
   originalUri: 'original_uri',
   catalogUri: 'catalog_uri',
   tagUri: 'tag_uri',
+  sourceUri: 'source_uri',
+  crop: 'crop',
+  detections: 'detections',
   candidates: 'candidates',
   checks: 'checks',
   fieldSources: 'field_sources',
   error: 'error',
 };
 
-const JSON_ARRAYS: (keyof Item)[] = ['seasons', 'candidates', 'checks'];
+const JSON_ARRAYS: (keyof Item)[] = ['seasons', 'candidates', 'checks', 'detections'];
 
 function toParam(key: keyof Item, value: unknown): SqlParam {
   if (JSON_ARRAYS.includes(key)) return JSON.stringify(value ?? []);
   if (key === 'fieldSources') return JSON.stringify(value ?? {});
+  if (key === 'crop') return value ? JSON.stringify(value) : null;
   if (value === undefined) return null;
   return value as SqlParam;
 }
@@ -152,7 +163,7 @@ export async function countByStatus(db: Db): Promise<Record<ItemStatus, number>>
   const rows = await db.getAllAsync<{ status: string; n: number }>(
     'SELECT status, COUNT(*) AS n FROM items GROUP BY status',
   );
-  const out: Record<ItemStatus, number> = { processing: 0, review: 0, active: 0, failed: 0, archived: 0 };
+  const out: Record<ItemStatus, number> = { processing: 0, review: 0, active: 0, failed: 0, archived: 0, pick: 0 };
   for (const r of rows) out[r.status as ItemStatus] = r.n;
   return out;
 }

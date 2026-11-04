@@ -2,13 +2,13 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { OCCASION_LABEL, OCCASIONS } from '@/domain/catalog';
-import { selectionFromItems } from '@/domain/outfit';
+import { lookFrom } from '@/domain/look';
 import { monthGrid, parseDateKey } from '@/domain/stats';
 import type { Outfit } from '@/domain/types';
 import { recordWear, removeOutfit, undoWear } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { useRecordToday } from '@/state/recordToday';
-import { itemsOf, loadSnapshot, type Snapshot, tryonFor } from '@/state/snapshot';
+import { itemsOf, loadSnapshot, type Snapshot, tryonFor, tryonForLog } from '@/state/snapshot';
 import { Icon } from '@/ui/Icon';
 import { Btn, IconBtn, Loading, PageHeader, Screen, Segmented, Sheet, T, Tap } from '@/ui/kit';
 import { C, PAD, R } from '@/ui/theme';
@@ -31,7 +31,7 @@ function OutfitSheet({ s, outfit, onClose }: { s: Snapshot; outfit: Outfit | nul
   return (
     <Sheet visible onClose={onClose} title={outfit.name}>
       <View style={{ flexDirection: 'row', gap: 14 }}>
-        <OutfitBoard items={items} tryonUri={tryonFor(s, outfit.itemIds)} compact style={{ width: 90, height: 120 }} />
+        <OutfitBoard items={items} tryonUri={tryonFor(s, outfit.itemIds, outfit.styling, outfit.makeup)} compact style={{ width: 90, height: 120 }} />
         <View style={{ flex: 1, gap: 4 }}>
           <T v="small" style={{ color: C.sub }}>
             {items.map((i) => i.name).join('、')}
@@ -56,7 +56,7 @@ function OutfitSheet({ s, outfit, onClose }: { s: Snapshot; outfit: Outfit | nul
           label="在试衣间打开"
           kind="outline"
           onPress={() => {
-            app.setFitting(selectionFromItems(items.filter((i) => i.status === 'active')));
+            app.setFitting(lookFrom(outfit.itemIds.filter((id) => s.byId.get(id)?.status === 'active'), outfit.styling, outfit.makeup));
             onClose();
             router.navigate('/fitting');
           }}
@@ -123,7 +123,7 @@ function Library({ s, onOpen }: { s: Snapshot; onOpen: (o: Outfit) => void }) {
           const items = itemsOf(s, o.itemIds);
           return (
             <Tap key={o.id} accessibilityLabel={o.name} onPress={() => onOpen(o)} style={{ width: '47.5%', gap: 8 }}>
-              <OutfitBoard items={items} tryonUri={tryonFor(s, o.itemIds)} style={{ aspectRatio: 0.8 }} />
+              <OutfitBoard items={items} tryonUri={tryonFor(s, o.itemIds, o.styling, o.makeup)} style={{ aspectRatio: 0.8 }} />
               <View style={{ gap: 2 }}>
                 <T style={{ fontSize: 14, fontWeight: '500' }} numberOfLines={1}>
                   {o.name}
@@ -197,7 +197,7 @@ function Calendar({ s }: { s: Snapshot }) {
               style={{ width: '13.6%', height: 62, borderRadius: R.small, overflow: 'hidden', backgroundColor: log ? C.card : C.bg, borderWidth: 2, borderColor: ring }}
             >
               <T style={{ position: 'absolute', left: 3, top: 1, fontSize: 10, color: isFuture ? C.muted : C.ink, fontWeight: c.dateKey === s.todayKey ? '700' : '400', zIndex: 1 }}>{c.day}</T>
-              {log ? <OutfitBoard items={itemsOf(s, log.itemIds)} tryonUri={log.photoUri ?? tryonFor(s, log.itemIds)} compact style={{ position: 'absolute', left: 4, right: 4, top: 15, bottom: 2, backgroundColor: 'transparent' }} /> : null}
+              {log ? <OutfitBoard items={itemsOf(s, log.itemIds)} tryonUri={log.photoUri ?? tryonForLog(s, log)} compact style={{ position: 'absolute', left: 4, right: 4, top: 15, bottom: 2, backgroundColor: 'transparent' }} /> : null}
             </Pressable>
           );
         })}
@@ -205,7 +205,7 @@ function Calendar({ s }: { s: Snapshot }) {
       <View style={{ marginTop: 18, marginHorizontal: PAD, padding: 16, borderRadius: R.card, backgroundColor: C.card, minHeight: 124, flexDirection: 'row', gap: 16, alignItems: 'center' }}>
         {selLog ? (
           <>
-            <OutfitBoard items={itemsOf(s, selLog.itemIds)} tryonUri={tryonFor(s, selLog.itemIds)} compact style={{ width: 64, height: 92, backgroundColor: '#FFFFFF' }} />
+            <OutfitBoard items={itemsOf(s, selLog.itemIds)} tryonUri={tryonForLog(s, selLog)} compact style={{ width: 64, height: 92, backgroundColor: '#FFFFFF' }} />
             <View style={{ flex: 1, gap: 4 }}>
               <T v="caption">{selLabel}{selLog.source === 'mirror' ? ' · 镜子照片' : ''}</T>
               <T style={{ fontSize: 17, fontWeight: '700' }}>{selOutfit?.name ?? '当天的穿搭'}</T>
@@ -243,7 +243,7 @@ function Calendar({ s }: { s: Snapshot }) {
               }}
               style={{ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 64 }}
             >
-              <OutfitBoard items={itemsOf(s, o.itemIds)} tryonUri={tryonFor(s, o.itemIds)} compact style={{ width: 46, height: 60 }} />
+              <OutfitBoard items={itemsOf(s, o.itemIds)} tryonUri={tryonFor(s, o.itemIds, o.styling, o.makeup)} compact style={{ width: 46, height: 60 }} />
               <View style={{ flex: 1 }}>
                 <T style={{ fontSize: 14, fontWeight: '500' }}>{o.name}</T>
                 <T v="caption" numberOfLines={1}>

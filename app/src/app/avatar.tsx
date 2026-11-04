@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Platform, TextInput, View } from 'react-native';
 import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
 import { type AiSettings, getAiBlocked, getAiSettings, qualityFor } from '@/ai/config';
-import { estimateImageCost, formatUsd } from '@/ai/models';
+import { estimateFor, resolveRoute, type Routing } from '@/ai/catalog';
+import { loadRouting } from '@/ai/keys';
+import { addCosts, formatEstimate } from '@/ai/models';
 import { getAvatar, saveAvatar } from '@/db/misc';
-import { getApiKey } from '@/platform/secrets';
 import type { Avatar } from '@/domain/types';
 import { startAvatar } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
@@ -30,11 +31,12 @@ export default function AvatarSetup() {
   const avatar = useData(getAvatar);
   const settings = useData(getAiSettings);
   const blocked = useData(getAiBlocked);
-  if (!avatar || !settings || blocked === undefined) return <Loading />;
-  return <Setup avatar={avatar} settings={settings} blocked={blocked} />;
+  const routing = useData(loadRouting);
+  if (!avatar || !settings || blocked === undefined || !routing) return <Loading />;
+  return <Setup avatar={avatar} settings={settings} blocked={blocked} routing={routing} />;
 }
 
-function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSettings; blocked: string | null }) {
+function Setup({ avatar, settings, blocked, routing }: { avatar: Avatar; settings: AiSettings; blocked: string | null; routing: Routing }) {
   const app = useApp();
   const safe = useSafe();
   const consent = usePhotoConsent();
@@ -109,7 +111,8 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
   const w = Number(weight);
   const bodyOk = h >= 100 && h <= 230 && w >= 25 && w <= 250;
   const photosOk = photos.every(Boolean);
-  const cost = estimateImageCost(null, { inputImages: 3, quality: qualityFor(settings.quality, 'avatar') }) + estimateImageCost(null, { inputImages: 2, quality: qualityFor(settings.quality, 'avatar') });
+  const quality = qualityFor(settings.quality, 'avatar');
+  const cost = addCosts(estimateFor(routing, 'avatar', { inputImages: 3, quality }), estimateFor(routing, 'avatar', { inputImages: 2, quality }));
   const body = { heightCm: h, weightKg: w, build };
 
   const generate = safe(async () => {
@@ -118,8 +121,8 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
       return;
     }
     if (!(await consent())) return;
-    if (!(await getApiKey())) {
-      app.toast('先填写 OpenAI API Key');
+    if (!resolveRoute('avatar', routing.routes, routing.keys)) {
+      app.toast('先添加能生成图片的 API Key');
       router.push('/apikey');
       return;
     }
@@ -168,14 +171,17 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
                   <T style={{ fontSize: 12 }}>拍{label}</T>
                 </Tap>
               )}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <T style={{ fontSize: 12, color: photos[i] ? C.ink : C.sub }}>
-                  {label} · {photos[i] ? '已拍' : '待拍'}
-                </T>
-                <Tap onPress={() => take(i, false)} hitSlop={8}>
-                  <T style={{ fontSize: 12, color: C.sub, textDecorationLine: 'underline' }}>相册</T>
-                </Tap>
-              </View>
+              <T style={{ fontSize: 12, color: photos[i] ? C.ink : C.sub }}>
+                {label} · {photos[i] ? '已拍' : '待拍'}
+              </T>
+              <Tap
+                accessibilityLabel={`从相册选${label}`}
+                onPress={() => take(i, false)}
+                style={{ height: 36, borderRadius: 18, backgroundColor: C.card, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+              >
+                <Icon name="album" size={16} />
+                <T style={{ fontSize: 12 }}>相册</T>
+              </Tap>
             </View>
           ))}
         </View>
@@ -231,7 +237,7 @@ function Setup({ avatar, settings, blocked }: { avatar: Avatar; settings: AiSett
             ))}
           </View>
         </View>
-        <T v="caption">生成正面和背面 · 约 {formatUsd(cost)}</T>
+        <T v="caption">生成正面和背面 · {formatEstimate(cost)}</T>
       </View>
     );
     footer =

@@ -4,17 +4,20 @@ import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Platform, TextInput, View } from 'react-native';
-import { getAiSettings, getModelChoice, type QualityLevel, saveAiSettings, savePrefs } from '@/ai/config';
+import { modelInfo, PURPOSES, resolveRoute } from '@/ai/catalog';
+import { getAiSettings, type QualityLevel, saveAiSettings, savePrefs } from '@/ai/config';
+import { loadRouting, removeAllKeys } from '@/ai/keys';
 import { formatUsd } from '@/ai/models';
 import type { Db } from '@/db/db';
 import { createItem, listItems } from '@/db/items';
-import { getSetting, monthSpend } from '@/db/misc';
+import { monthSpend } from '@/db/misc';
 import { listOutfits } from '@/db/outfits';
 import { listLogs } from '@/db/wear';
 import { buildWorkbook, isDuplicate, parseWorkbook, SpreadsheetError } from '@/domain/excel';
+import { EMPTY_LOOK } from '@/domain/look';
 import { toDateKey } from '@/domain/stats';
 import { pickSpreadsheet, shareBase64File, XLSX_MIME } from '@/platform/files';
-import { setApiKey } from '@/platform/secrets';
+import { secureSecrets } from '@/platform/secrets';
 import { userSources, wipeEverything } from '@/state/actions';
 import { BackupError, createBackup, readBackupInfo, restoreBackup } from '@/state/backup';
 import { BACKUP_SUPPORTED, pickBackupFile, pickNewBackupFile } from '@/platform/backupStorage';
@@ -44,8 +47,16 @@ const QUALITY: { id: QualityLevel; label: string; sub: string }[] = [
 const IDLE = [14, 30, 60, 90, 180];
 
 async function loadMe(db: Db) {
-  const [settings, spend, models, last4] = await Promise.all([getAiSettings(db), monthSpend(db), getModelChoice(db), getSetting(db, 'ai.keyLast4')]);
-  return { settings, spend, models, last4 };
+  const [settings, spend, { keys, routes }] = await Promise.all([getAiSettings(db), monthSpend(db), loadRouting(db)]);
+  const resolved = PURPOSES.map((p) => ({ kind: p.kind, r: resolveRoute(p.id, routes, keys) }));
+  return {
+    settings,
+    spend,
+    keys,
+    // The quality setting only matters if some image purpose uses a model that takes it (or no key is added yet).
+    showQuality: resolved.some(({ kind, r }) => kind === 'image' && (!r || modelInfo(r.provider, r.model)?.quality)),
+    unknownPrice: [...new Set(resolved.flatMap(({ r }) => (r && !modelInfo(r.provider, r.model)?.price ? [r.model] : [])))],
+  };
 }
 
 type SheetKind = 'cap' | 'quality' | 'idle' | 'name' | 'licenses' | null;
@@ -200,7 +211,7 @@ export default function MePage() {
     try {
       await app.runner.idle();
       const r = await restoreBackup(app.db, app.images, storage, (d, t) => setProgress(`${d}/${t}`));
-      app.setFitting({});
+      app.setFitting(EMPTY_LOOK);
       notify('恢复完成', `已恢复 ${r.items} 件衣服和 ${r.images} 张图片。`);
     } catch (e) {
       notify('恢复失败', `手机上的数据没有改动。${e instanceof Error ? e.message : String(e)}`);
@@ -214,16 +225,17 @@ export default function MePage() {
   };
 
   const wipe = async () => {
-    if (!(await confirmAsync('永久删除全部数据', '衣服、照片、穿搭、穿着记录、个人形象和 API Key 都会从这台手机上删除，无法恢复。'))) return;
+    if (!(await confirmAsync('永久删除全部数据', '衣服、照片、穿搭、穿着记录、个人形象和所有 API Key 都会从这台手机上删除，无法恢复。'))) return;
     if (!(await confirmAsync('再确认一次', '真的要删除吗？建议先做一次「完整备份」。', '永久删除'))) return;
     // A job still running would write the avatar / images back after the wipe, so let it finish first.
     setBusy('wipe');
     app.runner.hold();
     try {
       await app.runner.idle();
+      // Before the wipe: the key list in the database is the only record of which secrets exist.
+      await removeAllKeys(app.db, secureSecrets);
       await wipeEverything(app);
-      await setApiKey(null);
-      app.setFitting({});
+      app.setFitting(EMPTY_LOOK);
       app.toast('已删除全部数据');
       router.navigate('/');
     } catch (e) {
@@ -287,10 +299,9 @@ export default function MePage() {
             ))}
           </View>
         </View>
-        <Row label="我的 API Key" value={me.last4 ? `已绑定 · ••••${me.last4}` : '未填写 · 点击填写'} onPress={() => router.push('/apikey')} />
-        <Row label="每月花费上限" value={settings.capUsd ? `$${settings.capUsd}` : '不限'} onPress={() => setSheet('cap')} />
-        <Row label="画质" value={QUALITY.find((q) => q.id === settings.quality)?.label} onPress={() => setSheet('quality')} />
-        <Row label="使用的模型" value={me.models.image ? `${me.models.image} · ${me.models.vision ?? '—'}` : '填写 Key 后自动选择'} last />
+        <Row label="API 与模型" value={me.keys.length ? me.keys.map((k) => k.label).join(' · ') : '未添加 Key · 点击添加'} onPress={() => router.push('/apikey')} />
+        <Row label="每月花费上限" value={settings.capUsd ? `$${settings.capUsd}` : '不限'} onPress={() => setSheet('cap')} last={!me.showQuality} />
+        {me.showQuality ? <Row label="画质" value={QUALITY.find((q) => q.id === settings.quality)?.label} onPress={() => setSheet('quality')} last /> : null}
       </View>
 
       <View style={{ marginTop: 24, marginHorizontal: PAD }}>
@@ -352,8 +363,13 @@ export default function MePage() {
       </Modal>
       <Sheet visible={sheet === 'cap'} onClose={() => setSheet(null)} title="每月花费上限">
         <T v="small" style={{ color: C.sub }}>
-          到上限后 AI 暂停；按估算价格计算，以 OpenAI 账单为准。
+          到上限后 AI 暂停；按估算价格计算，以服务商账单为准。
         </T>
+        {me.unknownPrice.length ? (
+          <T v="small" style={{ color: C.sub }}>
+            以下模型价格未知，不计入上限：{me.unknownPrice.join('、')}
+          </T>
+        ) : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {CAPS.map((c) => (
             <Chip
@@ -378,7 +394,8 @@ export default function MePage() {
               sub={q.sub}
               value={settings.quality === q.id ? '✓' : ''}
               onPress={async () => {
-                await saveAiSettings(app.db, { quality: q.id });
+                // The level set here wins over a catalog quality chosen earlier in the regenerate panel.
+                await saveAiSettings(app.db, { quality: q.id, catalogQuality: undefined, tryonQuality: undefined });
                 setSheet(null);
                 app.refresh();
               }}

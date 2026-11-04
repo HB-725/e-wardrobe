@@ -29,6 +29,7 @@ const STATUS_LABEL: Record<Item['status'], string> = {
   active: '在用',
   archived: '已收起',
   review: '待确认',
+  pick: '待选择',
   processing: '生成中',
   failed: '生成失败',
 };

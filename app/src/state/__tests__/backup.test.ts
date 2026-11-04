@@ -27,6 +27,9 @@ class Images implements ImageStore {
   async importPhoto(u: string, folder: ImageFolder) {
     return this.saveBase64(this.disk.files.get(u) ?? '', folder);
   }
+  async crop(u: string, _box: unknown, folder: ImageFolder) {
+    return this.saveBase64(this.disk.files.get(u) ?? '', folder);
+  }
   async remove(u: string | null | undefined) {
     if (u) {
       this.removed.push(u);
@@ -73,6 +76,7 @@ async function seed() {
   await putTryon(db, `${jacket.id}+${tee.id}`, 'front', avatarVersion(avatar), await img('tryon', 'TF'));
   await setSetting(db, 'prefs', JSON.stringify({ nickname: '小林' }));
   await setSetting(db, 'ai.keyLast4', 'OLD1');
+  await setSetting(db, 'ai.keys', '[{"id":"old"}]');
   return { disk, db, images, jacket, tee, pending, outfit };
 }
 
@@ -88,6 +92,7 @@ describe('backup', () => {
     // New phone: empty db, own key indicator, separate storage.
     const db2 = await createTestDb();
     await setSetting(db2, 'ai.keyLast4', 'NEW2');
+    await setSetting(db2, 'ai.keys', '[{"id":"new"}]');
     const images2 = new Images(src.disk, 'new');
     const folder2 = Object.assign(new Folder(src.disk, images2), { texts: folder.texts, blobs: folder.blobs });
     await restoreBackup(db2, images2, folder2);
@@ -113,6 +118,9 @@ describe('backup', () => {
     expect(src.disk.files.get(tryon!)).toBe('TF');
     expect(await getSetting(db2, 'prefs')).toContain('小林');
     expect(await getSetting(db2, 'ai.keyLast4')).toBe('NEW2');
+    // Key descriptions belong to this phone's keystore: never exported, never replaced.
+    expect(folder.texts.get('backup.json')).not.toContain('ai.keys');
+    expect(await getSetting(db2, 'ai.keys')).toBe('[{"id":"new"}]');
   });
 
   it('restoring over existing data replaces it and deletes the old pictures', async () => {
@@ -169,5 +177,26 @@ describe('backup edge cases', () => {
     await expect(restoreBackup(db2, images2, Object.assign(new Folder(src.disk, images2), { texts: folder.texts, blobs: folder.blobs }))).rejects.toThrow();
     expect([...src.disk.files.keys()].some((k) => k.startsWith('n4/'))).toBe(false);
     expect(await listItems(db2)).toEqual([]);
+  });
+});
+
+describe('garments cut from one photo', () => {
+  it('back up and restore the shared whole photo once', async () => {
+    const src = await seed();
+    const photo = await src.images.saveBase64('WHOLE', 'original');
+    const a = await createItem(src.db, { name: 'T恤', slot: 'top', status: 'active', sourceUri: photo, crop: { x: 0, y: 0, w: 1, h: 0.5 }, originalUri: await src.images.saveBase64('CA', 'original') });
+    const b = await createItem(src.db, { name: '卫裤', slot: 'bottom', status: 'active', sourceUri: photo, originalUri: await src.images.saveBase64('CB', 'original') });
+    const folder = new Folder(src.disk, src.images);
+    await createBackup(src.db, folder);
+
+    const db = await createTestDb();
+    const images = new Images(src.disk, 'new');
+    await restoreBackup(db, images, Object.assign(new Folder(src.disk, images), { texts: folder.texts, blobs: folder.blobs }));
+    const ra = (await getItem(db, a.id))!;
+    const rb = (await getItem(db, b.id))!;
+    expect(ra.sourceUri).toBe(rb.sourceUri);
+    expect(ra.sourceUri).toMatch(/^new\//);
+    expect(src.disk.files.get(ra.sourceUri!)).toBe('WHOLE');
+    expect(ra.crop).toEqual({ x: 0, y: 0, w: 1, h: 0.5 });
   });
 });

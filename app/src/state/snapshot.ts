@@ -1,14 +1,16 @@
+import type { Routing } from '@/ai/catalog';
 import { getAiBlocked, getPrefs, type Prefs } from '@/ai/config';
+import { loadRouting } from '@/ai/keys';
 import type { Db } from '@/db/db';
 import { listItems } from '@/db/items';
 import { countActiveJobs } from '@/db/jobs';
-import { avatarVersion, frontTryons, getAvatar, getSetting } from '@/db/misc';
+import { avatarVersion, frontTryons, getAvatar } from '@/db/misc';
 import { listOutfits } from '@/db/outfits';
 import { listLogs } from '@/db/wear';
 import { SLOT_ORDER } from '@/domain/catalog';
-import { outfitKey } from '@/domain/outfit';
+import { lookFromGarments, lookKey } from '@/domain/look';
 import { type ItemStats, statsById, toDateKey } from '@/domain/stats';
-import type { Avatar, Item, JobType, Outfit, WearLog } from '@/domain/types';
+import type { Avatar, Item, JobType, Outfit, Styling, WearLog } from '@/domain/types';
 import { needsReview } from './actions';
 
 /** Everything the main pages need, loaded in one go (a wardrobe is a few hundred rows at most). */
@@ -29,15 +31,17 @@ export interface Snapshot {
   /** Front try-on image per outfit key for the current avatar. */
   tryons: Map<string, string>;
   blocked: string | null;
-  /** Whether an API key has been saved (its last 4 characters are kept in settings; the key itself is in secure storage). */
+  /** Whether any API key has been added (the keys themselves are in secure storage). */
   hasKey: boolean;
+  /** Keys and per-purpose models, for cost estimates. */
+  routing: Routing;
   jobs: Record<JobType, number>;
   prefs: Prefs;
 }
 
 export async function loadSnapshot(db: Db): Promise<Snapshot> {
   const today = new Date();
-  const [items, logs, outfits, avatar, blocked, jobs, prefs, last4] = await Promise.all([
+  const [items, logs, outfits, avatar, blocked, jobs, prefs, routing] = await Promise.all([
     listItems(db),
     listLogs(db),
     listOutfits(db),
@@ -45,7 +49,7 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     getAiBlocked(db),
     countActiveJobs(db),
     getPrefs(db),
-    getSetting(db, 'ai.keyLast4'),
+    loadRouting(db),
   ]);
   const active = items.filter((i) => i.status === 'active');
   const todayKey = toDateKey(today);
@@ -66,7 +70,8 @@ export async function loadSnapshot(db: Db): Promise<Snapshot> {
     tryons: await frontTryons(db, avatarVersion(avatar)),
     // A pause only matters while there is AI work waiting (e.g. not after the user kept the original photos).
     blocked: Object.values(jobs).some((n) => n > 0) ? blocked : null,
-    hasKey: !!last4,
+    hasKey: routing.keys.length > 0,
+    routing,
     jobs,
     prefs,
   };
@@ -80,11 +85,23 @@ export function itemsOf(snap: Snapshot, ids: string[]): Item[] {
     .sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
 }
 
-/** Cached try-on for a combination; items without a picture are not part of try-ons, so they are left out of the key. */
-export function tryonFor(snap: Snapshot, ids: string[]): string | null {
+/**
+ * Cached try-on for a combination worn this way (layer order, styling); items without a picture are not part of
+ * try-ons, so they are left out of the key.
+ */
+/** The made-up try-on when there is one, else the same outfit without makeup. */
+export function tryonFor(snap: Snapshot, ids: string[], styling: Record<string, Styling> = {}, makeup?: string | null): string | null {
   const drawable = ids.filter((id) => {
     const it = snap.byId.get(id);
     return !!it && !!(it.catalogUri ?? it.originalUri);
   });
-  return snap.tryons.get(outfitKey(drawable)) ?? null;
+  const slotOf = (id: string) => snap.byId.get(id)?.slot;
+  return (makeup ? snap.tryons.get(lookKey(drawable, styling, slotOf, makeup)) : null) ?? snap.tryons.get(lookKey(drawable, styling, slotOf)) ?? null;
+}
+
+/** A wear log as it was worn: the linked outfit's layering if it is the same garments, else tops under outerwear. */
+export function tryonForLog(snap: Snapshot, log: WearLog): string | null {
+  const o = log.outfitId ? snap.outfits.find((x) => x.id === log.outfitId) : undefined;
+  if (o && o.itemIds.length === log.itemIds.length && o.itemIds.every((id) => log.itemIds.includes(id))) return tryonFor(snap, o.itemIds, o.styling, o.makeup);
+  return tryonFor(snap, lookFromGarments(itemsOf(snap, log.itemIds)).ids);
 }

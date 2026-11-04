@@ -1,4 +1,5 @@
 import type { Avatar, TryonView, UsageEntry } from '@/domain/types';
+import { idsOfKey } from '@/domain/look';
 import { type Db, newId, nowIso, parseJson } from './db';
 
 // ---------- settings ----------
@@ -170,11 +171,11 @@ export async function pruneTryons(db: Db, currentVersion: string): Promise<strin
 /** Removes cached try-ons that include this item (its picture or category changed, or it was deleted). */
 export async function dropTryonsWithItem(db: Db, itemId: string): Promise<string[]> {
   const rows = await db.getAllAsync<{ key: string; view: string; uri: string }>('SELECT key, view, uri FROM tryon_cache');
-  const hit = rows.filter((r) => r.key.split('+').includes(itemId));
+  const hit = rows.filter((r) => idsOfKey(r.key).includes(itemId));
   for (const r of hit) await db.runAsync('DELETE FROM tryon_cache WHERE key = ? AND view = ?', [r.key, r.view]);
   // Try-ons still waiting would draw the old look; a running one discards its result itself.
   const jobs = await db.getAllAsync<{ id: string; ref_id: string }>("SELECT id, ref_id FROM jobs WHERE type = 'tryon' AND status != 'running'");
-  for (const j of jobs) if (j.ref_id.split('|')[0].split('+').includes(itemId)) await db.runAsync('DELETE FROM jobs WHERE id = ?', [j.id]);
+  for (const j of jobs) if (idsOfKey(j.ref_id.split('|')[0]).includes(itemId)) await db.runAsync('DELETE FROM jobs WHERE id = ?', [j.id]);
   return hit.map((r) => r.uri);
 }
 
@@ -182,8 +183,9 @@ export async function dropTryonsWithItem(db: Db, itemId: string): Promise<string
 export async function referencedImages(db: Db): Promise<Set<string>> {
   const out = new Set<string>();
   const add = (v: string | null | undefined) => v && out.add(v);
-  for (const r of await db.getAllAsync<{ a: string | null; b: string | null; c: string | null; d: string }>('SELECT original_uri AS a, catalog_uri AS b, tag_uri AS c, candidates AS d FROM items')) {
+  for (const r of await db.getAllAsync<{ a: string | null; b: string | null; c: string | null; d: string; s: string | null }>('SELECT original_uri AS a, catalog_uri AS b, tag_uri AS c, candidates AS d, source_uri AS s FROM items')) {
     add(r.a);
+    add(r.s);
     add(r.b);
     add(r.c);
     parseJson<string[]>(r.d, []).forEach(add);

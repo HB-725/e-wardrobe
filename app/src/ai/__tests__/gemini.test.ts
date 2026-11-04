@@ -46,6 +46,17 @@ describe('Gemini client', () => {
     expect(r.usage).toEqual({ textIn: 20, imageIn: 0, out: 200 });
   });
 
+  it('keeps the candidates that worked when another one is blocked, and counts both answers', async () => {
+    const { fetch } = fakeFetch([
+      { body: { candidates: [{ content: { parts: [{ inlineData: { data: 'X' } }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 100 } } },
+      { body: { candidates: [{ finishReason: 'IMAGE_SAFETY' }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 0 } } },
+    ]);
+    const r = await createGeminiClient({ apiKey: 'k', fetch }).imageEdit({ model: 'm', prompt: 'p', images: [IMG], n: 2 });
+    expect(r).toEqual({ images: ['X'], usage: { textIn: 20, imageIn: 0, out: 100 } });
+    const allBlocked = fakeFetch([{ body: { candidates: [{ finishReason: 'IMAGE_SAFETY' }] } }]);
+    await expect(createGeminiClient({ apiKey: 'k', fetch: allBlocked.fetch }).imageEdit({ model: 'm', prompt: 'p', images: [IMG], n: 2 })).rejects.toMatchObject({ kind: 'rejected' });
+  });
+
   it('reports safety blocks as rejected and a text-only answer as a bad response', async () => {
     const blocked = fakeFetch([{ body: { promptFeedback: { blockReason: 'SAFETY' } } }]);
     await expect(createGeminiClient({ apiKey: 'k', fetch: blocked.fetch }).imageEdit({ model: 'm', prompt: 'p', images: [IMG] })).rejects.toMatchObject({ kind: 'rejected' });

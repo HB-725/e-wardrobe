@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
-import { ActivityIndicator, Text, View, type ViewStyle } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, Text, View, type ViewStyle } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { SLOT_ORDER } from '@/domain/catalog';
-import type { Item, Slot } from '@/domain/types';
+import type { Item } from '@/domain/types';
 import { displayUri } from '@/state/actions';
 import { C, R } from './theme';
 
@@ -103,54 +103,48 @@ export function Silhouette({ color = '#B9B9BE' }: { color?: string }) {
   );
 }
 
-/** Garment cards beside the figure in the instant (free) preview, in bands from head to feet. */
-const BANDS: Slot[] = ['accessory', 'outer', 'top', 'bag', 'bottom', 'shoes'];
-
-export function Stage({
-  avatarUri,
-  items,
-  tryonUri,
-  busy,
-  style,
-}: {
-  avatarUri: string | null;
-  items: Item[];
-  tryonUri: string | null;
-  busy?: boolean;
-  style?: ViewStyle;
-}) {
+/**
+ * The figure: the try-on once there is one, else the avatar (or a silhouette). What is put on is listed in the
+ * fitting room's drawer, not drawn here, so nothing looks "worn" before the try-on. While one is being made a
+ * light band sweeps down the figure.
+ */
+export function Stage({ avatarUri, tryonUri, busy, style }: { avatarUri: string | null; tryonUri: string | null; busy?: boolean; style?: ViewStyle }) {
   return (
     <View style={[{ backgroundColor: C.card, borderRadius: R.card, overflow: 'hidden' }, style]}>
       {tryonUri ? (
         <Image source={{ uri: tryonUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" transition={200} />
+      ) : avatarUri ? (
+        <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" />
       ) : (
-        <>
-          {/* The figure fills the stage exactly as the AI try-on will; the chosen garments sit in a narrow column
-              on the right edge at about the height they are worn, so nothing looks "worn" before the try-on. */}
-          {avatarUri ? <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" /> : <Silhouette />}
-          {/* Ends above the turn buttons that the fitting room lays over the bottom of the stage. */}
-          <View style={{ position: 'absolute', right: 4, top: '2%', bottom: 60, width: 60 }}>
-            {BANDS.map((slot) => {
-              const it = items.find((x) => x.slot === slot);
-              return (
-                <View key={slot} style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-end' }}>
-                  {it ? (
-                    <View style={{ height: '94%', maxHeight: 80, aspectRatio: 0.75, padding: 2, borderRadius: R.small, backgroundColor: '#FFFFFF', boxShadow: '0 1px 4px rgba(0,0,0,0.16)' }}>
-                      <ItemImage item={it} style={{ flex: 1, borderRadius: 6 }} />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
-        </>
-      )}
-      {busy ? (
-        <View style={{ position: 'absolute', left: 8, top: 8, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: R.pill, backgroundColor: C.scrim, paddingHorizontal: 10, paddingVertical: 4 }}>
-          <ActivityIndicator size="small" color="#FFFFFF" />
-          <Text style={{ color: '#FFFFFF', fontSize: 11 }}>正在生成上身效果</Text>
+        <View style={{ position: 'absolute', left: '30%', right: '30%', top: '8%', bottom: '4%', opacity: 0.6 }}>
+          <Silhouette color="#C9C9CC" />
         </View>
-      ) : null}
+      )}
+      {busy ? <Sweep /> : null}
+    </View>
+  );
+}
+
+function Sweep() {
+  const [y] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(y, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [y]);
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, overflow: 'hidden' }}>
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          height: '30%',
+          backgroundColor: 'rgba(255,255,255,0.35)',
+          transform: [{ translateY: y.interpolate({ inputRange: [0, 1], outputRange: [-300, 900] }) }],
+        }}
+      />
     </View>
   );
 }

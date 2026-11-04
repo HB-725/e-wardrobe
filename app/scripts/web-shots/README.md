@@ -9,7 +9,7 @@ mkdir -p /tmp/shots && node scripts/web-shots/shoot.js /tmp/shots
 ```
 
 `?demo=1` seeds a full wardrobe (`src/dev/seedDemo.ts`), `?demo=empty` a fresh install, `?demo=noavatar` no avatar.
-The images in `demo/` are AI-generated samples (no real person).
+The images in `demo/` are AI-generated samples (no real person); `beanie`, `scarf` and `watch` are drawn illustrations.
 
 `VW` / `VH` set the viewport (default 390×844) and `DPR` the pixel ratio (default 2). Store screenshots (9:16, 1080×1920):
 `VW=360 VH=640 DPR=3 node scripts/web-shots/shoot.js /tmp/store`.

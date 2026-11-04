@@ -6,7 +6,7 @@
  *
  *   [blob 0][blob 1]...[index JSON][footer: "EWBK1" + 16-digit index offset + 16-digit index length]
  */
-import type { ImageFolder } from '@/ai/imageStore';
+import type { ImageExt, ImageFolder } from '@/ai/imageStore';
 import type { BackupStorage } from './backup';
 
 const MAGIC = 'EWBK1';
@@ -103,7 +103,7 @@ export class ArchiveReader implements BackupStorage {
 
   constructor(
     private readonly source: ByteSource,
-    private readonly saveImage: (bytes: Uint8Array, folder: ImageFolder, ext: 'jpg' | 'webp') => Promise<string>,
+    private readonly saveImage: (bytes: Uint8Array, folder: ImageFolder, ext: ImageExt) => Promise<string>,
   ) {}
 
   private async load(): Promise<Index> {
@@ -128,7 +128,7 @@ export class ArchiveReader implements BackupStorage {
   async getImage(name: string, folder: ImageFolder): Promise<string> {
     const e = (await this.load()).images[name];
     if (!e) throw new ArchiveError(`备份里缺少图片 ${name}`);
-    return this.saveImage(await this.source.read(e.offset, e.length), folder, name.endsWith('.webp') ? 'webp' : 'jpg');
+    return this.saveImage(await this.source.read(e.offset, e.length), folder, (/\.(webp|png)$/.exec(name)?.[1] as ImageExt | undefined) ?? 'jpg');
   }
 
   async writeText(): Promise<void> {

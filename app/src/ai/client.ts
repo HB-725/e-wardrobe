@@ -8,7 +8,7 @@ export type AiErrorKind =
   | 'auth' // key rejected
   | 'quota' // account out of credit
   | 'cap' // monthly in-app spend cap reached
-  | 'consent' // user has not agreed to photos being sent to OpenAI
+  | 'consent' // user has not agreed to photos being sent to the provider
   | 'rate' // 429 rate limit, retry later
   | 'network' // could not connect (offline); nothing was sent
   | 'timeout' // no answer in time; the request may still have been processed (and billed)
@@ -47,15 +47,15 @@ export function describeAiError(e: unknown, interactive = false): string {
   if (interactive && (e.kind === 'rate' || e.kind === 'server' || e.kind === 'bad_response')) return 'AI 服务暂时不可用，请稍后重试';
   switch (e.kind) {
     case 'no_key':
-      return '还没有填写 API Key，去「我的」页面填写';
+      return '还没有能用于这项功能的 API Key，去「我的 → API 与模型」添加';
     case 'auth':
-      return 'API Key 无效或已失效，去「我的」页面更换';
+      return 'API Key 无效或已失效，去「我的 → API 与模型」更换';
     case 'quota':
-      return 'OpenAI 账户余额不足，充值后会自动继续';
+      return 'AI 服务商账户的余额或额度不足，充值后会自动继续';
     case 'cap':
       return '已达到本月 AI 花费上限，可在「我的」页面提高上限';
     case 'consent':
-      return '需要你同意把照片发送给 OpenAI，才能继续生成';
+      return '需要你同意把照片发送给所选的 AI 服务商，才能继续生成';
     case 'rate':
       return '请求太频繁，稍后自动重试';
     case 'network':

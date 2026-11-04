@@ -11,9 +11,14 @@ export interface AiSettings {
   quality: QualityLevel;
   /** How many catalog candidates to generate per garment. */
   candidates: number;
+  /** Set from the regenerate panel ("以后商品图都用这个"); cleared when the quality level is changed on the Me page. */
+  catalogQuality?: 'low' | 'medium' | 'high';
+  /** Set from the try-on sheet ("以后上身效果都用这个"); cleared like catalogQuality. */
+  tryonQuality?: 'low' | 'medium' | 'high';
 }
 
-export const DEFAULT_AI_SETTINGS: AiSettings = { capUsd: 5, quality: 'standard', candidates: 2 };
+// One candidate: on 44 real garments the second one beat the first 3 times; a miss goes to the regenerate panel.
+export const DEFAULT_AI_SETTINGS: AiSettings = { capUsd: 5, quality: 'standard', candidates: 1 };
 
 const K = {
   settings: 'ai.settings',
@@ -49,23 +54,20 @@ export async function setAiBlocked(db: Db, reason: string | null): Promise<void>
   await setSetting(db, K.blocked, reason ?? '');
 }
 
-const PHOTO_CONSENT = 'privacy.photoConsent';
-
-/** Whether the user agreed that their photos are sent to OpenAI (asked once, before the first send). */
-export async function hasPhotoConsent(db: Db): Promise<boolean> {
-  return (await getSetting(db, PHOTO_CONSENT)) === '1';
-}
-
-export async function setPhotoConsent(db: Db): Promise<void> {
-  await setSetting(db, PHOTO_CONSENT, '1');
-}
-
 export type ImageTask = 'catalog' | 'avatar' | 'tryon' | 'photo';
 
 export function qualityFor(level: QualityLevel, task: ImageTask): 'low' | 'medium' | 'high' {
   if (level === 'economy') return 'low';
   if (level === 'high') return task === 'catalog' ? 'medium' : 'high';
   return task === 'catalog' ? 'low' : 'medium';
+}
+
+export function catalogQuality(s: AiSettings): 'low' | 'medium' | 'high' {
+  return s.catalogQuality ?? qualityFor(s.quality, 'catalog');
+}
+
+export function tryonQuality(s: AiSettings): 'low' | 'medium' | 'high' {
+  return s.tryonQuality ?? qualityFor(s.quality, 'tryon');
 }
 
 // ---------- preferences that are not AI-specific ----------

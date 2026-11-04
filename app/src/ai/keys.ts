@@ -1,8 +1,10 @@
 import type { Db } from '@/db/db';
 import { newId, nowIso, parseJson } from '@/db/db';
 import { getSetting, setSetting } from '@/db/misc';
-import { AUTO_ROUTES, type KeyEntry, type ProviderId, type Routes } from './catalog';
+import { AUTO_ROUTES, type KeyEntry, type ProviderId, PURPOSES, resolveRoute, type Routes, type Routing, usableModels } from './catalog';
+import { createOpenAiClient, type OpenAiClient } from './client';
 import { getModelChoice } from './config';
+import { createGeminiClient } from './providers/gemini';
 
 /**
  * API keys from several providers (docs/design/multi-provider.md). The keys themselves live only in the platform's
@@ -24,12 +26,27 @@ const S = {
   consent: 'privacy.consent',
   migrated: 'ai.keysMigrated',
   legacyConsent: 'privacy.photoConsent',
+  builtIn: 'ai.builtInKey',
 } as const;
 
 export const PROVIDER_LABEL: Record<ProviderId, string> = { openai: 'OpenAI', gemini: 'Google Gemini' };
 
+export function createClient(provider: ProviderId, apiKey: string, timeoutMs?: number): OpenAiClient {
+  return provider === 'gemini' ? createGeminiClient({ apiKey, timeoutMs }) : createOpenAiClient({ apiKey, timeoutMs });
+}
+
+/** Reads the provider's model list: the models of it this app can use. */
+export async function probeModels(provider: ProviderId, client: OpenAiClient): Promise<string[]> {
+  return usableModels(provider, await client.listModels());
+}
+
 export async function listKeys(db: Db): Promise<KeyEntry[]> {
   return parseJson<KeyEntry[]>(await getSetting(db, S.keys), []);
+}
+
+export async function loadRouting(db: Db): Promise<Routing> {
+  const [keys, routes] = await Promise.all([listKeys(db), getRoutes(db)]);
+  return { keys, routes };
 }
 
 async function saveKeys(db: Db, keys: KeyEntry[]): Promise<void> {
@@ -69,6 +86,21 @@ export async function addKey(db: Db, secrets: SecretStore, provider: ProviderId,
   return entry;
 }
 
+/**
+ * A key built into test builds (EXPO_PUBLIC_OPENAI_API_KEY / EXPO_PUBLIC_GEMINI_API_KEY in app/.env.local), so they
+ * work without adding one. Added once per key, on the first start that reaches the provider; removing it keeps it removed.
+ */
+export async function addBuiltInKey(db: Db, secrets: SecretStore, provider: ProviderId, apiKey: string | undefined, client?: OpenAiClient): Promise<boolean> {
+  const key = apiKey?.trim();
+  const done = `${S.builtIn}.${provider}`;
+  if (!key || (await getSetting(db, done)) === key.slice(-4)) return false;
+  const models = await probeModels(provider, client ?? createClient(provider, key, 20_000));
+  const entry = await addKey(db, secrets, provider, key, `${PROVIDER_LABEL[provider]}（内置）`);
+  await markVerified(db, entry.id, models);
+  await setSetting(db, done, key.slice(-4));
+  return true;
+}
+
 /** Records a successful verification: the models this key can use, and a clean slate for blocked ones. */
 export async function markVerified(db: Db, id: string, models: string[], at = nowIso()): Promise<void> {
   const keys = await listKeys(db);
@@ -96,6 +128,13 @@ export async function removeKey(db: Db, secrets: SecretStore, id: string): Promi
   await secrets.set(secretName(id), null);
 }
 
+/** Privacy wipe: the secrets go first, since the descriptions are the only list of them. */
+export async function removeAllKeys(db: Db, secrets: SecretStore): Promise<void> {
+  for (const k of await listKeys(db)) await secrets.set(secretName(k.id), null);
+  await secrets.set(LEGACY_KEY, null);
+  await saveKeys(db, []);
+}
+
 // ---------- consent, per provider ----------
 
 /** Whether the user agreed that their photos are sent to this provider (asked before the first send to each). */
@@ -106,6 +145,15 @@ export async function hasConsentFor(db: Db, provider: ProviderId): Promise<boole
 export async function setConsentFor(db: Db, provider: ProviderId, at = nowIso()): Promise<void> {
   const all = parseJson<Partial<Record<ProviderId, string>>>(await getSetting(db, S.consent), {});
   await setSetting(db, S.consent, JSON.stringify({ ...all, [provider]: at }));
+}
+
+/** Providers the current routes would send photos to that the user has not agreed to yet. */
+export async function pendingConsent(db: Db): Promise<ProviderId[]> {
+  const { keys, routes } = await loadRouting(db);
+  const used = new Set(PURPOSES.map((p) => resolveRoute(p.id, routes, keys)?.provider).filter((p): p is ProviderId => !!p));
+  const out: ProviderId[] = [];
+  for (const p of used) if (!(await hasConsentFor(db, p))) out.push(p);
+  return out;
 }
 
 // ---------- one-time move from the single OpenAI key ----------

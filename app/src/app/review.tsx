@@ -2,14 +2,20 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { estimateFor } from '@/ai/catalog';
 import { AiError, type AiErrorKind, blockedRoute, describeAiError } from '@/ai/client';
+import { catalogQuality, getAiSettings } from '@/ai/config';
+import { formatEstimate } from '@/ai/models';
+import { SLOT_LABEL } from '@/domain/catalog';
 import type { Item } from '@/domain/types';
-import { confirmItem, keepCurrent, keepOriginal, needsReview, regenerateItem, removeItem, retryItem } from '@/state/actions';
+import { confirmItem, confirmPicks, keepCurrent, keepOriginal, needsReview, regenerateWith, removeItem, retryItem, setDetections } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { loadSnapshot, type Snapshot } from '@/state/snapshot';
 import { confirmAsync, notify } from '@/ui/dialogs';
 import { type Form, formOf, formProblems, ItemForm, patchOf } from '@/ui/ItemForm';
-import { Btn, Loading, NavHeader, Screen, T, Tap } from '@/ui/kit';
+import { Btn, Checkbox, Loading, NavHeader, Screen, T, Tap } from '@/ui/kit';
+import { PickMarks } from '@/ui/PhotoBoxes';
+import { RegenerateSheet } from '@/ui/RegenerateSheet';
 import { C, PAD, R } from '@/ui/theme';
 
 /** Ready items first, then failed, then still generating; oldest first within a group. */
@@ -24,6 +30,7 @@ export default function ReviewPage() {
   const app = useApp();
   const params = useLocalSearchParams<{ id?: string }>();
   const s = useData(loadSnapshot);
+  const settings = useData(getAiSettings);
   const [curId, setCurId] = useState<string | null>(params.id ?? null);
   // Chosen candidate per item + candidate set, so a regenerated set starts again at the first one.
   const [picks, setPicks] = useState<Record<string, number>>({});
@@ -31,6 +38,7 @@ export default function ReviewPage() {
   const [edits, setEdits] = useState<Record<string, Partial<Form>>>({});
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(0);
+  const [regenOpen, setRegenOpen] = useState(false);
 
   const queue = s ? queueOf(s) : [];
   const cur = queue.find((i) => i.id === curId) ?? queue.find(needsReview) ?? queue[0] ?? null;
@@ -69,7 +77,8 @@ export default function ReviewPage() {
   const chosen = cur.candidates[pick] ?? null;
   const checks = cur.checks[pick] ?? [];
   const ready = needsReview(cur);
-  const isRegen = ready && cur.status !== 'review';
+  const isPick = cur.status === 'pick';
+  const isRegen = ready && (cur.status === 'active' || cur.status === 'archived');
   const otherReady = queue.some((i) => i.id !== cur.id && needsReview(i));
 
   const run = async (fn: () => Promise<void>, advance = true) => {
@@ -97,7 +106,27 @@ export default function ReviewPage() {
     void run(() => fn(patchOf(cur, f)));
   };
 
-  const footer = isRegen ? (
+  const picked = cur.detections.filter((d) => d.selected).length;
+  const one = settings ? estimateFor(s.routing, 'catalog', { inputImages: 1, quality: catalogQuality(settings), n: Math.max(1, Math.min(3, settings.candidates)) }) : null;
+  const toggle = (i: number) => run(() => setDetections(app, cur.id, cur.detections.map((d, j) => (j === i ? { ...d, selected: !d.selected } : d))), false);
+  const dropPhoto = async () => {
+    if (!(await confirmAsync('这张照片一件都不录？', '照片会删除。'))) return;
+    await run(() => removeItem(app, cur.id), false);
+    next();
+  };
+
+  const footer = isPick ? (
+    <>
+      <Btn label="全不要" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={dropPhoto} />
+      <Btn
+        label={picked ? `录入 ${picked} 件 · ${formatEstimate(one === null ? null : one * picked)}` : '先选要录入的衣服'}
+        style={{ flex: 2 }}
+        loading={busy}
+        disabled={!picked}
+        onPress={() => run(async () => void (await confirmPicks(app, cur.id)))}
+      />
+    </>
+  ) : isRegen ? (
     <>
       <Btn label="保留现在的" kind="outline" style={{ flex: 1 }} disabled={busy} onPress={saveWith((patch) => keepCurrent(app, cur.id, patch))} />
       <Btn label="换成新的" style={{ flex: 2 }} loading={busy} disabled={!chosen} onPress={saveWith((patch) => confirmItem(app, cur.id, pick, patch))} />
@@ -122,7 +151,7 @@ export default function ReviewPage() {
   return (
     <Screen footer={footer}>
       <NavHeader
-        title={isRegen ? '选择新的标准图' : '确认新单品'}
+        title={isPick ? '选择要录入的衣服' : isRegen ? '选择新的标准图' : '确认新单品'}
         subtitle={`第 ${index + 1} 件 / 共 ${queue.length} 件`}
         right={
           <Tap
@@ -138,6 +167,27 @@ export default function ReviewPage() {
           </Tap>
         }
       />
+      {isPick && cur.originalUri ? (
+        <View style={{ paddingTop: 16, paddingHorizontal: PAD, gap: 10 }}>
+          <PickMarks uri={cur.originalUri} detections={cur.detections} onToggle={toggle} maxHeight={420} />
+          <T v="caption">照片里有 {cur.detections.length} 件，点圆点或下面的名字选要录入的，可以多选。</T>
+          <View>
+            {cur.detections.map((d, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: C.lineSoft }}>
+                <Tap accessibilityRole="checkbox" accessibilityState={{ checked: d.selected }} onPress={() => toggle(i)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52 }}>
+                  <Checkbox on={d.selected} />
+                  <T style={{ flex: 1, fontSize: 14 }} numberOfLines={1}>
+                    {d.manual ? '自己框的一件' : `${d.name} · ${SLOT_LABEL[d.slot]}`}
+                  </T>
+                </Tap>
+                <Btn label="调整框" kind="outline" height={36} disabled={busy} onPress={() => router.push(`/crop?id=${cur.id}&det=${i}`)} />
+              </View>
+            ))}
+          </View>
+          <Btn label="自己框一件" icon="plus" kind="ghost" height={44} disabled={busy} onPress={() => router.push(`/crop?id=${cur.id}&det=new`)} />
+        </View>
+      ) : null}
+      {isPick ? null : (
       <View style={{ flexDirection: 'row', gap: 8, paddingTop: 16, paddingHorizontal: PAD }}>
         <View style={{ flex: 1, gap: 6 }}>
           <View style={{ aspectRatio: 2 / 3, borderRadius: R.card, overflow: 'hidden', backgroundColor: C.card }}>
@@ -170,7 +220,8 @@ export default function ReviewPage() {
           <T style={{ fontSize: 12, fontWeight: '500' }}>{chosen ? `标准图 · 方案 ${pick + 1}` : '标准图'}</T>
         </View>
       </View>
-      {ready ? (
+      )}
+      {ready && !isPick ? (
         <View style={{ flexDirection: 'row', gap: 8, paddingTop: 10, paddingHorizontal: PAD, alignItems: 'center' }}>
           <T v="caption" style={{ marginRight: 4 }}>
             候选
@@ -180,7 +231,7 @@ export default function ReviewPage() {
               <Image source={{ uri: c }} style={{ flex: 1 }} contentFit="cover" />
             </Pressable>
           ))}
-          <Btn label="重新生成" kind="outline" height={44} style={{ marginLeft: 'auto' }} disabled={busy} onPress={() => run(() => regenerateItem(app, cur.id), false)} />
+          <Btn label="重新生成" kind="outline" height={44} style={{ marginLeft: 'auto' }} disabled={busy || !settings} onPress={() => setRegenOpen(true)} />
         </View>
       ) : null}
       {checks.length > 0 ? (
@@ -199,7 +250,28 @@ export default function ReviewPage() {
           ))}
         </View>
       ) : null}
-      <ItemForm item={cur} form={f} onChange={set} style={{ paddingTop: 12, paddingHorizontal: PAD }} />
+      {isPick ? null : <ItemForm item={cur} form={f} onChange={set} style={{ paddingTop: 12, paddingHorizontal: PAD }} />}
+      {settings ? (
+        <RegenerateSheet
+          key={cur.id}
+          visible={regenOpen}
+          onClose={() => setRegenOpen(false)}
+          item={cur}
+          routing={s.routing}
+          settings={settings}
+          onCrop={() => {
+            setRegenOpen(false);
+            router.push(`/crop?id=${cur.id}&mode=item`);
+          }}
+          onSubmit={(opts) => {
+            // Category, name and colour typed here are saved first, so the new picture follows them.
+            const problems = formProblems(f);
+            if (problems.length) return notify('请先改一下', problems.join('\n'));
+            setRegenOpen(false);
+            void run(() => regenerateWith(app, cur.id, patchOf(cur, f), opts), false);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }

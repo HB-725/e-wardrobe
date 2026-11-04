@@ -28,7 +28,7 @@ type Table = (typeof TABLES)[number];
 
 /** Columns holding one image uri, and which app folder the image belongs in. */
 const URI_COLUMNS: Partial<Record<Table, Record<string, ImageFolder>>> = {
-  items: { original_uri: 'original', catalog_uri: 'catalog', tag_uri: 'tag' },
+  items: { original_uri: 'original', catalog_uri: 'catalog', tag_uri: 'tag', source_uri: 'original' },
   wear_logs: { photo_uri: 'mirror' },
   avatar: { front_uri: 'avatar', back_uri: 'avatar' },
   tryon_cache: { uri: 'tryon', avatar_version: 'avatar' },
@@ -38,8 +38,11 @@ const URI_LIST_COLUMNS: Partial<Record<Table, Record<string, ImageFolder>>> = {
   items: { candidates: 'catalog' },
   avatar: { source_uris: 'body' },
 };
-/** Settings that describe this phone (its key, its queue) rather than the user's data; never backed up or replaced. */
-const DEVICE_SETTINGS = ['ai.blocked', 'ai.keyLast4', 'ai.models'];
+/**
+ * Settings that describe this phone (its keys, its queue) rather than the user's data; never backed up or replaced.
+ * The key list only makes sense next to the secrets in this phone's keystore, and the model choices point at its keys.
+ */
+const DEVICE_SETTINGS = ['ai.blocked', 'ai.keyLast4', 'ai.models', 'ai.keys', 'ai.routes', 'ai.keysMigrated'];
 
 interface BackupFile {
   format: typeof BACKUP_FORMAT;

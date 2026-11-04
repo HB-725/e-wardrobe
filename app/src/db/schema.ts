@@ -109,6 +109,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE items ADD COLUMN candidates TEXT NOT NULL DEFAULT '[]';
   ALTER TABLE items ADD COLUMN checks TEXT NOT NULL DEFAULT '[]';
   `,
+  `
+  ALTER TABLE items ADD COLUMN source_uri TEXT;
+  ALTER TABLE items ADD COLUMN crop TEXT;
+  ALTER TABLE items ADD COLUMN detections TEXT NOT NULL DEFAULT '[]';
+  `,
+  `
+  ALTER TABLE outfit_items ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE outfit_items ADD COLUMN styling TEXT;
+  `,
+  `
+  ALTER TABLE outfits ADD COLUMN makeup TEXT;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -18,7 +18,7 @@ function TabBar({ state, navigateToTab }: BottomTabBarProps) {
   return (
     <View
       accessibilityRole="tablist"
-      style={{ flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8, paddingHorizontal: 8, paddingBottom: Math.max(insets.bottom, 10), backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.line }}
+      style={{ flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8, paddingHorizontal: 8, paddingBottom: 10 + insets.bottom, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.line }}
     >
       {state.routes.map((route, i) => {
         const tab = TABS.find((t) => t.name === route.name);
