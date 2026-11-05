@@ -13,7 +13,8 @@ const FIELD_LINES = [
   'name：2–6 个字的简短名称，例如「牛仔夹克」「白色衬衫」「直筒牛仔裤」。',
   'slot：outer 外套 / top 上衣 / bottom 下装（裤、裙）/ shoes 鞋 / bag 包 / accessory 配饰（帽、围巾、腰带等）。连衣裙算 top。',
   'subcategory：更细的类别，例如「夹克」「衬衫」「半裙」。',
-  'colorName：主色的中文名，例如「靛蓝」「米白」；colorHex：主色的十六进制。',
+  // The image model paints the hex it is given: navy pants called 黑色 #1A1A1A came back black.
+  'colorName：主色的中文名，例如「靛蓝」「米白」。深色要分清藏青、黑、深灰、墨绿，灰要分清麻灰、浅灰；褪色或水洗过的黑写「褪色黑」「水洗黑」。colorHex：主色的十六进制，按衣服本身的颜色取，别被阴影和室内灯光带黑。',
   'seasons：适合的季节，可多选。',
   'printText：衣服上印的文字、logo 字样，逐字抄写（含大小写）；没有文字填 null。',
 ];

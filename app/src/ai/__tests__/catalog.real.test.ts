@@ -32,7 +32,12 @@ const KEY = process.env.REAL_AI_KEY ?? 'proxy-injected';
   it('recognises every photo, cuts the garment out and makes catalog candidates', async () => {
     const db = await createTestDb();
     const images = new DiskImages(DIR!);
-    const client = (PROVIDER === 'gemini' ? createGeminiClient : createOpenAiClient)({ apiKey: KEY, fetch: curlFetch(DIR!) });
+    // Every image prompt sent, to see what the recognition told the image model.
+    const logPrompt = (body: string) => {
+      const prompt = /"prompt":"((?:[^"\\]|\\.)*)"/.exec(body)?.[1];
+      if (prompt) fs.appendFileSync(path.join(DIR!, 'prompts.txt'), `${JSON.parse(`"${prompt}"`)}\n\n`);
+    };
+    const client = (PROVIDER === 'gemini' ? createGeminiClient : createOpenAiClient)({ apiKey: KEY, fetch: curlFetch(DIR!, logPrompt) });
     const deps: AiDeps = { db, images, clientFor: async () => client };
     const secrets = new Map<string, string>();
     const k = await addKey(db, { get: async (n) => secrets.get(n) ?? null, set: async (n, v) => void (v ? secrets.set(n, v) : secrets.delete(n)) }, PROVIDER, KEY);

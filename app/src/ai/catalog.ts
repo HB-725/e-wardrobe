@@ -108,14 +108,14 @@ const AUTO_ORDER: Record<'image' | 'vision', [ProviderId, string][]> = {
 
 /**
  * Catalog images must keep the garment's real look (fading, washes, logos, exact colour). On 9 real photos and 9
- * models (2026-11-05): gpt-image-1-mini lost it at any quality; Gemini 3.1 Flash-Lite kept it with a clean, even
- * background at $0.034 a picture; gpt-image-2 and gpt-image-1.5 (low) kept it too; Gemini 3.1 Flash and 3 Pro were
- * no better than Lite for 3–5× the price; Gemini 2.5 kept it but with uneven backgrounds. Try-ons and photos keep
- * the cheaper AUTO_ORDER.
+ * models (2026-11-05): gpt-image-1-mini lost it at any quality, and no prompt got it back; gpt-image-2 (low) and
+ * Gemini 3.1 Flash-Lite both kept it, at $0.016 and $0.046 a garment (recognition, one picture, check), so
+ * gpt-image-2 goes first; gpt-image-1.5 (low) kept it too; Gemini 3.1 Flash and 3 Pro were no better than Lite for
+ * 3–5× the price; Gemini 2.5 kept it but with uneven backgrounds. Try-ons and photos keep the cheaper AUTO_ORDER.
  */
 const CATALOG_ORDER: [ProviderId, string][] = [
-  ['gemini', 'gemini-3.1-flash-lite-image'],
   ['openai', 'gpt-image-2'],
+  ['gemini', 'gemini-3.1-flash-lite-image'],
   ['openai', 'gpt-image-1.5'],
   ['gemini', 'gemini-3.1-flash-image'],
   ['gemini', 'gemini-2.5-flash-image'],

@@ -49,7 +49,7 @@ interface ModelInfo {                              // 代码里的已知模型�
 
 | 用途 | 顺序 |
 | --- | --- |
-| 商品图 | gemini-3.1-flash-lite-image → gpt-image-2 → gpt-image-1.5 → gemini-3.1-flash-image → gemini-2.5-flash-image → gpt-image-1-mini → gpt-image-1（2026-11-05 用 9 张实拍比了 9 个模型：mini 任何画质都丢做旧、水洗、logo；3.1 Flash-Lite 最还原且背景干净，$0.034/张） |
+| 商品图 | gpt-image-2 → gemini-3.1-flash-lite-image → gpt-image-1.5 → gemini-3.1-flash-image → gemini-2.5-flash-image → gpt-image-1-mini → gpt-image-1（2026-11-05 用 9 张实拍比了 9 个模型：mini 任何画质都丢做旧、水洗、logo；gpt-image-2 低画质和 3.1 Flash-Lite 还原度接近，一件 $0.016 对 $0.046，所以在前） |
 | 形象 / 上身效果 / 大片 | gpt-image-1-mini → gemini-2.5-flash-image → gemini-3.1-flash-lite-image → gemini-3.1-flash-image → gpt-image-1.5 / gpt-image-1 / gpt-image-2 → 其他探测到的 Gemini 生图模型 |
 | 识别 | gpt-5.4-nano → gemini-3.1-flash-lite → 3.5-flash-lite → 2.5-flash-lite（老 Key 才有）→ 3-flash-preview → 其他 OpenAI 小模型 |
 

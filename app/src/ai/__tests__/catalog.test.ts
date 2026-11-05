@@ -72,7 +72,8 @@ describe('catalog images', () => {
   // On 9 real garment photos (2026-11-05, 9 models) gpt-image-1-mini lost fading, washes, logos and colours at any
   // quality. Gemini 3.1 Flash-Lite Image kept them with a clean background at $0.034 a picture; gpt-image-2 and
   // gpt-image-1.5 (low) kept them too; Gemini 2.5 did but with uneven backgrounds. Try-ons keep the cheaper order.
-  it('prefers Gemini 3.1 Flash-Lite, then gpt-image-2 / 1.5, over mini for catalog images only', () => {
+  // gpt-image-2 (low) keeps the garment as well as Gemini 3.1 Flash-Lite for a third of the price ($0.016 vs $0.046 a garment).
+  it('prefers gpt-image-2, then Gemini 3.1 Flash-Lite, then gpt-image-1.5, over mini for catalog images only', () => {
     const k = key('k6', 'openai', ['gpt-image-1-mini', 'gpt-image-1.5', 'gpt-5.4-nano']);
     expect(resolveRoute('catalog', AUTO_ROUTES, [k])).toMatchObject({ model: 'gpt-image-1.5' });
     expect(resolveRoute('tryon', AUTO_ROUTES, [k])).toMatchObject({ model: 'gpt-image-1-mini' });
@@ -80,6 +81,7 @@ describe('catalog images', () => {
     expect(resolveRoute('catalog', AUTO_ROUTES, [k, g3])).toMatchObject({ model: 'gemini-3.1-flash-lite-image' });
     const o2 = key('k8', 'openai', ['gpt-image-1-mini', 'gpt-image-1.5', 'gpt-image-2']);
     expect(resolveRoute('catalog', AUTO_ROUTES, [o2])).toMatchObject({ model: 'gpt-image-2' });
+    expect(resolveRoute('catalog', AUTO_ROUTES, [g3, o2])).toMatchObject({ model: 'gpt-image-2' });
     expect(resolveRoute('catalog', AUTO_ROUTES, [openai, gemini])).toMatchObject({ provider: 'gemini', model: 'gemini-2.5-flash-image' });
     expect(resolveRoute('catalog', AUTO_ROUTES, [openai])).toMatchObject({ model: 'gpt-image-1-mini' });
   });

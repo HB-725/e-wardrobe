@@ -12,7 +12,7 @@ import { outfitKey } from '@/domain/outfit';
 import { type AiDeps, applyAutofill, generatePhoto, matchMirror, pickMirrorCandidates, tryonRef } from '../engine';
 import { imageExt, type ImageStore } from '../imageStore';
 import { addKey, listKeys, markVerified, saveRoutes, setConsentFor } from '../keys';
-import { type AutofillResult, catalogPrompt, type DetectResult, photoPrompt, SCENES, tryonPrompt } from '../prompts';
+import { autofillText, catalogPrompt, photoPrompt, SCENES, tryonPrompt, type AutofillResult, type DetectResult } from '../prompts';
 import { lookKey } from '@/domain/look';
 import { JobRunner } from '../runner';
 
@@ -829,6 +829,13 @@ describe('garments on a photo', () => {
     expect(p).toContain('fading');
     expect(p).toContain('illegible');
     expect(p).not.toContain('complete parts that were hidden');
+  });
+
+  // On 9 real photos (2026-11-05) the recogniser called navy track pants 黑色 #1A1A1A and gpt-image-2 drew them black.
+  it('tells the recogniser to tell navy from black and a faded black from a black', () => {
+    const t = autofillText(false);
+    expect(t).toContain('藏青');
+    expect(t).toContain('褪色');
   });
 
   it('puts the owner notes last in the catalog prompt', () => {
