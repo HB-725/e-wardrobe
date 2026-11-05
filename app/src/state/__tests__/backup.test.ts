@@ -30,6 +30,12 @@ class Images implements ImageStore {
   async crop(u: string, _box: unknown, folder: ImageFolder) {
     return this.saveBase64(this.disk.files.get(u) ?? '', folder);
   }
+  async size() {
+    return { width: 1024, height: 1536 };
+  }
+  async layer(dressedB64: string, greenUri: string) {
+    return `mem://layer/${dressedB64.length}-${greenUri.length}`;
+  }
   async remove(u: string | null | undefined) {
     if (u) {
       this.removed.push(u);

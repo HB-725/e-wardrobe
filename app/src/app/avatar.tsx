@@ -47,6 +47,10 @@ function Setup({ avatar, settings, blocked, routing }: { avatar: Avatar; setting
   const [height, setHeight] = useState(avatar.heightCm ? String(avatar.heightCm) : '');
   const [weight, setWeight] = useState(avatar.weightKg ? String(avatar.weightKg) : '');
   const [build, setBuild] = useState(avatar.build ?? 'avg');
+  // Optional: measured once, they make the fitting room's to-scale garments and fit words exact.
+  const [shoulder, setShoulder] = useState(avatar.shoulderCm ? String(avatar.shoulderCm) : '');
+  const [chest, setChest] = useState(avatar.chestCm ? String(avatar.chestCm) : '');
+  const [waist, setWaist] = useState(avatar.waistCm ? String(avatar.waistCm) : '');
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   // Photos taken here but never used for a generation are deleted when the page closes.
@@ -113,7 +117,8 @@ function Setup({ avatar, settings, blocked, routing }: { avatar: Avatar; setting
   const photosOk = photos.every(Boolean);
   const quality = qualityFor(settings.quality, 'avatar');
   const cost = addCosts(estimateFor(routing, 'avatar', { inputImages: 3, quality }), estimateFor(routing, 'avatar', { inputImages: 2, quality }));
-  const body = { heightCm: h, weightKg: w, build };
+  const cm = (v: string) => (Number(v) > 0 ? Number(v) : null);
+  const body = { heightCm: h, weightKg: w, build, shoulderCm: cm(shoulder), chestCm: cm(chest), waistCm: cm(waist) };
 
   const generate = safe(async () => {
     if (processing) {
@@ -225,6 +230,11 @@ function Setup({ avatar, settings, blocked, routing }: { avatar: Avatar; setting
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {input('身高 (cm)', height, setHeight)}
           {input('体重 (kg)', weight, setWeight)}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {input('肩宽 (cm，选填)', shoulder, setShoulder)}
+          {input('胸围 (cm，选填)', chest, setChest)}
+          {input('腰围 (cm，选填)', waist, setWaist)}
         </View>
         {height && weight && !bodyOk ? <T style={{ fontSize: 12, color: C.danger }}>请填写合理的身高（100–230 cm）和体重（25–250 kg）</T> : null}
         <View style={{ gap: 8 }}>

@@ -1,17 +1,19 @@
 import { type Box, boxArea, fromBox2d, padBox, tidyGarments } from '@/domain/crop';
 import { idsOfKey, lookKey, withoutMakeupKey } from '@/domain/look';
 import { makeupPromptText } from '@/domain/makeup';
-import type { Detection, FieldSource, Item, Job, Slot, Styling } from '@/domain/types';
+import type { Avatar, Detection, FieldSource, Item, Job, Slot, Styling } from '@/domain/types';
 import type { Db } from '@/db/db';
 import { getItem, listItems, updateItem } from '@/db/items';
 import { hasNewerJob, updateJobPayload } from '@/db/jobs';
-import { addUsage, avatarUsable, avatarVersion, deleteTryon, getAvatar, getTryon, monthSpend, pruneTryons, putTryon, saveAvatar } from '@/db/misc';
+import { addUsage, avatarUsable, avatarVersion, deleteTryon, getAvatar, getTryon, listLayers, monthSpend, pruneLayers, pruneTryons, putLayer, putTryon, saveAvatar } from '@/db/misc';
 import { callCost, type KeyEntry, modelInfo, type Purpose, type Resolved, resolveRoute, type Route } from './catalog';
 import { AiError, type OpenAiClient } from './client';
 import { catalogQuality, getAiSettings, qualityFor, tryonQuality } from './config';
 import { type ImageStore, imageExt } from './imageStore';
 import { blockModelForKey, getRoutes, hasConsentFor, listKeys, markVerified, probeModels } from './keys';
-import { ANALYSIS_SCHEMA, ANALYSIS_SYSTEM, type AnalysisResult, analysisText, AUTOFILL_SCHEMA, AUTOFILL_SYSTEM, type AutofillResult, autofillText, avatarBackPrompt, avatarFrontPrompt, catalogPrompt, DETECT_SCHEMA, DETECT_SYSTEM, type DetectResult, detectText, FACE_SCHEMA, FACE_SYSTEM, FACE_TEXT, type FaceResult, FIDELITY_SCHEMA, FIDELITY_SYSTEM, type FidelityResult, fidelityText, type GarmentFields, makeupPrompt, MIRROR_SCHEMA, MIRROR_SYSTEM, type MirrorResult, mirrorText, OUTFIT_SCHEMA, OUTFIT_SYSTEM, type OutfitResult, outfitText, photoPrompt, SCENES, STYLE_REF_NOTE, tryonBackPrompt, tryonPrompt } from './prompts';
+import { bodyOf, fitWords, garmentBrief } from '@/domain/fit';
+import { maskBox, maskPng } from '@/domain/layers';
+import { ANALYSIS_SCHEMA, ANALYSIS_SYSTEM, type AnalysisResult, analysisText, AUTOFILL_SCHEMA, AUTOFILL_SYSTEM, type AutofillResult, autofillText, avatarBackPrompt, avatarFrontPrompt, catalogPrompt, DETECT_SCHEMA, DETECT_SYSTEM, type DetectResult, detectText, FACE_SCHEMA, FACE_SYSTEM, FACE_TEXT, type FaceResult, FIDELITY_SCHEMA, FIDELITY_SYSTEM, type FidelityResult, fidelityText, type GarmentFields, makeupPrompt, MIRROR_SCHEMA, MIRROR_SYSTEM, type MirrorResult, mirrorText, OUTFIT_SCHEMA, OUTFIT_SYSTEM, type OutfitResult, outfitText, GREEN_PROMPT, layerPrompt, photoPrompt, sceneOf, STYLE_REF_NOTE, tryonBackPrompt, tryonPrompt, type Worn } from './prompts';
 
 export interface AiDeps {
   db: Db;
@@ -84,6 +86,7 @@ async function generate(
     quality: 'low' | 'medium' | 'high';
     n?: number;
     transparent?: boolean;
+    mask?: string;
     /** An existing catalog image, sent to Gemini only (see below). */
     styleRef?: () => Promise<string | null>;
     route?: Route;
@@ -98,7 +101,7 @@ async function generate(
       images = [...images, ref];
     }
     const quality = modelInfo(r.provider, r.model)?.quality ? req.quality : undefined;
-    const res = await client.imageEdit({ model: r.model, prompt, images, quality, n: req.n, size: '1024x1536', transparent: req.transparent });
+    const res = await client.imageEdit({ model: r.model, prompt, images, quality, n: req.n, size: '1024x1536', transparent: req.transparent, mask: req.mask });
     // Unknown prices count as 0: they are not held against the cap (the settings page says so).
     await addUsage(deps.db, { kind, model: r.model, costUsd: callCost(r.provider, r.model, res.usage) ?? 0 });
     return res.images;
@@ -256,6 +259,8 @@ async function runCatalog(deps: AiDeps, startJob: Job): Promise<void> {
     // Everything the photo shows, in words: image models redraw a garment as new unless told what to keep, and a
     // vision model that sees wear (the analysis route, not nano) describes it better than the image model reads it.
     const analysis = await vision<AnalysisResult>(deps, 'catalog', { system: ANALYSIS_SYSTEM, text: analysisText(item.slot), images: [original], schemaName: 'analysis', schema: ANALYSIS_SCHEMA, detail: 'high' }, 'analysis');
+    // Kept on the item: try-ons and photos tell the image model the same things.
+    await updateItem(db, item.id, { look: analysis });
     const b64s = await generate(deps, 'catalog', {
       prompt: catalogPrompt(item.slot, item.name, { name: item.colorName, hex: item.colorHex }, job.payload.hint as string | undefined, printText, analysis),
       images: [original],
@@ -330,12 +335,65 @@ async function runAvatar(deps: AiDeps, job: Job): Promise<void> {
   const [back] = await generate(deps, 'avatar', { prompt: avatarBackPrompt(), images: [frontRef, ...backRef], quality });
   const backUri = await images.saveBase64(back, 'avatar');
 
+  // The same two pictures in flat green base clothes: garments are painted onto these for the fitting room's layers.
+  const [greenFront] = await generate(deps, 'avatar', { prompt: GREEN_PROMPT, images: [frontRef], quality });
+  const greenFrontUri = await images.saveBase64(greenFront, 'avatar');
+  const [greenBack] = await generate(deps, 'avatar', { prompt: GREEN_PROMPT, images: [await images.toDataUrl(backUri, 1024)], quality });
+  const greenBackUri = await images.saveBase64(greenBack, 'avatar');
+
   const prev = await getAvatar(db);
-  await images.remove(prev.frontUri);
-  await images.remove(prev.backUri);
-  const next = await saveAvatar(db, { frontUri, backUri, status: 'ready', error: null });
+  for (const uri of [prev.frontUri, prev.backUri, prev.greenFrontUri, prev.greenBackUri]) await images.remove(uri);
+  const next = await saveAvatar(db, { frontUri, backUri, greenFrontUri, greenBackUri, status: 'ready', error: null });
   for (const uri of await pruneTryons(db, avatarVersion(next))) await images.remove(uri);
+  for (const uri of await pruneLayers(db, avatarVersion(next))) await images.remove(uri);
 }
+
+/**
+ * One garment painted onto the green avatar inside the box of its body part, keyed to a layer the fitting room can
+ * stack (see domain/layers). Needs an image model that paints inside a mask (gpt-image); Gemini refuses.
+ */
+async function runLayer(deps: AiDeps, job: Job): Promise<void> {
+  const { db, images } = deps;
+  const view = job.payload.view === 'back' ? 'back' : 'front';
+  const variant = job.payload.variant === 'open' ? 'open' : 'closed';
+  const item = await getItem(db, job.refId.split('|')[0]);
+  const avatar = await getAvatar(db);
+  const greenUri = view === 'back' ? avatar.greenBackUri : avatar.greenFrontUri;
+  const box = item ? maskBox(item.slot) : null;
+  if (!item?.catalogUri || !avatarUsable(avatar) || !greenUri || !box) return;
+  const version = avatarVersion(avatar);
+  const { width, height } = await images.size(greenUri);
+  const mask = `data:image/png;base64,${toBase64(maskPng(width, height, box))}`;
+  const [worn] = wornOf([item], {}, avatar);
+  const [dressed] = await generate(deps, 'tryon', {
+    prompt: layerPrompt(worn, variant, view),
+    images: [await images.toDataUrl(greenUri, Math.max(width, height)), await images.toDataUrl(item.catalogUri, 768)],
+    mask,
+    quality: 'low',
+  });
+  const uri = await images.layer(dressed, greenUri, box);
+  const now = await getItem(db, item.id);
+  // The picture or the avatar changed meanwhile: this layer belongs to neither.
+  if (!now || now.catalogUri !== item.catalogUri || avatarVersion(await getAvatar(db)) !== version) return images.remove(uri);
+  const old = (await listLayers(db, [item.id], version)).find((l) => l.view === view && l.variant === variant);
+  await putLayer(db, { itemId: item.id, avatarVersion: version, view, variant, uri });
+  if (old && old.uri !== uri) await images.remove(old.uri);
+}
+
+const toBase64 = (bytes: Uint8Array): string => {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+};
+
+/** The garments as the try-on and photo prompts describe them: slot, how it is worn, what it looks like, how it fits. */
+function wornOf(garments: Item[], styling: Record<string, Styling>, avatar: Avatar): Worn[] {
+  const body = bodyOf(avatar);
+  return garments.map((g) => ({ slot: g.slot, styling: styling[g.id], brief: garmentBrief(g.look), fit: fitWords(g, body) }));
+}
+
+/** One job per garment, view and variant: the queue keeps one job per type and ref. */
+export const layerRef = (itemId: string, view: 'front' | 'back', variant: 'closed' | 'open') => `${itemId}|${view}|${variant}`;
 
 export function tryonRef(key: string, view: 'front' | 'back'): string {
   return `${key}|${view}`;
@@ -401,7 +459,7 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
   if (garments.length === 0 && !makeup) return;
   const look = (gs: Item[]) => gs.map((g) => `${g.id}:${g.slot}:${g.catalogUri ?? g.originalUri}`).join('|');
   const startLook = look(garments);
-  const worn = garments.map((g) => ({ slot: g.slot, styling: styling[g.id] }));
+  const worn = wornOf(garments, styling, avatar);
   const version = avatarVersion(avatar);
   const quality = (job.payload.quality as 'low' | 'medium' | 'high' | undefined) ?? tryonQuality(await getAiSettings(db));
   const plainKey = withoutMakeupKey(key);
@@ -436,7 +494,9 @@ async function runTryon(deps: AiDeps, job: Job): Promise<void> {
   if (!front) {
     const refs = await Promise.all(garments.map((g) => images.toDataUrl((g.catalogUri ?? g.originalUri)!, 768)));
     const base = await images.toDataUrl(avatar.frontUri, 1024);
-    const b64 = await drawChecked(deps, 'tryon', garments, refs, async (fix) => (await generate(deps, 'tryon', { prompt: tryonPrompt(worn, hint, fix), images: [base, ...refs], quality, route }))[0]);
+    // Photos of the owner wearing a garment show its real fit better than any words; at most two.
+    const ownerRefs = await Promise.all(garments.filter((g) => g.look?.fit?.trim() && g.sourceUri).slice(0, 2).map((g) => images.toDataUrl(g.sourceUri!, 768)));
+    const b64 = await drawChecked(deps, 'tryon', garments, refs, async (fix) => (await generate(deps, 'tryon', { prompt: tryonPrompt(worn, hint, fix, ownerRefs.length), images: [base, ...refs, ...ownerRefs], quality, route }))[0]);
     front = await store(plainKey, 'front', b64);
     if (!front || (view === 'front' && !makeup)) return;
   }
@@ -495,6 +555,8 @@ export async function runJob(deps: AiDeps, job: Job): Promise<void> {
       return runAvatar(deps, job);
     case 'tryon':
       return runTryon(deps, job);
+    case 'layer':
+      return runLayer(deps, job);
     default:
       return;
   }
@@ -599,11 +661,11 @@ export async function matchMirror(deps: AiDeps, photoUri: string): Promise<{ mat
   return { matches, unmatched: r.unmatched };
 }
 
-export async function generatePhoto(deps: AiDeps, itemIds: string[], sceneId: string, styling: Record<string, Styling> = {}, makeup?: string | null): Promise<string> {
+export async function generatePhoto(deps: AiDeps, itemIds: string[], sceneId: string, styling: Record<string, Styling> = {}, makeup?: string | null, customScene?: string | null): Promise<string> {
   await assertBudget(deps);
   const avatar = await getAvatar(deps.db);
   if (!avatarUsable(avatar) || !avatar.frontUri) throw new AiError('rejected', 'avatar not ready');
-  const scene = SCENES.find((s) => s.id === sceneId) ?? SCENES[0];
+  const scene = sceneOf(sceneId, customScene);
   const garments = await orderedGarments(deps.db, itemIds);
   if (garments.length === 0) throw new AiError('rejected', 'no garment images');
   const settings = await getAiSettings(deps.db);
@@ -614,7 +676,7 @@ export async function generatePhoto(deps: AiDeps, itemIds: string[], sceneId: st
   const madeUp = makeup ? await getTryon(deps.db, key, 'front', version) : null;
   const front = madeUp ?? (await getTryon(deps.db, withoutMakeupKey(key), 'front', version));
   const base = await deps.images.toDataUrl(front ?? avatar.frontUri, 1024);
-  const worn = garments.map((g) => ({ slot: g.slot, styling: styling[g.id] }));
+  const worn = wornOf(garments, styling, avatar);
   const makeupLine = makeup && !madeUp ? makeupPromptText(makeup) : null;
   const b64 = await drawChecked(deps, 'photo', garments, refs, async (fix) => (await generate(deps, 'photo', { prompt: photoPrompt(worn, scene, makeupLine, { dressed: !!front, fix }), images: [base, ...refs], quality: qualityFor(settings.quality, 'photo') }))[0]);
   return deps.images.saveBase64(b64, 'photo');

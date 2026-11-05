@@ -15,6 +15,7 @@ const img = (n: string) => `/demo/${n}.jpg`;
 
 export async function seedDemo(db: Db, variant: string): Promise<void> {
   if (variant === 'empty') return;
+  if (variant === 'user') return (await import('./seedUser')).seedUser(db);
   const today = new Date();
   const daysAgo = (n: number) => toDateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - n));
   const mk = async (p: Partial<Item> & Pick<Item, 'name' | 'slot'>, createdDaysAgo: number) => {

@@ -52,6 +52,10 @@ export interface Item {
   channel: string | null;
   location: string | null;
   fitNotes: string | null;
+  /** What the photo showed at intake, in English for the image models; `fit` only when the owner wore it there. */
+  look: GarmentLook | null;
+  /** How it fits its owner: two taps at intake, or measured centimetres (flat widths for chest and waist). */
+  fit: Fit | null;
   status: ItemStatus;
   originalUri: string | null;
   catalogUri: string | null;
@@ -104,19 +108,51 @@ export interface WearLog {
   createdAt: string;
 }
 
+export interface GarmentLook {
+  colour: string;
+  material: string;
+  cut: string;
+  details: string;
+  prints: string;
+  wear: string;
+  creases: string;
+  fit?: string;
+}
+
+export interface Fit {
+  width?: 'loose' | 'regular' | 'tight' | null;
+  length?: 'short' | 'regular' | 'long' | null;
+  cm?: Partial<Record<'shoulder' | 'chest' | 'length' | 'sleeve' | 'waist' | 'outseam' | 'hem', number>> | null;
+}
+
+/** One garment painted onto the avatar (one view, closed or worn open), keyed out so it stacks on the avatar picture. */
+export interface GarmentLayer {
+  itemId: string;
+  avatarVersion: string;
+  view: 'front' | 'back';
+  variant: 'closed' | 'open';
+  uri: string;
+}
+
 export interface Avatar {
   frontUri: string | null;
   backUri: string | null;
+  /** The same pictures with the base clothes in flat chroma green: garments are painted onto these (see domain/layers). */
+  greenFrontUri: string | null;
+  greenBackUri: string | null;
   sourceUris: string[];
   heightCm: number | null;
   weightKg: number | null;
   build: string | null;
+  shoulderCm: number | null;
+  chestCm: number | null;
+  waistCm: number | null;
   status: 'none' | 'processing' | 'ready' | 'failed';
   error: string | null;
   updatedAt: string | null;
 }
 
-export type JobType = 'catalog' | 'autofill' | 'avatar' | 'tryon' | 'mirror';
+export type JobType = 'catalog' | 'autofill' | 'avatar' | 'tryon' | 'mirror' | 'layer';
 
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed';
 

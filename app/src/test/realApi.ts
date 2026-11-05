@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import type { FetchLike } from '@/ai/client';
 import { imageExt, type ImageStore } from '@/ai/imageStore';
 import type { Box } from '@/domain/crop';
+import { decodeImage, layerPng } from '@/domain/layers';
 
 /** Node in Jest has no proxy-aware fetch; curl honours HTTPS_PROXY. `onResponse` sees every request body and answer. */
 export function curlFetch(dir: string, onResponse?: (body: string, text: string) => void): FetchLike {
@@ -53,6 +54,15 @@ export class DiskImages implements ImageStore {
     const p = path.join(this.dir, 'out', `${folder}-${++this.n}${path.extname(uri)}`);
     fs.mkdirSync(path.dirname(p), { recursive: true });
     execFileSync('sips', ['-c', String(Math.round(box.h * h)), String(Math.round(box.w * w)), '--cropOffset', String(Math.round(box.y * h)), String(Math.round(box.x * w)), uri, '--out', p], { stdio: 'ignore' });
+    return p;
+  }
+  async size(uri: string) {
+    const { width, height } = decodeImage(new Uint8Array(fs.readFileSync(uri)));
+    return { width, height };
+  }
+  async layer(dressedB64: string, greenUri: string, box: Box) {
+    const p = path.join(this.dir, 'out', `layer-${++this.n}.png`);
+    fs.writeFileSync(p, layerPng(Buffer.from(dressedB64, 'base64'), new Uint8Array(fs.readFileSync(greenUri)), box));
     return p;
   }
   async remove() {}

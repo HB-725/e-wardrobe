@@ -114,6 +114,9 @@ const AUTO_ORDER: Record<'image' | 'vision', [ProviderId, string][]> = {
  * gpt-image-2 goes first; gpt-image-1.5 (low) kept it too; Gemini 3.1 Flash and 3 Pro were no better than Lite for
  * 3–5× the price; Gemini 2.5 kept it but with uneven backgrounds. Try-ons and photos keep the cheaper AUTO_ORDER.
  */
+/** Purposes where the garment must come out as it really is; the avatar itself keeps the cheaper order. */
+const FAITHFUL = new Set<Purpose>(['catalog', 'tryon', 'photo']);
+
 const CATALOG_ORDER: [ProviderId, string][] = [
   ['openai', 'gpt-image-2'],
   ['gemini', 'gemini-3.1-flash-lite-image'],
@@ -193,7 +196,7 @@ export function resolveRoute(purpose: Purpose, routes: Routes, keys: KeyEntry[])
     if (k && usable(k, chosen.model)) return { keyId: k.id, provider: k.provider, model: chosen.model, fellBack: false };
   }
   const pick = (): Omit<Resolved, 'fellBack'> | null => {
-    for (const [provider, model] of purpose === 'catalog' ? CATALOG_ORDER : purpose === 'analysis' ? ANALYSIS_ORDER : AUTO_ORDER[kind]) {
+    for (const [provider, model] of FAITHFUL.has(purpose) ? CATALOG_ORDER : purpose === 'analysis' ? ANALYSIS_ORDER : AUTO_ORDER[kind]) {
       const k = keys.find((x) => x.provider === provider && usable(x, model));
       if (k) return { keyId: k.id, provider, model };
     }
@@ -237,5 +240,5 @@ export interface Routing {
 /** Estimate for an image purpose with the model it would use now; before any key is added, the default model's. */
 export function estimateFor(routing: Routing, purpose: Purpose, opts: { inputImages: number; quality: 'low' | 'medium' | 'high'; n?: number }): number | null {
   const r = resolveRoute(purpose, routing.routes, routing.keys);
-  return r ? estimateCost(r.provider, r.model, opts) : estimateCost('openai', AUTO_ORDER.image[0][1], opts);
+  return r ? estimateCost(r.provider, r.model, opts) : estimateCost('openai', (FAITHFUL.has(purpose) ? CATALOG_ORDER.find(([p]) => p === 'openai')! : AUTO_ORDER.image[0])[1], opts);
 }

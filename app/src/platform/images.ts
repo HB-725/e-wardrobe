@@ -3,6 +3,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { type ImageExt, imageExt, type ImageFolder, type ImageStore } from '@/ai/imageStore';
 import { newId } from '@/db/db';
 import { toPixels } from '@/domain/crop';
+import { decodeImage, layerPng } from '@/domain/layers';
 
 const ROOT = 'images';
 
@@ -121,6 +122,17 @@ export const nativeImages: ImageStore = {
     const dest = new File(folderDir(folder), `${newId()}.jpg`);
     await new File(r.uri).move(dest);
     return dest.uri;
+  },
+
+  async size(uri) {
+    const { width, height } = decodeImage(await new File(uri).bytes());
+    return { width, height };
+  },
+
+  async layer(dressedB64, greenUri, box) {
+    // Decoded and keyed in JS (jpeg-js / upng-js): about a second for 1024×1536 on a phone, in the job queue.
+    const dressed = Uint8Array.from(atob(dressedB64), (c) => c.charCodeAt(0));
+    return saveImageBytes(layerPng(dressed, await new File(greenUri).bytes(), box), 'layer', 'png');
   },
 
   async remove(uri) {

@@ -108,13 +108,19 @@ export function Silhouette({ color = '#B9B9BE' }: { color?: string }) {
  * fitting room's drawer, not drawn here, so nothing looks "worn" before the try-on. While one is being made a
  * light band sweeps down the figure.
  */
-export function Stage({ avatarUri, tryonUri, busy, style }: { avatarUri: string | null; tryonUri: string | null; busy?: boolean; style?: ViewStyle }) {
+/** `layers`: garment layers in the avatar's own coordinates, stacked over it exactly as it is drawn (see domain/layers). */
+export function Stage({ avatarUri, tryonUri, layers = [], busy, style }: { avatarUri: string | null; tryonUri: string | null; layers?: string[]; busy?: boolean; style?: ViewStyle }) {
   return (
     <View style={[{ backgroundColor: C.card, borderRadius: R.card, overflow: 'hidden' }, style]}>
       {tryonUri ? (
         <Image source={{ uri: tryonUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" transition={200} />
       ) : avatarUri ? (
-        <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" />
+        <>
+          <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" />
+          {layers.map((uri) => (
+            <Image key={uri} source={{ uri }} pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" transition={150} />
+          ))}
+        </>
       ) : (
         <View style={{ position: 'absolute', left: '30%', right: '30%', top: '8%', bottom: '4%', opacity: 0.6 }}>
           <Silhouette color="#C9C9CC" />

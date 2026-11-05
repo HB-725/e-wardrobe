@@ -2,13 +2,14 @@ import { saveAiSettings } from '@/ai/config';
 import type { Route } from '@/ai/catalog';
 import type { ImageStore } from '@/ai/imageStore';
 import { getRoutes, saveRoutes } from '@/ai/keys';
-import { tryonRef } from '@/ai/engine';
+import { layerRef, tryonRef } from '@/ai/engine';
 import type { Db } from '@/db/db';
-import { createItem, deleteItem, getItem, updateItem } from '@/db/items';
-import { deleteJobsFor, enqueueJob, latestJobFor, retryJob, updateJobPayload } from '@/db/jobs';
+import { createItem, deleteItem, getItem, listItems, updateItem } from '@/db/items';
+import { deleteJobsFor, enqueueJob, latestJobFor, listJobs, retryJob, updateJobPayload } from '@/db/jobs';
 import { createOutfit, deleteOutfit, findOutfitByItems, getOutfit, listOutfits, updateOutfit } from '@/db/outfits';
-import { avatarVersion, dropTryonsWithItem, getAvatar, getTryon, listTryonUris, referencedImages, saveAvatar, wipeAll } from '@/db/misc';
+import { avatarUsable, avatarVersion, dropLayersOf, dropTryonsWithItem, getAvatar, getTryon, listLayers, listTryonUris, referencedImages, saveAvatar, wipeAll } from '@/db/misc';
 import { deleteLogByDate, getLogByDate, logWear } from '@/db/wear';
+import { maskBox, wantsOpen } from '@/domain/layers';
 import type { Box } from '@/domain/crop';
 import { type Look, lookKey } from '@/domain/look';
 import type { Avatar, Item, Outfit, Slot, Styling, TryonView, WearSource } from '@/domain/types';
@@ -49,6 +50,36 @@ export async function confirmItem(ctx: Ctx, id: string, candidate: number | null
   // Try-ons were drawn from the old picture (or category).
   if (chosen !== item.catalogUri || (fields.slot && fields.slot !== item.slot)) await dropTryons(ctx, id);
   await updateItem(ctx.db, id, { ...fields, catalogUri: chosen, candidates: [], checks: [], status: item.status === 'archived' ? 'archived' : 'active', error: null });
+  // The fitting room's layers were painted from the old picture.
+  if (chosen !== item.catalogUri) for (const uri of await dropLayersOf(ctx.db, id)) await ctx.images.remove(uri);
+}
+
+/**
+ * Queues the layers the fitting room still lacks for this avatar (closed for every garment with a picture, open too
+ * for what opens, front and back), the garments being worn first. Returns how many were queued.
+ */
+export async function ensureLayers(ctx: Ctx, priorityIds: string[] = []): Promise<number> {
+  const avatar = await getAvatar(ctx.db);
+  if (!avatarUsable(avatar) || !avatar.greenFrontUri) return 0;
+  const version = avatarVersion(avatar);
+  const items = await listItems(ctx.db, ['active']);
+  const ordered = [...items.filter((i) => priorityIds.includes(i.id)), ...items.filter((i) => !priorityIds.includes(i.id))];
+  const have = new Set((await listLayers(ctx.db, items.map((i) => i.id), version)).map((l) => `${l.itemId}:${l.view}:${l.variant}`));
+  const queued = new Set((await listJobs(ctx.db, ['queued', 'running'])).filter((j) => j.type === 'layer').map((j) => j.refId));
+  let n = 0;
+  for (const it of ordered) {
+    if (!it.catalogUri || !maskBox(it.slot)) continue;
+    for (const view of ['front', 'back'] as const) {
+      if (view === 'back' && !avatar.greenBackUri) continue;
+      for (const variant of wantsOpen(it) ? (['closed', 'open'] as const) : (['closed'] as const)) {
+        const ref = layerRef(it.id, view, variant);
+        if (have.has(`${it.id}:${view}:${variant}`) || queued.has(ref)) continue;
+        await enqueueJob(ctx.db, 'layer', ref, { view, variant });
+        n += 1;
+      }
+    }
+  }
+  return n;
 }
 
 /** Dismiss regenerated candidates and keep the current standard image. */
@@ -164,6 +195,7 @@ export async function removeItem(ctx: Ctx, id: string): Promise<void> {
   for (const uri of [item.tagUri, item.catalogUri, ...item.candidates]) await ctx.images.remove(uri);
   for (const uri of [item.originalUri, item.sourceUri]) await removeUnshared(ctx, uri, id);
   await dropTryons(ctx, id);
+  for (const uri of await dropLayersOf(ctx.db, id)) await ctx.images.remove(uri);
   await deleteItem(ctx.db, id);
   // Outfits / days that only consisted of this item would be left empty.
   const orphanPhotos = await ctx.db.getAllAsync<{ photo_uri: string | null }>(
@@ -271,7 +303,7 @@ export async function addFitNote(ctx: Ctx, id: string, note: string, dateLabel: 
 
 // ---------- avatar & try-on ----------
 
-export async function startAvatar(ctx: Ctx, input: { photos: string[]; body: Pick<Avatar, 'heightCm' | 'weightKg' | 'build'> }): Promise<void> {
+export async function startAvatar(ctx: Ctx, input: { photos: string[]; body: Pick<Avatar, 'heightCm' | 'weightKg' | 'build'> & Partial<Pick<Avatar, 'shoulderCm' | 'chestCm' | 'waistCm'>> }): Promise<void> {
   const prev = await getAvatar(ctx.db);
   const kept = new Set(input.photos);
   for (const old of prev.sourceUris) if (!kept.has(old)) await ctx.images.remove(old);

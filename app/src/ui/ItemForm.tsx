@@ -17,7 +17,19 @@ export interface Form {
   location: string;
   purchasedOn: string;
   fitNotes: string;
+  /** How it fits its owner: two taps, and optional centimetres (text while typing). */
+  fitWidth: '' | 'loose' | 'regular' | 'tight';
+  fitLength: '' | 'short' | 'regular' | 'long';
+  cm: Partial<Record<CmKey, string>>;
 }
+
+export type CmKey = 'shoulder' | 'chest' | 'length' | 'sleeve' | 'waist' | 'outseam' | 'hem';
+/** Which measurements make sense for a category, with their labels (flat widths for chest and waist). */
+export const CM_FIELDS: Partial<Record<Slot, [CmKey, string][]>> = {
+  top: [['shoulder', '肩宽'], ['chest', '胸宽（平铺）'], ['length', '衣长'], ['sleeve', '袖长']],
+  outer: [['shoulder', '肩宽'], ['chest', '胸宽（平铺）'], ['length', '衣长'], ['sleeve', '袖长']],
+  bottom: [['waist', '腰宽（平铺）'], ['outseam', '裤长'], ['hem', '脚口']],
+};
 
 export function formOf(it: Item): Form {
   return {
@@ -33,7 +45,20 @@ export function formOf(it: Item): Form {
     location: it.location ?? '',
     purchasedOn: it.purchasedOn ?? '',
     fitNotes: it.fitNotes ?? '',
+    fitWidth: it.fit?.width ?? '',
+    fitLength: it.fit?.length ?? '',
+    cm: Object.fromEntries(Object.entries(it.fit?.cm ?? {}).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)])),
   };
+}
+
+/** The form's fit as stored: null when nothing was said. */
+export function fitOf(f: Form): Item['fit'] {
+  const cm = Object.fromEntries(Object.entries(f.cm).map(([k, v]) => [k, Number(String(v).trim())]).filter(([, v]) => Number.isFinite(v) && (v as number) > 0));
+  const fit: NonNullable<Item['fit']> = {};
+  if (f.fitWidth) fit.width = f.fitWidth;
+  if (f.fitLength) fit.length = f.fitLength;
+  if (Object.keys(cm).length) fit.cm = cm;
+  return Object.keys(fit).length ? fit : null;
 }
 
 /** Accepts 2025-9, 2025-09-14, 2025/9/14, 2025年9月; returns YYYY-MM-DD or null. */
@@ -76,6 +101,7 @@ export function patchOf(it: Item, f: Form): Partial<Item> {
     location: f.location.trim() || null,
     purchasedOn: !f.purchasedOn.trim() ? null : (normalizeDate(f.purchasedOn) ?? it.purchasedOn),
     fitNotes: f.fitNotes.trim() || null,
+    fit: fitOf(f),
   };
   const sources = { ...it.fieldSources };
   for (const k of Object.keys(next) as (keyof Item)[]) {
@@ -130,6 +156,34 @@ export function ItemForm({ item, form, onChange, style, notes }: { item: Item; f
         <SourceBadge source={item.fieldSources.seasons} />
       </View>
       <Field label="尺码" value={form.size} onChange={(v) => onChange({ size: v })} source={item.fieldSources.size} />
+      <View style={{ paddingVertical: 10, gap: 8 }}>
+        <T style={{ fontSize: 13, color: C.sub }}>穿在你身上</T>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {(['loose', 'regular', 'tight'] as const).map((w) => (
+            <Chip key={w} label={{ loose: '偏大', regular: '合身', tight: '偏小' }[w]} on={form.fitWidth === w} onPress={() => onChange({ fitWidth: form.fitWidth === w ? '' : w })} />
+          ))}
+          <View style={{ width: 8 }} />
+          {(['short', 'regular', 'long'] as const).map((l) => (
+            <Chip key={l} label={{ short: '偏短', regular: '正常', long: '偏长' }[l]} on={form.fitLength === l} onPress={() => onChange({ fitLength: form.fitLength === l ? '' : l })} />
+          ))}
+        </View>
+        {notes && CM_FIELDS[form.slot] ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {CM_FIELDS[form.slot]!.map(([k, label]) => (
+              <TextInput
+                key={k}
+                value={form.cm[k] ?? ''}
+                onChangeText={(v) => onChange({ cm: { ...form.cm, [k]: v.replace(/[^\d.]/g, '') } })}
+                placeholder={`${label} cm`}
+                placeholderTextColor={C.faint}
+                keyboardType="decimal-pad"
+                accessibilityLabel={`${label}（厘米）`}
+                style={{ width: '47%', height: 40, paddingHorizontal: 12, borderRadius: R.input, backgroundColor: C.card, fontSize: 14, color: C.ink }}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
       <Field label="材质" value={form.material} onChange={(v) => onChange({ material: v })} source={item.fieldSources.material} />
       <Field label="品牌" value={form.brand} onChange={(v) => onChange({ brand: v })} source={item.fieldSources.brand} />
       <Field label="价格" value={form.price} onChange={(v) => onChange({ price: v.replace(/[^\d.]/g, '') })} placeholder="选填，单位元" numeric />

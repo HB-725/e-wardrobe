@@ -199,7 +199,7 @@ export async function countActiveJobs(db: Db): Promise<Record<JobType, number>> 
   const rows = await db.getAllAsync<{ type: string; n: number }>(
     "SELECT type, COUNT(*) AS n FROM jobs WHERE status IN ('queued', 'running') GROUP BY type",
   );
-  const out: Record<JobType, number> = { catalog: 0, autofill: 0, avatar: 0, tryon: 0, mirror: 0 };
+  const out: Record<JobType, number> = { catalog: 0, autofill: 0, avatar: 0, tryon: 0, mirror: 0, layer: 0 };
   for (const r of rows) out[r.type as JobType] = r.n;
   return out;
 }

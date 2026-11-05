@@ -1,8 +1,10 @@
 import type { Box } from '@/domain/crop';
-import type { Detection, FidelityCheck, FieldSource, Item, ItemStatus, Season, Slot } from '@/domain/types';
+import type { Detection, FidelityCheck, FieldSource, Fit, GarmentLook, Item, ItemStatus, Season, Slot } from '@/domain/types';
 import { type Db, newId, nowIso, parseJson, type SqlParam } from './db';
 
 interface ItemRow {
+  look: string | null;
+  fit: string | null;
   id: string;
   name: string;
   slot: string;
@@ -50,6 +52,8 @@ function fromRow(r: ItemRow): Item {
     channel: r.channel,
     location: r.location,
     fitNotes: r.fit_notes,
+    look: parseJson<GarmentLook | null>(r.look, null),
+    fit: parseJson<Fit | null>(r.fit, null),
     status: r.status as ItemStatus,
     originalUri: r.original_uri,
     catalogUri: r.catalog_uri,
@@ -82,6 +86,8 @@ const COLUMNS: Partial<Record<keyof Item, string>> = {
   channel: 'channel',
   location: 'location',
   fitNotes: 'fit_notes',
+  look: 'look',
+  fit: 'fit',
   status: 'status',
   originalUri: 'original_uri',
   catalogUri: 'catalog_uri',
@@ -100,7 +106,7 @@ const JSON_ARRAYS: (keyof Item)[] = ['seasons', 'candidates', 'checks', 'detecti
 function toParam(key: keyof Item, value: unknown): SqlParam {
   if (JSON_ARRAYS.includes(key)) return JSON.stringify(value ?? []);
   if (key === 'fieldSources') return JSON.stringify(value ?? {});
-  if (key === 'crop') return value ? JSON.stringify(value) : null;
+  if (key === 'crop' || key === 'look' || key === 'fit') return value ? JSON.stringify(value) : null;
   if (value === undefined) return null;
   return value as SqlParam;
 }

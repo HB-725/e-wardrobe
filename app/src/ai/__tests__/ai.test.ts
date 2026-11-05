@@ -4,17 +4,18 @@ import type { Box } from '@/domain/crop';
 import type { Item } from '@/domain/types';
 import { createItem, getItem, updateItem } from '@/db/items';
 import { enqueueJob, latestJobFor, listJobs } from '@/db/jobs';
-import { addUsage, getAvatar, getSetting, getTryon, monthSpend, putTryon, saveAvatar, avatarVersion, setSetting } from '@/db/misc';
+import { addUsage, avatarVersion, getAvatar, getSetting, getTryon, listLayers, monthSpend, putTryon, saveAvatar, setSetting } from '@/db/misc';
 import { AUTO_ROUTES, type KeyEntry, type ProviderId } from '../catalog';
 import { AiError, classify, createOpenAiClient, type FetchLike, type ImageEditRequest, type OpenAiClient, reasoningEffort } from '../client';
 import { getAiBlocked, saveAiSettings } from '../config';
 import { outfitKey } from '@/domain/outfit';
-import { type AiDeps, applyAutofill, generatePhoto, matchMirror, pickMirrorCandidates, tryonRef } from '../engine';
+import { type AiDeps, applyAutofill, generatePhoto, layerRef, matchMirror, pickMirrorCandidates, tryonRef } from '../engine';
 import { imageExt, type ImageStore } from '../imageStore';
 import { addKey, listKeys, markVerified, saveRoutes, setConsentFor } from '../keys';
 import { type AnalysisResult, type AutofillResult, autofillText, catalogPrompt, type DetectResult, photoPrompt, SCENES, tryonPrompt } from '../prompts';
 import { lookKey } from '@/domain/look';
 import { JobRunner } from '../runner';
+import { ensureLayers } from '@/state/actions';
 
 class MemoryImages implements ImageStore {
   files = new Map<string, string>();
@@ -34,6 +35,12 @@ class MemoryImages implements ImageStore {
   async crop(uri: string, box: Box, folder: string) {
     this.crops.push({ uri, box });
     return this.saveBase64(`crop:${this.files.get(uri) ?? ''}`, folder);
+  }
+  async size() {
+    return { width: 1024, height: 1536 };
+  }
+  async layer(dressedB64: string, greenUri: string, _box: Box) {
+    return this.saveBase64(`layer:${dressedB64.slice(0, 8)}:${this.files.get(greenUri) ?? ''}`, 'layer');
   }
   async remove(uri: string | null | undefined) {
     if (uri) this.files.delete(uri);
@@ -58,13 +65,13 @@ const AUTOFILL: AutofillResult = {
   fromTag: ['size', 'material'],
 };
 
-const ANALYSIS: AnalysisResult = { colour: 'Faded black, lighter on the shoulders.', material: 'Heavy cotton fleece.', cut: 'Boxy, cropped.', details: 'Kangaroo pocket.', prints: 'Yellow smiley reading "drew".', wear: 'Sun-faded shoulders.', creases: 'Folds from the floor only.' };
+const ANALYSIS: AnalysisResult = { colour: 'Faded black, lighter on the shoulders.', material: 'Heavy cotton fleece.', cut: 'Boxy, cropped.', details: 'Kangaroo pocket.', prints: 'Yellow smiley reading "drew".', wear: 'Sun-faded shoulders.', creases: 'Folds from the floor only.', fit: '' };
 
 const { isGarment: _g, ...GARMENT } = AUTOFILL;
 /** One garment filling the photo: behaves like the single-garment recognition before boxes existed. */
 const WHOLE: DetectResult = { garments: [{ ...GARMENT, box_2d: [0, 0, 1000, 1000] }] };
 
-type Call = { kind: 'image' | 'vision'; model: string; schemaName?: string; images: number; n?: number; prompt?: string; quality?: string };
+type Call = { kind: 'image' | 'vision'; model: string; schemaName?: string; images: number; n?: number; prompt?: string; quality?: string; mask?: boolean };
 
 type Fidelity = { candidates: { checks: { label: string; ok: boolean; note: string }[] }[] };
 type Outfit = { fullBody: boolean; problems: string[] };
@@ -77,7 +84,7 @@ function fakeClient(opts: { failImage?: (model: string, i: number) => AiError | 
       return opts.models ?? ['gpt-image-1-mini', 'gpt-image-1', 'gpt-5.4-nano', 'gpt-4o-mini'];
     },
     async imageEdit(req) {
-      calls.push({ kind: 'image', model: req.model, images: req.images.length, n: req.n, prompt: req.prompt, quality: req.quality });
+      calls.push({ kind: 'image', model: req.model, images: req.images.length, n: req.n, prompt: req.prompt, quality: req.quality, mask: !!req.mask });
       const call = imageCalls++;
       const err = opts.failImage?.(req.model, call);
       if (err) throw err;
@@ -282,6 +289,22 @@ describe('runner', () => {
     expect(await getAiBlocked(db)).toBe('cap');
   });
 
+  it('tells the try-on how each garment looks and fits its owner, with the owner photo as a reference', async () => {
+    await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', heightCm: 175, weightKg: 64, status: 'ready' });
+    const hoodie = await createItem(db, { name: '卫衣', slot: 'top', status: 'active', catalogUri: 'mem://catalog/h', look: ANALYSIS, fit: { cm: { shoulder: 56, chest: 65, length: 88 } } });
+    const jacket = await createItem(db, { name: '夹克', slot: 'outer', status: 'active', catalogUri: 'mem://catalog/j', sourceUri: 'mem://selfie/1', look: { ...ANALYSIS, material: 'Washed canvas.', fit: 'Boxy on the owner, sleeves past the wrist.' } });
+    const client = fakeClient();
+    await enqueueJob(db, 'tryon', tryonRef(outfitKey([hoodie.id, jacket.id]), 'front'), { itemIds: [hoodie.id, jacket.id] });
+    await drain(new JobRunner(deps(client), noTimers));
+    const call = client.calls.find((c) => c.kind === 'image')!;
+    expect(call.prompt).toContain('Heavy cotton fleece.');
+    expect(call.prompt).toContain('Shoulder seams drop about 13 cm below the natural shoulder; very loose through the chest; hem reaches mid-thigh.');
+    expect(call.prompt).toContain('Boxy on the owner, sleeves past the wrist.');
+    expect(call.prompt).toContain('image 4');
+    // base + 2 catalog refs + the selfie the jacket was cut from
+    expect(call.images).toBe(4);
+  });
+
   it('builds the avatar, then caches try-on images per combination and view', async () => {
     await saveAvatar(db, { sourceUris: ['mem://body/1', 'mem://body/2', 'mem://body/3'], heightCm: 175, weightKg: 68, status: 'processing' });
     const client = fakeClient();
@@ -292,8 +315,10 @@ describe('runner', () => {
     expect(avatar.status).toBe('ready');
     expect(avatar.frontUri).toBeTruthy();
     expect(avatar.backUri).toBeTruthy();
-    // front call gets 3 body photos, back call gets the front + back photo
-    expect(client.calls.filter((c) => c.kind === 'image').map((c) => c.images)).toEqual([3, 2]);
+    // front call gets 3 body photos, back call gets the front + back photo; then each is copied in green base clothes
+    expect(client.calls.filter((c) => c.kind === 'image').map((c) => c.images)).toEqual([3, 2, 1, 1]);
+    expect(avatar.greenFrontUri).toBeTruthy();
+    expect(avatar.greenBackUri).toBeTruthy();
 
     const a = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'mem://catalog/a' });
     const b = await createItem(db, { name: 'J', slot: 'bottom', status: 'active', catalogUri: 'mem://catalog/b' });
@@ -513,7 +538,8 @@ describe('paid results survive retries', () => {
     const a = await getAvatar(db);
     expect(a.status).toBe('ready');
     // front once + back twice
-    expect(client.calls.filter((c) => c.kind === 'image')).toHaveLength(3);
+    // front, the back that failed, the back again, then the two green copies
+    expect(client.calls.filter((c) => c.kind === 'image')).toHaveLength(5);
   });
 
   it('marks exhausted interrupted jobs failed on start', async () => {
@@ -798,6 +824,49 @@ describe('garments on a photo', () => {
     const p = client.calls.find((c) => c.kind === 'image')!.prompt!;
     expect(p).toContain('Wear: Sun-faded to grey on the shoulders and hood.');
     expect(p).toContain('Cut and proportions: Boxy, cropped.');
+  });
+
+  it('keeps what the analysis saw on the item, for try-ons and photos later', async () => {
+    const item = await photo();
+    await drain(new JobRunner(deps(fakeClient()), noTimers));
+    expect((await getItem(db, item.id))!.look).toEqual(ANALYSIS);
+  });
+
+  it('lets the owner put the photo in a scene of their own words', async () => {
+    await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', status: 'ready' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'mem://catalog/t' });
+    const client = fakeClient();
+    await generatePhoto(deps(client), [tee.id], 'custom', {}, null, '傍晚的海边码头');
+    expect(client.calls.find((c) => c.kind === 'image')!.prompt).toContain('傍晚的海边码头');
+  });
+
+  it('paints a garment onto the green avatar inside its slot box and keeps the keyed layer', async () => {
+    await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', greenFrontUri: 'mem://avatar/gf', greenBackUri: 'mem://avatar/gb', status: 'ready' });
+    const jacket = await createItem(db, { name: '夹克', slot: 'outer', status: 'active', catalogUri: 'mem://catalog/j', look: { ...ANALYSIS, details: 'Full zip.' } });
+    const client = fakeClient();
+    await enqueueJob(db, 'layer', layerRef(jacket.id, 'front', 'open'), { view: 'front', variant: 'open' });
+    await drain(new JobRunner(deps(client), noTimers));
+    const call = client.calls.find((c) => c.kind === 'image')!;
+    expect(call.mask).toBe(true);
+    expect(call.images).toBe(2);
+    expect(call.prompt).toContain('open');
+    expect(call.prompt).toContain('Heavy cotton fleece.');
+    const layers = await listLayers(db, [jacket.id], avatarVersion(await getAvatar(db)));
+    expect(layers).toHaveLength(1);
+    expect(layers[0]).toMatchObject({ itemId: jacket.id, view: 'front', variant: 'open' });
+  });
+
+  it('queues the missing layers: closed for every garment, open too for what opens, both views', async () => {
+    await saveAvatar(db, { frontUri: 'mem://avatar/f', backUri: 'mem://avatar/b', greenFrontUri: 'mem://avatar/gf', greenBackUri: 'mem://avatar/gb', status: 'ready' });
+    await createItem(db, { name: '夹克', slot: 'outer', status: 'active', catalogUri: 'mem://catalog/j' });
+    const tee = await createItem(db, { name: 'T', slot: 'top', status: 'active', catalogUri: 'mem://catalog/t' });
+    await createItem(db, { name: '包', slot: 'bag', status: 'active', catalogUri: 'mem://catalog/b' });
+    await createItem(db, { name: '没图', slot: 'top', status: 'active' });
+    const n = await ensureLayers({ db, images, runner: { kick() {} } }, [tee.id]);
+    expect(n).toBe(6);
+    const jobs = (await listJobs(db, ['queued'])).map((j) => `${j.refId.startsWith(tee.id) ? 'tee' : 'jacket'}:${j.payload.view}:${j.payload.variant}`);
+    expect(jobs.sort()).toEqual(['jacket:back:closed', 'jacket:back:open', 'jacket:front:closed', 'jacket:front:open', 'tee:back:closed', 'tee:front:closed']);
+    expect(await ensureLayers({ db, images, runner: { kick() {} } })).toBe(0);
   });
 
   it('tells the image model the exact print text', async () => {

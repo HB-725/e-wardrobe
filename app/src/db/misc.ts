@@ -1,4 +1,4 @@
-import type { Avatar, TryonView, UsageEntry } from '@/domain/types';
+import type { Avatar, GarmentLayer, TryonView, UsageEntry } from '@/domain/types';
 import { idsOfKey } from '@/domain/look';
 import { type Db, newId, nowIso, parseJson } from './db';
 
@@ -21,10 +21,15 @@ export async function setSetting(db: Db, key: string, value: string): Promise<vo
 interface AvatarRow {
   front_uri: string | null;
   back_uri: string | null;
+  green_front_uri: string | null;
+  green_back_uri: string | null;
   source_uris: string;
   height_cm: number | null;
   weight_kg: number | null;
   build: string | null;
+  shoulder_cm: number | null;
+  chest_cm: number | null;
+  waist_cm: number | null;
   status: string;
   error: string | null;
   updated_at: string | null;
@@ -33,10 +38,15 @@ interface AvatarRow {
 export const EMPTY_AVATAR: Avatar = {
   frontUri: null,
   backUri: null,
+  greenFrontUri: null,
+  greenBackUri: null,
   sourceUris: [],
   heightCm: null,
   weightKg: null,
   build: null,
+  shoulderCm: null,
+  chestCm: null,
+  waistCm: null,
   status: 'none',
   error: null,
   updatedAt: null,
@@ -48,10 +58,15 @@ export async function getAvatar(db: Db): Promise<Avatar> {
   return {
     frontUri: r.front_uri,
     backUri: r.back_uri,
+    greenFrontUri: r.green_front_uri,
+    greenBackUri: r.green_back_uri,
     sourceUris: parseJson<string[]>(r.source_uris, []),
     heightCm: r.height_cm,
     weightKg: r.weight_kg,
     build: r.build,
+    shoulderCm: r.shoulder_cm,
+    chestCm: r.chest_cm,
+    waistCm: r.waist_cm,
     status: r.status as Avatar['status'],
     error: r.error,
     updatedAt: r.updated_at,
@@ -61,18 +76,24 @@ export async function getAvatar(db: Db): Promise<Avatar> {
 export async function saveAvatar(db: Db, patch: Partial<Avatar>): Promise<Avatar> {
   const next = { ...(await getAvatar(db)), ...patch, updatedAt: nowIso() };
   await db.runAsync(
-    `INSERT INTO avatar (id, front_uri, back_uri, source_uris, height_cm, weight_kg, build, status, error, updated_at)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET front_uri = excluded.front_uri, back_uri = excluded.back_uri,
+    `INSERT INTO avatar (id, front_uri, back_uri, green_front_uri, green_back_uri, source_uris, height_cm, weight_kg, build, shoulder_cm, chest_cm, waist_cm, status, error, updated_at)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET front_uri = excluded.front_uri, back_uri = excluded.back_uri, green_front_uri = excluded.green_front_uri, green_back_uri = excluded.green_back_uri,
        source_uris = excluded.source_uris, height_cm = excluded.height_cm, weight_kg = excluded.weight_kg,
-       build = excluded.build, status = excluded.status, error = excluded.error, updated_at = excluded.updated_at`,
+       build = excluded.build, shoulder_cm = excluded.shoulder_cm, chest_cm = excluded.chest_cm,
+       waist_cm = excluded.waist_cm, status = excluded.status, error = excluded.error, updated_at = excluded.updated_at`,
     [
       next.frontUri,
       next.backUri,
+      next.greenFrontUri,
+      next.greenBackUri,
       JSON.stringify(next.sourceUris),
       next.heightCm,
       next.weightKg,
       next.build,
+      next.shoulderCm,
+      next.chestCm,
+      next.waistCm,
       next.status,
       next.error,
       next.updatedAt,
@@ -213,4 +234,38 @@ export async function frontTryons(db: Db, version: string): Promise<Map<string, 
     [version],
   );
   return new Map(rows.map((r) => [r.key, r.uri]));
+}
+
+// ---------- garment layers (the green-screen 2.5D fitting room) ----------
+
+export async function putLayer(db: Db, layer: GarmentLayer): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO garment_layers (item_id, avatar_version, view, variant, uri, created_at) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(item_id, avatar_version, view, variant) DO UPDATE SET uri = excluded.uri, created_at = excluded.created_at`,
+    [layer.itemId, layer.avatarVersion, layer.view, layer.variant, layer.uri, nowIso()],
+  );
+}
+
+/** The layers of these garments for one avatar version (every view and variant). */
+export async function listLayers(db: Db, itemIds: string[], avatarVersion: string): Promise<GarmentLayer[]> {
+  if (itemIds.length === 0) return [];
+  const rows = await db.getAllAsync<{ item_id: string; avatar_version: string; view: string; variant: string; uri: string }>(
+    `SELECT item_id, avatar_version, view, variant, uri FROM garment_layers WHERE avatar_version = ? AND item_id IN (${itemIds.map(() => '?').join(', ')})`,
+    [avatarVersion, ...itemIds],
+  );
+  return rows.map((r) => ({ itemId: r.item_id, avatarVersion: r.avatar_version, view: r.view as GarmentLayer['view'], variant: r.variant as GarmentLayer['variant'], uri: r.uri }));
+}
+
+/** Removes a garment's layers (its picture changed, or it is gone); returns the files to delete. */
+export async function dropLayersOf(db: Db, itemId: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ uri: string }>('SELECT uri FROM garment_layers WHERE item_id = ?', [itemId]);
+  await db.runAsync('DELETE FROM garment_layers WHERE item_id = ?', [itemId]);
+  return rows.map((r) => r.uri);
+}
+
+/** Layers of any other avatar version are stale; returns the files to delete. */
+export async function pruneLayers(db: Db, keepVersion: string): Promise<string[]> {
+  const rows = await db.getAllAsync<{ uri: string }>('SELECT uri FROM garment_layers WHERE avatar_version != ?', [keepVersion]);
+  await db.runAsync('DELETE FROM garment_layers WHERE avatar_version != ?', [keepVersion]);
+  return rows.map((r) => r.uri);
 }

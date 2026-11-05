@@ -15,7 +15,7 @@ import { addFitNote, addGarments, confirmItem, confirmPicks, cropItem, keepCurre
 import { avatarVersion, putTryon, saveAvatar } from '@/db/misc';
 import { outfitKey } from '@/domain/outfit';
 import { tryonRef } from '@/ai/engine';
-import { formOf, formProblems, normalizeDate, patchOf } from '@/ui/ItemForm';
+import { fitOf, formOf, formProblems, normalizeDate, patchOf } from '@/ui/ItemForm';
 
 class Images implements ImageStore {
   removed: string[] = [];
@@ -31,6 +31,12 @@ class Images implements ImageStore {
   }
   async crop(_u: string, _box: unknown, folder: string) {
     return `mem://${folder}/crop${++this.n}`;
+  }
+  async size() {
+    return { width: 1024, height: 1536 };
+  }
+  async layer(dressedB64: string, greenUri: string) {
+    return `mem://layer/${dressedB64.length}-${greenUri.length}`;
   }
   async remove(u: string | null | undefined) {
     if (u) this.removed.push(u);
@@ -493,5 +499,16 @@ describe('garments picked from a photo', () => {
     expect(job.payload).toEqual({ regenerate: true, model: { keyId: 'k1', model: 'gpt-image-1' }, quality: 'medium', hint: '颜色浅一点' });
     expect((await getRoutes(db)).catalog).toEqual({ keyId: 'k1', model: 'gpt-image-1' });
     expect((await getAiSettings(db)).catalogQuality).toBe('medium');
+  });
+});
+
+describe('fit on the form', () => {
+  it('keeps the two taps and the centimetres typed, and nothing when nothing was said', async () => {
+    const it = await createItem(db, { name: 'x', slot: 'top', status: 'active', fit: { width: 'loose', cm: { length: 72 } } });
+    const f = formOf(it);
+    expect(f).toMatchObject({ fitWidth: 'loose', fitLength: '', cm: { length: '72' } });
+    expect(fitOf({ ...f, fitLength: 'short', cm: { ...f.cm, chest: '61.5', sleeve: '' } })).toEqual({ width: 'loose', length: 'short', cm: { length: 72, chest: 61.5 } });
+    expect(fitOf({ ...f, fitWidth: '', cm: {} })).toBeNull();
+    expect(patchOf(it, { ...f, fitWidth: 'tight' }).fit).toEqual({ width: 'tight', cm: { length: 72 } });
   });
 });

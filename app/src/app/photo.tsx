@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { AiError, blockedRoute, describeAiError } from '@/ai/client';
 import { getAiSettings, qualityFor } from '@/ai/config';
 import { generatePhoto } from '@/ai/engine';
@@ -27,6 +27,7 @@ export default function PhotoPage() {
   const s = useData(loadSnapshot);
   const settings = useData(getAiSettings);
   const [scene, setScene] = useState(SCENES[0].id);
+  const [custom, setCustom] = useState('');
   const [shots, setShots] = useState<string[]>([]);
   const [pick, setPick] = useState(0);
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -68,7 +69,7 @@ export default function PhotoPage() {
     try {
       // The garments come in the fitting room's layer order; how each is worn and the makeup come from there too.
       const styling = Object.fromEntries(Object.entries(app.fitting.styling).filter(([id]) => ids.includes(id)));
-      const uri = await generatePhoto(app.ai, ids, scene, styling, app.fitting.makeup);
+      const uri = await generatePhoto(app.ai, ids, scene, styling, app.fitting.makeup, custom);
       if (!mounted.current) return void app.images.remove(uri);
       setShots((x) => {
         setPick(x.length);
@@ -140,7 +141,18 @@ export default function PhotoPage() {
         {SCENES.map((sc) => (
           <Chip key={sc.id} label={sc.label} on={sc.id === scene} onPress={() => setScene(sc.id)} />
         ))}
+        <Chip label="自己写" on={scene === 'custom'} onPress={() => setScene('custom')} />
       </ScrollView>
+      {scene === 'custom' ? (
+        <TextInput
+          value={custom}
+          onChangeText={setCustom}
+          placeholder="例如：傍晚的海边码头"
+          placeholderTextColor={C.muted}
+          accessibilityLabel="自己写的场景"
+          style={{ marginTop: 10, marginHorizontal: PAD, height: 44, paddingHorizontal: 14, borderRadius: R.card, backgroundColor: C.card, fontSize: 15, color: C.ink }}
+        />
+      ) : null}
       {items.length ? (
         <T v="caption" style={{ marginTop: 12, marginHorizontal: PAD }}>
           {items.map((i) => i.name).join(' · ')}

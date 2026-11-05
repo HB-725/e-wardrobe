@@ -183,6 +183,7 @@ export function createGeminiClient(opts: { apiKey: string; fetch?: FetchLike; ba
     },
 
     async imageEdit(req) {
+      if (req.mask) throw new AiError('model', 'Gemini image models cannot paint inside a mask');
       // One image per call: candidateCount is not available for image output, so candidates are separate requests.
       // One refused candidate must not throw away the others that were paid for.
       const settled = await Promise.allSettled(Array.from({ length: Math.max(1, req.n ?? 1) }, () => generateImage(req)));

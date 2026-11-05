@@ -51,7 +51,8 @@ describe('resolveRoute', () => {
   it('honours a mixed choice per purpose', () => {
     const routes: Routes = { ...AUTO_ROUTES, catalog: { keyId: 'k2', model: 'gemini-2.5-flash-image' } };
     expect(resolveRoute('catalog', routes, [openai, gemini])).toEqual({ keyId: 'k2', provider: 'gemini', model: 'gemini-2.5-flash-image', fellBack: false });
-    expect(resolveRoute('tryon', routes, [openai, gemini])).toMatchObject({ provider: 'openai', model: 'gpt-image-1-mini' });
+    // Try-ons now take the faithful order too: of these keys only Gemini 2.5 Flash Image is on it.
+    expect(resolveRoute('tryon', routes, [openai, gemini])).toMatchObject({ provider: 'gemini', model: 'gemini-2.5-flash-image' });
   });
 
   it('falls back to auto (and says so) when the chosen key or model is gone', () => {
@@ -73,10 +74,12 @@ describe('catalog images', () => {
   // quality. Gemini 3.1 Flash-Lite Image kept them with a clean background at $0.034 a picture; gpt-image-2 and
   // gpt-image-1.5 (low) kept them too; Gemini 2.5 did but with uneven backgrounds. Try-ons keep the cheaper order.
   // gpt-image-2 (low) keeps the garment as well as Gemini 3.1 Flash-Lite for a third of the price ($0.016 vs $0.046 a garment).
-  it('prefers gpt-image-2, then Gemini 3.1 Flash-Lite, then gpt-image-1.5, over mini for catalog images only', () => {
+  it('prefers gpt-image-2, then Gemini 3.1 Flash-Lite, then gpt-image-1.5, over mini for catalog images, try-ons and photos; avatars keep mini', () => {
     const k = key('k6', 'openai', ['gpt-image-1-mini', 'gpt-image-1.5', 'gpt-5.4-nano']);
     expect(resolveRoute('catalog', AUTO_ROUTES, [k])).toMatchObject({ model: 'gpt-image-1.5' });
-    expect(resolveRoute('tryon', AUTO_ROUTES, [k])).toMatchObject({ model: 'gpt-image-1-mini' });
+    expect(resolveRoute('tryon', AUTO_ROUTES, [k])).toMatchObject({ model: 'gpt-image-1.5' });
+    expect(resolveRoute('photo', AUTO_ROUTES, [k])).toMatchObject({ model: 'gpt-image-1.5' });
+    expect(resolveRoute('avatar', AUTO_ROUTES, [k])).toMatchObject({ model: 'gpt-image-1-mini' });
     const g3 = key('k7', 'gemini', ['gemini-2.5-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-3.1-flash-image', 'gemini-3-pro-image']);
     expect(resolveRoute('catalog', AUTO_ROUTES, [k, g3])).toMatchObject({ model: 'gemini-3.1-flash-lite-image' });
     const o2 = key('k8', 'openai', ['gpt-image-1-mini', 'gpt-image-1.5', 'gpt-image-2']);
@@ -137,7 +140,8 @@ describe('costs', () => {
 
   it('estimates with the model a purpose would use, and says so when the price is unknown', () => {
     const opts = { inputImages: 2, quality: 'low' as const };
-    expect(estimateFor({ keys: [], routes: AUTO_ROUTES }, 'tryon', opts)).toBe(estimateCost('openai', 'gpt-image-1-mini', opts));
+    expect(estimateFor({ keys: [], routes: AUTO_ROUTES }, 'tryon', opts)).toBe(estimateCost('openai', 'gpt-image-2', opts));
+    expect(estimateFor({ keys: [], routes: AUTO_ROUTES }, 'avatar', opts)).toBe(estimateCost('openai', 'gpt-image-1-mini', opts));
     expect(estimateFor({ keys: [gemini], routes: AUTO_ROUTES }, 'tryon', opts)).toBe(estimateCost('gemini', 'gemini-2.5-flash-image', opts));
     const preview: Routes = { ...AUTO_ROUTES, tryon: { keyId: 'k2', model: 'gemini-3.1-flash-image-preview' } };
     expect(formatEstimate(addCosts(0.01, estimateFor({ keys: [gemini], routes: preview }, 'tryon', opts)))).toBe('价格未知');

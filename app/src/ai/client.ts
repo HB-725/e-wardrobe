@@ -94,6 +94,8 @@ export interface ImageEditRequest {
   n?: number;
   /** Transparent output needs webp (or png); catalog cut-outs use it so they sit on any background. */
   transparent?: boolean;
+  /** PNG data URL the size of the first image: transparent where the model may paint, opaque where the picture stays. */
+  mask?: string;
 }
 
 export interface VisionJsonRequest {
@@ -214,6 +216,7 @@ export function createOpenAiClient(opts: {
         model: req.model,
         prompt: req.prompt,
         images: req.images.map((image_url) => ({ image_url })),
+        ...(req.mask ? { mask: { image_url: req.mask } } : {}),
         size: req.size ?? '1024x1536',
         quality: req.quality ?? 'low',
         n: req.n ?? 1,

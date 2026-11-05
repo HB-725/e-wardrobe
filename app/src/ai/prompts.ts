@@ -1,5 +1,5 @@
 import { SLOT_LABEL } from '@/domain/catalog';
-import type { Slot, Styling } from '@/domain/types';
+import type { GarmentLook, Slot, Styling } from '@/domain/types';
 
 /** Shared look of every catalog image; the app's card colour, so pictures blend into the UI. */
 export const CATALOG_BG = '#F1F1F2';
@@ -130,18 +130,11 @@ export function analysisText(slot: Slot): string {
     'prints：印花 / 刺绣 / logo / 文字：内容逐字（含大小写）、位置、相对大小、工艺（print / embroidery / patch）、状态（开裂、褪色、起皮）。',
     'wear：穿着痕迹：褪色在哪、水洗类型（acid / stone / snow wash）、磨损、起球、破洞、毛边、污渍，各在什么部位、多重。',
     'creases：哪些褶皱是摆放折叠造成的（商品图要抚平），哪些是衣服本身的（压褶、抽褶、缝线起皱、面料自然的垂坠纹），后者要保留。',
+    'fit：只在照片里有人穿着它时写：它在这个人身上的穿着效果——肩线落在肩上还是肩下多少、胸围松紧、下摆到腰 / 胯 / 大腿哪里、袖口到手腕还是盖过手、裤腿宽窄和裤长到脚踝哪里。没人穿就填空字符串。',
   ].join('\n');
 }
 
-export interface AnalysisResult {
-  colour: string;
-  material: string;
-  cut: string;
-  details: string;
-  prints: string;
-  wear: string;
-  creases: string;
-}
+export type AnalysisResult = GarmentLook & { fit: string };
 
 const ANALYSIS_KEYS: [keyof AnalysisResult, string][] = [
   ['colour', 'Colour'],
@@ -156,8 +149,8 @@ const ANALYSIS_KEYS: [keyof AnalysisResult, string][] = [
 export const ANALYSIS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ANALYSIS_KEYS.map(([k]) => k),
-  properties: Object.fromEntries(ANALYSIS_KEYS.map(([k]) => [k, { type: 'string' }])),
+  required: [...ANALYSIS_KEYS.map(([k]) => k), 'fit'],
+  properties: Object.fromEntries([...ANALYSIS_KEYS.map(([k]) => k), 'fit'].map((k) => [k, { type: 'string' }])),
 };
 
 /** The analysis as one paragraph for the image prompt; null when it says nothing. */
@@ -165,6 +158,28 @@ export function analysisLine(a: AnalysisResult | null | undefined): string | nul
   if (!a) return null;
   const parts = ANALYSIS_KEYS.filter(([k]) => a[k]?.trim()).map(([k, label]) => `${label}: ${a[k].trim()}`);
   return parts.length ? `What the photo shows of this garment, every point to be kept exactly as described. ${parts.join(' ')}` : null;
+}
+
+// ---------- garment layers (green-screen 2.5D) ----------
+
+/** The avatar picture again, base clothes turned flat chroma green, so garments painted on it can be keyed out. */
+export const GREEN_PROMPT =
+  'Keep this photo exactly as it is — same person, pose, body, face, hair, skin, lighting, background and framing — and only change the colour of the base clothes (the T-shirt and the shorts) to a flat, uniform, bright chroma green (#00FF00) with no shading, like a green-screen suit. Nothing else changes.';
+
+/** Paint one garment onto the green avatar (image 1) from its product photo (image 2), inside the mask, worn closed or open. */
+export function layerPrompt(garment: Worn, variant: 'closed' | 'open', view: 'front' | 'back'): string {
+  const side = view === 'back' ? 'from behind' : 'from the front';
+  return [
+    `Image 1 is a person in flat green base clothes in a studio, seen ${side}. Image 2 is a product photo of a ${SLOT_EN[garment.slot]}.`,
+    `Put exactly this garment on the person over the green base clothes${variant === 'open' ? ', worn open: the zip or buttons fully undone, the two fronts hanging apart naturally so the green base shows down the middle' : ''}.`,
+    'Keep the person, pose, body, skin, lighting and background exactly as they are, and leave every bit of green base clothing that is still visible exactly green; change nothing outside the garment.',
+    'The garment stays exactly as in image 2: colour, fading and wash, prints, logos and text in the same place and size, length and fit.',
+    garment.brief ?? null,
+    garment.fit ? `Fit on this person: ${garment.fit}` : null,
+    view === 'back' ? 'Anything placed on the front of a garment (a chest print, logo, text, front pockets) cannot be seen from behind and must not appear.' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 // ---------- catalog image ----------
@@ -293,7 +308,17 @@ export function avatarBackPrompt(): string {
 export interface Worn {
   slot: Slot;
   styling?: Styling;
+  /** What it looks like (the intake analysis) and how it fits its owner, for the image model. */
+  brief?: string | null;
+  fit?: string | null;
 }
+
+/** One garment in the list of reference images, with everything the model must keep about it. */
+const garmentLine = (g: Worn, i: number) => `image ${i + 2}: ${SLOT_EN[g.slot]} (${SLOT_LABEL[g.slot]})${g.brief ? ` — ${g.brief}` : ''}${g.fit ? ` Fit on this person: ${g.fit}` : ''}`;
+
+/** The owner's own photos wearing some of the garments, appended after the garment images. */
+const ownerLine = (first: number, count: number) =>
+  count > 0 ? `Also, ${count === 1 ? `image ${first}` : `images ${first}–${first + count - 1}`} show${count === 1 ? 's' : ''} the owner wearing some of these garments: match how each fits there (how loose, how long, where the shoulder seams fall).` : null;
 
 const isUpperSlot = (s: Slot) => s === 'top' || s === 'outer';
 
@@ -336,9 +361,9 @@ const notes = (hint?: string | null) => (hint?.trim() ? `Notes from the user, fo
 
 const fixLine = (fix?: string | null) => (fix ? `A previous attempt went wrong (${fix}); avoid that this time.` : null);
 
-export function tryonPrompt(garments: Worn[], hint?: string | null, fix?: string | null): string {
+export function tryonPrompt(garments: Worn[], hint?: string | null, fix?: string | null, ownerPhotos = 0): string {
   const slots = garments.map((g) => g.slot);
-  const list = slots.map((s, i) => `image ${i + 2}: ${SLOT_EN[s]} (${SLOT_LABEL[s]})`).join('; ');
+  const list = garments.map(garmentLine).join('; ');
   // Worded like photoPrompt on purpose: "dress this person ... layer naturally" made the model turn a plain tee
   // into an open overshirt worn over a tee (verified with gpt-image-1-mini).
   return [
@@ -348,7 +373,8 @@ export function tryonPrompt(garments: Worn[], hint?: string | null, fix?: string
     ...layering(garments),
     accessories(garments),
     'Do not add any garment, layer, jacket, overshirt, cardigan or accessory that is not shown in the images.',
-    'Keep each garment exactly as shown: colour, pattern, logos and prints (same position and size), buttons, pockets, length and fit.',
+    'Keep each garment exactly as shown and described: colour, pattern, logos and prints (same position and size), buttons, pockets, length and fit.',
+    ownerLine(garments.length + 2, ownerPhotos),
     'Keep the face, hair and body shape exactly the same. The whole body is in frame, from above the top of the head to below the shoes. Photorealistic.',
     notes(hint),
     fixLine(fix),
@@ -424,12 +450,23 @@ export interface Scene {
 }
 
 export const SCENES: Scene[] = [
-  { id: 'cafe', label: '咖啡馆', prompt: 'standing in a bright cozy cafe with large windows, natural daylight' },
-  { id: 'street', label: '街头', prompt: 'walking on a city street in the afternoon, shallow depth of field, street-style photo' },
-  { id: 'office', label: '办公室', prompt: 'standing in a modern bright office' },
-  { id: 'park', label: '公园', prompt: 'standing in a green park on a sunny day' },
-  { id: 'studio', label: '纯色棚拍', prompt: `in a fashion photo studio with a plain ${CATALOG_BG} backdrop, editorial lighting` },
+  // Art-directed, not a bare noun: a one-line scene gave the generic blurred street. Place, light, lens, colours, pose.
+  { id: 'cafe', label: '咖啡馆', prompt: 'in a quiet sunlit specialty cafe: pale wood counter and a large window behind, morning light raking across the floor, a cup on the table, 35 mm lens, soft natural colours, editorial lifestyle photo' },
+  { id: 'street', label: '街头', prompt: 'on a quiet side street of pale stone and plaster buildings, soft overcast light, no crowd, a parked bicycle and a shop awning far behind, 50 mm lens at eye level, muted film-like colours, mid-stride, editorial street-style photo' },
+  { id: 'office', label: '办公室', prompt: 'in a bright modern office with floor-to-ceiling windows, light wood and white walls, soft daylight, desks blurred far behind, 50 mm lens, clean editorial photo' },
+  { id: 'park', label: '公园', prompt: 'on a tree-lined park path in early autumn, dappled late-afternoon sunlight, warm green and amber tones, 85 mm lens with gentle background blur, relaxed walk, lifestyle photo' },
+  { id: 'gallery', label: '美术馆', prompt: 'in a white-walled art gallery with a high ceiling and diffuse skylight, one large abstract canvas far behind, concrete floor, 35 mm lens, calm minimal editorial photo' },
+  { id: 'night', label: '夜晚街头', prompt: 'on a city street at night, warm shop-window light on the face and clothes, neon signs blurred far behind, wet pavement reflections, 50 mm lens, cinematic street photo with the garments in their true colours' },
+  { id: 'home', label: '居家', prompt: 'in a bright tidy living room with a linen sofa and tall windows, soft morning light, plants on the sill, 35 mm lens, natural lifestyle photo' },
+  { id: 'studio', label: '纯色棚拍', prompt: `in a fashion photo studio against a seamless ${CATALOG_BG} backdrop, one large soft key light from the left, a faint shadow on the floor, 85 mm lens, clean lookbook photo` },
 ];
+
+/** The scene for a photo: a listed one, or the owner's own words (`custom`). */
+export function sceneOf(id: string, custom?: string | null): Scene {
+  const own = custom?.trim();
+  if (id === 'custom' && own) return { id: 'custom', label: own, prompt: `in this setting: ${own}. Natural light for the place, an uncluttered composition, the person part of the scene rather than posed in front of it` };
+  return SCENES.find((s) => s.id === id) ?? SCENES[0];
+}
 
 /**
  * One instruction for dressing the avatar and placing them in a scene. (Chaining the try-on prompt with a
@@ -437,7 +474,7 @@ export const SCENES: Scene[] = [
  */
 /** `dressed`: image 1 is the front try-on, already wearing the outfit, so only the scene changes (fewer wrong garments). */
 export function photoPrompt(garments: Worn[], scene: Scene, makeup?: string | null, opts: { dressed?: boolean; fix?: string | null } = {}): string {
-  const list = garments.map((g, i) => `image ${i + 2}: ${SLOT_EN[g.slot]} (${SLOT_LABEL[g.slot]})`).join('; ');
+  const list = garments.map(garmentLine).join('; ');
   return [
     opts.dressed
       ? `Image 1 shows this exact person already wearing the outfit. The other images show each garment on its own, for reference: ${list}.`

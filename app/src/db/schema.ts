@@ -121,6 +121,24 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE outfits ADD COLUMN makeup TEXT;
   `,
+  `
+  ALTER TABLE items ADD COLUMN look TEXT;
+  ALTER TABLE items ADD COLUMN fit TEXT;
+  ALTER TABLE avatar ADD COLUMN shoulder_cm REAL;
+  ALTER TABLE avatar ADD COLUMN chest_cm REAL;
+  ALTER TABLE avatar ADD COLUMN waist_cm REAL;
+  ALTER TABLE avatar ADD COLUMN green_front_uri TEXT;
+  ALTER TABLE avatar ADD COLUMN green_back_uri TEXT;
+  CREATE TABLE garment_layers (
+    item_id TEXT NOT NULL,
+    avatar_version TEXT NOT NULL,
+    view TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    uri TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (item_id, avatar_version, view, variant)
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

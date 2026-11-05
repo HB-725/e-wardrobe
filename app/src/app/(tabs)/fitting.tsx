@@ -12,8 +12,8 @@ import { isUpper, layersOf, type Look, MAX_ACCESSORIES, MAX_LAYERS, moveLayer, r
 import { customMakeup, isCustomMakeup, makeupLabel, MAKEUPS } from '@/domain/makeup';
 import { defaultOutfitName } from '@/domain/outfit';
 import type { Item, Slot, TryonView } from '@/domain/types';
-import { avatarUsable } from '@/db/misc';
-import { requestTryon, saveOutfit, type TryonOptions, tryonState } from '@/state/actions';
+import { avatarUsable, avatarVersion, listLayers } from '@/db/misc';
+import { ensureLayers, requestTryon, saveOutfit, type TryonOptions, tryonState } from '@/state/actions';
 import { useApp, useData } from '@/state/app';
 import { usePhotoConsent } from '@/state/consent';
 import { useRecordToday } from '@/state/recordToday';
@@ -22,6 +22,7 @@ import { Icon, type IconName } from '@/ui/Icon';
 import { Btn, Chip, Loading, Sheet, T, Tap } from '@/ui/kit';
 import { TryonSheet } from '@/ui/RegenerateSheet';
 import { C, PAD, R } from '@/ui/theme';
+import { layersFor } from '@/domain/layers';
 import { ItemImage, OutfitBoard, Stage } from '@/ui/visuals';
 
 /** Collapsed drawer: handle, one row of tabs, one row of garments. */
@@ -454,6 +455,23 @@ export default function FittingPage() {
   const drawableLook: Look = { ...look, ids: drawable.map((i) => i.id) };
   const key = `${drawableLook.ids.join(',')}|${JSON.stringify(look.styling)}|${look.makeup ?? ''}`;
   const tryon = useData((db) => tryonState(db, drawableLook, view), [key, view]);
+  // The garments as layers over the avatar (painted once each at intake); missing ones are painted in the background.
+  const version = s ? avatarVersion(s.avatar) : '';
+  const layerRows = useData((db) => listLayers(db, wornIds, version), [wornIds.join(','), version]);
+  const stack = layersFor(worn, look.styling, view, layerRows ?? []);
+  const preparing = stack.missing.length;
+  const canLayer = !!s && avatarUsable(s.avatar) && !!s.avatar.greenFrontUri && !s.blocked;
+  useEffect(() => {
+    if (!canLayer || preparing === 0) return;
+    const t = setTimeout(() => void ensureLayers(app, wornIds).then((n) => n && app.runner.kick()), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the worn ids are the look; `app` is stable.
+  }, [canLayer, preparing, wornIds.join(',')]);
+  // Garments catalogued before the avatar (or before layers existed) get theirs now, in the background.
+  useEffect(() => {
+    if (canLayer) void ensureLayers(app).then((n) => n && app.runner.kick());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per avatar
+  }, [canLayer, version]);
 
   // The drawer is as tall as when open and slides down so only its collapsed part shows.
   const openHeight = Math.max(DRAWER_CLOSED + 160, Math.round(height * 0.6));
@@ -462,6 +480,7 @@ export default function FittingPage() {
   useEffect(() => {
     if (height > 0) drawer.layout(travel);
   }, [drawer, height, travel]);
+
   useEffect(() => {
     if (!stacked) return;
     const t = setTimeout(() => setStacked(null), 5000);
@@ -476,6 +495,13 @@ export default function FittingPage() {
     onUpdate: (e) => drawer.move(e.translationY),
     onDeactivate: (e) => drawer.end(e.translationY, e.velocityY),
   });
+
+  const generate = async (opts: TryonOptions) => {
+    setTryonOpen(false);
+    if (!(await consent())) return;
+    await requestTryon(app, drawableLook, view, opts);
+    app.refresh();
+  };
 
   if (!s) return <Loading />;
 
@@ -521,12 +547,6 @@ export default function FittingPage() {
   const openTryon = () => {
     setSheetN((n) => n + 1);
     setTryonOpen(true);
-  };
-  const generate = async (opts: TryonOptions) => {
-    setTryonOpen(false);
-    if (!(await consent())) return;
-    await requestTryon(app, drawableLook, view, opts);
-    app.refresh();
   };
   const names = drawable.map((i) => i.name).join('、');
   const summary = [
@@ -695,6 +715,7 @@ export default function FittingPage() {
       <Stage
         avatarUri={avatarReady ? avatarUri : null}
         tryonUri={tryon?.uri ?? null}
+        layers={stack.map((l) => l.uri)}
         busy={busy && !s.blocked}
         style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: DRAWER_CLOSED - 20, borderRadius: 0 }}
       />

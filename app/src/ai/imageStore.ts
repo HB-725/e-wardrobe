@@ -1,7 +1,7 @@
 import type { Box } from '@/domain/crop';
 
 /** Where photos and generated images live. Native uses the app's document directory; tests use memory. */
-export type ImageFolder = 'original' | 'tag' | 'body' | 'mirror' | 'catalog' | 'avatar' | 'tryon' | 'photo';
+export type ImageFolder = 'original' | 'tag' | 'body' | 'mirror' | 'catalog' | 'avatar' | 'tryon' | 'photo' | 'layer';
 
 export interface ImageStore {
   /** Data URL (JPEG, or WEBP when the source has transparency), downscaled so the long edge is at most `maxEdge`. */
@@ -12,6 +12,10 @@ export interface ImageStore {
   importPhoto(uri: string, folder: ImageFolder): Promise<string>;
   /** Save the part of a stored photo inside `box` as a new image, returns its uri. */
   crop(uri: string, box: Box, folder: ImageFolder): Promise<string>;
+  /** Pixel size of a stored image. */
+  size(uri: string): Promise<{ width: number; height: number }>;
+  /** A garment painted onto the green avatar (base64 from the model) → its keyed layer as PNG (see domain/layers); returns its uri. */
+  layer(dressedB64: string, greenUri: string, box: Box): Promise<string>;
   remove(uri: string | null | undefined): Promise<void>;
   /** Delete every stored image (privacy wipe). */
   wipe(): Promise<void>;
