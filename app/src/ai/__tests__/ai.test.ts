@@ -12,7 +12,7 @@ import { outfitKey } from '@/domain/outfit';
 import { type AiDeps, applyAutofill, generatePhoto, matchMirror, pickMirrorCandidates, tryonRef } from '../engine';
 import { imageExt, type ImageStore } from '../imageStore';
 import { addKey, listKeys, markVerified, saveRoutes, setConsentFor } from '../keys';
-import { autofillText, catalogPrompt, photoPrompt, SCENES, tryonPrompt, type AutofillResult, type DetectResult } from '../prompts';
+import { type AnalysisResult, type AutofillResult, autofillText, catalogPrompt, type DetectResult, photoPrompt, SCENES, tryonPrompt } from '../prompts';
 import { lookKey } from '@/domain/look';
 import { JobRunner } from '../runner';
 
@@ -58,6 +58,8 @@ const AUTOFILL: AutofillResult = {
   fromTag: ['size', 'material'],
 };
 
+const ANALYSIS: AnalysisResult = { colour: 'Faded black, lighter on the shoulders.', material: 'Heavy cotton fleece.', cut: 'Boxy, cropped.', details: 'Kangaroo pocket.', prints: 'Yellow smiley reading "drew".', wear: 'Sun-faded shoulders.', creases: 'Folds from the floor only.' };
+
 const { isGarment: _g, ...GARMENT } = AUTOFILL;
 /** One garment filling the photo: behaves like the single-garment recognition before boxes existed. */
 const WHOLE: DetectResult = { garments: [{ ...GARMENT, box_2d: [0, 0, 1000, 1000] }] };
@@ -66,7 +68,7 @@ type Call = { kind: 'image' | 'vision'; model: string; schemaName?: string; imag
 
 type Fidelity = { candidates: { checks: { label: string; ok: boolean; note: string }[] }[] };
 type Outfit = { fullBody: boolean; problems: string[] };
-function fakeClient(opts: { failImage?: (model: string, i: number) => AiError | null; models?: string[]; detect?: DetectResult; fidelity?: Fidelity; outfit?: Outfit[]; image?: (call: number, i: number) => string } = {}): OpenAiClient & { calls: Call[] } {
+function fakeClient(opts: { failImage?: (model: string, i: number) => AiError | null; models?: string[]; detect?: DetectResult; analysis?: AnalysisResult; fidelity?: Fidelity; outfit?: Outfit[]; image?: (call: number, i: number) => string } = {}): OpenAiClient & { calls: Call[] } {
   const calls: Call[] = [];
   let imageCalls = 0;
   return {
@@ -86,6 +88,7 @@ function fakeClient(opts: { failImage?: (model: string, i: number) => AiError | 
       let data: unknown;
       if (req.schemaName === 'garment') data = AUTOFILL;
       else if (req.schemaName === 'detect') data = opts.detect ?? WHOLE;
+      else if (req.schemaName === 'analysis') data = opts.analysis ?? ANALYSIS;
       else if (req.schemaName === 'fidelity')
         data = opts.fidelity ?? { candidates: [{ checks: [{ label: '主色', ok: true, note: '一致' }] }, { checks: [{ label: '主色', ok: false, note: '偏浅' }] }] };
       else if (req.schemaName === 'outfit') data = opts.outfit?.shift() ?? { fullBody: true, problems: [] };
@@ -198,7 +201,7 @@ describe('runner', () => {
     expect(after.slot).toBe('outer');
     expect(after.candidates).toHaveLength(1);
     expect(after.checks).toEqual([[{ label: '主色', ok: true, note: '一致' }]]);
-    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['detect', 'image', 'fidelity']);
+    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['detect', 'analysis', 'image', 'fidelity']);
     expect((await monthSpend(db)).totalUsd).toBeGreaterThan(0);
     expect(await listJobs(db, ['queued', 'running'])).toHaveLength(0);
   });
@@ -486,7 +489,7 @@ describe('paid results survive retries', () => {
     const orig = client.visionJson.bind(client);
     client.visionJson = async (req) => {
       visionCalls += 1;
-      if (visionCalls === 2) throw new AiError('server', '502 on fidelity'); // fidelity failure is swallowed
+      if (visionCalls === 3) throw new AiError('server', '502 on fidelity'); // detect, analysis, then fidelity, whose failure is swallowed
       return orig(req);
     };
     // Simulate a crash right after generation: fail the update after images were saved.
@@ -639,7 +642,7 @@ describe('multiple providers', () => {
     const runner = new JobRunner({ db, images, clientFor: async (k) => (k.provider === 'gemini' ? gemini : openai) }, noTimers);
     await drain(runner);
     // Recognition stays on OpenAI (agreed); the Gemini catalog image waits for its own consent.
-    expect(openai.calls.map((c) => c.schemaName)).toEqual(['detect']);
+    expect(openai.calls.map((c) => c.schemaName)).toEqual(['detect', 'analysis']);
     expect(gemini.calls).toHaveLength(0);
     expect(await getAiBlocked(db)).toBe('consent');
     await setConsentFor(db, 'gemini');
@@ -660,7 +663,7 @@ describe('multiple providers', () => {
     const client = fakeClient({ models: ['gpt-image-9', 'gpt-5.4-nano'] });
     await drain(new JobRunner(deps(client), noTimers));
     // Only the two recognition calls are priced: 2 × (1000 × $0.2 + 100 × $1.25) / 1M.
-    expect((await monthSpend(db)).totalUsd).toBeCloseTo(0.00065, 8);
+    expect((await monthSpend(db)).totalUsd).toBeCloseTo(0.000975, 8);
     expect(client.calls.find((c) => c.kind === 'image')?.model).toBe('gpt-image-9');
 
     await markVerified(db, k.id, ['gpt-image-9', 'gpt-5.4-nano'], '2020-01-01T00:00:00Z');
@@ -785,6 +788,18 @@ describe('garments on a photo', () => {
     expect(after.checks.map((c) => c[0].ok)).toEqual([true, false]);
   });
 
+  it('analyses the cut-out garment and gives the image model every point', async () => {
+    await photo();
+    const client = fakeClient({ analysis: { ...ANALYSIS, wear: 'Sun-faded to grey on the shoulders and hood.' } });
+    await drain(new JobRunner(deps(client), noTimers));
+    const names = client.calls.map((c) => c.schemaName ?? c.kind);
+    expect(names.indexOf('analysis')).toBeGreaterThan(names.indexOf('detect'));
+    expect(names.indexOf('analysis')).toBeLessThan(names.indexOf('image'));
+    const p = client.calls.find((c) => c.kind === 'image')!.prompt!;
+    expect(p).toContain('Wear: Sun-faded to grey on the shoulders and hood.');
+    expect(p).toContain('Cut and proportions: Boxy, cropped.');
+  });
+
   it('tells the image model the exact print text', async () => {
     await photo();
     const client = fakeClient({ detect: { garments: [{ ...tee, printText: 'OET GRUNN', box_2d: [20, 20, 980, 980] }] } });
@@ -820,7 +835,7 @@ describe('garments on a photo', () => {
     await enqueueJob(db, 'catalog', item.id, { autofill: 'crop' });
     const client = fakeClient();
     await drain(new JobRunner(deps(client), noTimers));
-    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['garment', 'image', 'fidelity']);
+    expect(client.calls.map((c) => c.schemaName ?? c.kind)).toEqual(['garment', 'analysis', 'image', 'fidelity']);
     expect((await getItem(db, item.id))!.name).toBe('牛仔夹克');
   });
 

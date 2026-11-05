@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import { callCost, estimateCost, type KeyEntry, type ModelInfo, modelInfo, modelsFor, type Purpose, PURPOSES, resolveRoute, type Route, type Routing } from '@/ai/catalog';
 import { describeAiError } from '@/ai/client';
-import { type AiSettings, catalogQuality, getAiSettings, qualityFor, tryonQuality } from '@/ai/config';
+import { type AiSettings, catalogQuality, getAiSettings, type ImageTask, qualityFor, tryonQuality } from '@/ai/config';
 import { createClient, getKeySecret, loadRouting, markVerified, probeModels, PROVIDER_LABEL, removeKey, renameKey, saveRoutes } from '@/ai/keys';
 import { formatEstimate } from '@/ai/models';
 import type { Db } from '@/db/db';
@@ -26,7 +26,7 @@ function priceText(m: ModelInfo, purpose: Purpose, settings: AiSettings): string
     const usd = callCost(m.provider, m.id, { in: 1500, out: 200 });
     return usd === null ? '价格未知' : `${formatEstimate(usd)} / 次`;
   }
-  const quality = purpose === 'catalog' ? catalogQuality(settings) : purpose === 'tryon' ? tryonQuality(settings) : qualityFor(settings.quality, purpose as Exclude<Purpose, 'vision'>);
+  const quality = purpose === 'catalog' ? catalogQuality(settings) : purpose === 'tryon' ? tryonQuality(settings) : qualityFor(settings.quality, purpose as ImageTask);
   const usd = estimateCost(m.provider, m.id, { inputImages: purpose === 'catalog' ? 1 : 3, quality });
   return usd === null ? '价格未知' : `${formatEstimate(usd)} / 张`;
 }

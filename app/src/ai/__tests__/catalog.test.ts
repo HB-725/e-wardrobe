@@ -1,4 +1,4 @@
-import { AUTO_ROUTES, callCost, estimateCost, estimateFor, type KeyEntry, modelInfo, modelKind, modelsFor, resolveRoute, type Routes, usableModels } from '../catalog';
+import { AUTO_ROUTES, callCost, estimateCost, estimateFor, type KeyEntry, modelInfo, modelKind, modelsFor, PURPOSES, resolveRoute, type Routes, usableModels } from '../catalog';
 import { addCosts, formatEstimate } from '../models';
 
 const key = (id: string, provider: KeyEntry['provider'], models: string[], extra: Partial<KeyEntry> = {}): KeyEntry => ({
@@ -84,6 +84,20 @@ describe('catalog images', () => {
     expect(resolveRoute('catalog', AUTO_ROUTES, [g3, o2])).toMatchObject({ model: 'gpt-image-2' });
     expect(resolveRoute('catalog', AUTO_ROUTES, [openai, gemini])).toMatchObject({ provider: 'gemini', model: 'gemini-2.5-flash-image' });
     expect(resolveRoute('catalog', AUTO_ROUTES, [openai])).toMatchObject({ model: 'gpt-image-1-mini' });
+  });
+});
+
+describe('garment analysis', () => {
+  // gpt-5.4-nano cannot see sun-fade or acid wash on a garment (2026-11-05); Gemini 3.1 Flash-Lite and gpt-5.4-mini up can.
+  it('is a vision purpose that avoids nano when a model that sees wear is on any key', () => {
+    expect(PURPOSES.find((p) => p.id === 'analysis')).toMatchObject({ kind: 'vision' });
+    expect(AUTO_ROUTES.analysis).toBe('auto');
+    const o = key('k9', 'openai', ['gpt-5.4-nano', 'gpt-5.4-mini', 'gpt-image-1-mini']);
+    expect(resolveRoute('analysis', AUTO_ROUTES, [o])).toMatchObject({ model: 'gpt-5.4-mini' });
+    expect(resolveRoute('vision', AUTO_ROUTES, [o])).toMatchObject({ model: 'gpt-5.4-nano' });
+    const g = key('k10', 'gemini', ['gemini-3.1-flash-lite', 'gemini-2.5-flash-lite']);
+    expect(resolveRoute('analysis', AUTO_ROUTES, [o, g])).toMatchObject({ model: 'gemini-3.1-flash-lite' });
+    expect(resolveRoute('analysis', AUTO_ROUTES, [openai])).toMatchObject({ model: 'gpt-5.4-nano' });
   });
 });
 

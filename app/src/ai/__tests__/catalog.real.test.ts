@@ -3,7 +3,8 @@
  * the catalog candidates and check them. A photo with several garments takes the biggest, as the picker would.
  * Writes out/ (crops and candidates) and report.json. About $0.02 per photo on OpenAI, $0.09 on Gemini.
  *   REAL_AI_DIR=/path [REAL_AI_PROVIDER=gemini] REAL_AI_KEY=... npx jest src/ai/__tests__/catalog.real.test.ts
- * REAL_AI_QUALITY=low|medium|high and REAL_AI_MODEL=<image model id> override the catalog settings for a comparison.
+ * REAL_AI_QUALITY=low|medium|high and REAL_AI_MODEL=<image model id> override the catalog settings for a comparison;
+ * REAL_AI_VISION=<model id> picks the recogniser and analyser, on REAL_AI_PROVIDER2 / REAL_AI_KEY2 when it is another provider's.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -38,11 +39,23 @@ const KEY = process.env.REAL_AI_KEY ?? 'proxy-injected';
       if (prompt) fs.appendFileSync(path.join(DIR!, 'prompts.txt'), `${JSON.parse(`"${prompt}"`)}\n\n`);
     };
     const client = (PROVIDER === 'gemini' ? createGeminiClient : createOpenAiClient)({ apiKey: KEY, fetch: curlFetch(DIR!, logPrompt) });
-    const deps: AiDeps = { db, images, clientFor: async () => client };
+    const clients: Partial<Record<ProviderId, typeof client>> = { [PROVIDER]: client };
+    const deps: AiDeps = { db, images, clientFor: async (key) => clients[key.provider] ?? client };
     const secrets = new Map<string, string>();
-    const k = await addKey(db, { get: async (n) => secrets.get(n) ?? null, set: async (n, v) => void (v ? secrets.set(n, v) : secrets.delete(n)) }, PROVIDER, KEY);
+    const store = { get: async (n: string) => secrets.get(n) ?? null, set: async (n: string, v: string | null) => void (v ? secrets.set(n, v) : secrets.delete(n)) };
+    const k = await addKey(db, store, PROVIDER, KEY);
     await markVerified(db, k.id, await probeModels(PROVIDER, client));
     await setConsentFor(db, PROVIDER);
+    let visionKey = k;
+    const p2 = process.env.REAL_AI_PROVIDER2 as ProviderId | undefined;
+    if (p2 && process.env.REAL_AI_KEY2) {
+      const c2 = (p2 === 'gemini' ? createGeminiClient : createOpenAiClient)({ apiKey: process.env.REAL_AI_KEY2, fetch: curlFetch(DIR!, logPrompt) });
+      clients[p2] = c2;
+      visionKey = await addKey(db, store, p2, process.env.REAL_AI_KEY2);
+      await markVerified(db, visionKey.id, await probeModels(p2, c2));
+      await setConsentFor(db, p2);
+    }
+    if (process.env.REAL_AI_VISION) await saveRoutes(db, { ...(await getRoutes(db)), vision: { keyId: visionKey.id, model: process.env.REAL_AI_VISION }, analysis: { keyId: visionKey.id, model: process.env.REAL_AI_VISION } });
     const quality = process.env.REAL_AI_QUALITY as 'low' | 'medium' | 'high' | undefined;
     if (quality) await saveAiSettings(db, { catalogQuality: quality });
     if (process.env.REAL_AI_MODEL) await saveRoutes(db, { ...(await getRoutes(db)), catalog: { keyId: k.id, model: process.env.REAL_AI_MODEL } });

@@ -143,6 +143,12 @@
   - 试过让识别模型多写一段英文「照片里看到的」（`look` 字段）喂给画图模型，gpt-image-2 跑 4 轮、mini 跑 2 轮（各 9 件）：颜色命名有帮助（Nike 藏青），但 gpt-5.4-nano 看不出晒褪和水洗，写「solid black / no visible fading / print intact」时画图模型就真把本来能从照片保住的褪色抹平；写错结构（给棉服编出胸袋）mini 就照画。**整段描述净效果为负，已撤掉**，只保留颜色这一课：识别提示词补「深色分清藏青 / 黑 / 深灰 / 墨绿，灰分清麻灰 / 浅灰，褪色黑、水洗黑；取色别被阴影带黑」。验证：Nike 裤子识别从 黑色 #1F2430 变为 深蓝 #0B1A33，gpt-image-2 画出藏青；drew 卫衣的褪色和裂纹印花保持。
   - 结论：mini 靠提示词追不上，差在模型对磨损质感的还原，不是指令；商品图默认顺序 `CATALOG_ORDER` 改为 gpt-image-2 在前（一件 $0.016，和 Gemini 3.1 Flash-Lite 的 $0.046 效果接近，用户定的）。`catalog.real.test.ts` 现在把每次发给画图模型的提示词记到目录里的 `prompts.txt`。
   - 验证：jest 202 个 + 5 个真实 API 跳过，tsc、lint 通过；今天真实 API 共约 $7.8。
+- [x] **裁好后先做一次全面分析再生图（`analysis` 用途）**（2026-11-05 傍晚，本地，未提交）：
+  - 探了 9 个视觉模型写 drew 卫衣和 Kith 毛衣：**只有 gpt-5.4-nano 看不见晒褪和雪花水洗**，Gemini 3.1 Flash-Lite 起、gpt-5.4-mini 起全都写得准，Lite 一次约 $0.001（和 nano 差不多）。
+  - 新增一步：裁剪之后、生图之前，对裁好的图做一次结构化分析（`ANALYSIS_SYSTEM` / `analysisText(slot)` / `ANALYSIS_SCHEMA`，七项英文：colour、material、cut、details、prints、wear、creases，只写看得见的、不写「没有」），整段拼进商品图提示词（`analysisLine`）。新的用途 `analysis`（设置里叫「分析衣服」），自动顺序 `ANALYSIS_ORDER`：Gemini 3.1 Flash-Lite → 3.5 Flash-Lite → gpt-5.4-mini → Gemini 3 Flash → 2.5 Flash → gpt-4o → gpt-5-mini，nano 只在别无选择时。`vision()` 多了 purpose 参数；`catalog.real.test.ts` 的 `REAL_AI_VISION`（可配 `REAL_AI_PROVIDER2` / `REAL_AI_KEY2` 用另一家的 Key）同时指定识别和分析模型，每次发给画图模型的提示词记到目录里的 `prompts.txt`。
+  - 9 件对照（低画质）：mini + Gemini Lite 分析 $0.009/件，drew 卫衣的晒褪和裂纹印花、Kith 的雪花水洗都画出来了，接近 gpt-image-2 不带分析（$0.0165）；gpt-image-2 + Gemini Lite 分析 $0.0185，drew 是所有轮里最像的；gpt-5.4-mini 做分析（+$0.007/件）没有比 Lite 更好。分析偶尔也会错（Lite 把藏青 Nike 裤写成 black，mini 仍按色值画成藏青；mini 给飞行员夹克自己加了红里布，分析里没写）。
+  - 之前试的「识别时顺带写一段描述」（`look` 字段）已撤掉，被这一步取代。
+  - 验证：jest 204 个 + 5 个真实 API 跳过，tsc、lint 通过；今天真实 API 共约 $9.5。
 - [ ] 上架：隐私政策网址要等 PR 合并到 main（或把 PRIVACY.md 放到别的公开网址）；新个人开发者账号需要 12 人 14 天封闭测试。
 
 ## 本地构建（用户自己的电脑）

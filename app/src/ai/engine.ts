@@ -11,7 +11,7 @@ import { AiError, type OpenAiClient } from './client';
 import { catalogQuality, getAiSettings, qualityFor, tryonQuality } from './config';
 import { type ImageStore, imageExt } from './imageStore';
 import { blockModelForKey, getRoutes, hasConsentFor, listKeys, markVerified, probeModels } from './keys';
-import { AUTOFILL_SCHEMA, AUTOFILL_SYSTEM, type AutofillResult, autofillText, avatarBackPrompt, avatarFrontPrompt, catalogPrompt, DETECT_SCHEMA, DETECT_SYSTEM, type DetectResult, detectText, FACE_SCHEMA, FACE_SYSTEM, FACE_TEXT, type FaceResult, FIDELITY_SCHEMA, FIDELITY_SYSTEM, type FidelityResult, fidelityText, type GarmentFields, makeupPrompt, MIRROR_SCHEMA, MIRROR_SYSTEM, type MirrorResult, mirrorText, OUTFIT_SCHEMA, OUTFIT_SYSTEM, type OutfitResult, outfitText, photoPrompt, SCENES, STYLE_REF_NOTE, tryonBackPrompt, tryonPrompt } from './prompts';
+import { ANALYSIS_SCHEMA, ANALYSIS_SYSTEM, type AnalysisResult, analysisText, AUTOFILL_SCHEMA, AUTOFILL_SYSTEM, type AutofillResult, autofillText, avatarBackPrompt, avatarFrontPrompt, catalogPrompt, DETECT_SCHEMA, DETECT_SYSTEM, type DetectResult, detectText, FACE_SCHEMA, FACE_SYSTEM, FACE_TEXT, type FaceResult, FIDELITY_SCHEMA, FIDELITY_SYSTEM, type FidelityResult, fidelityText, type GarmentFields, makeupPrompt, MIRROR_SCHEMA, MIRROR_SYSTEM, type MirrorResult, mirrorText, OUTFIT_SCHEMA, OUTFIT_SYSTEM, type OutfitResult, outfitText, photoPrompt, SCENES, STYLE_REF_NOTE, tryonBackPrompt, tryonPrompt } from './prompts';
 
 export interface AiDeps {
   db: Db;
@@ -109,8 +109,9 @@ async function vision<T>(
   deps: AiDeps,
   kind: Job['type'] | 'photo',
   req: { system: string; text: string; images: string[]; schemaName: string; schema: Record<string, unknown>; detail?: 'low' | 'high' | 'auto' },
+  purpose: 'vision' | 'analysis' = 'vision',
 ): Promise<T> {
-  return withRoute(deps, 'vision', async (client, r) => {
+  return withRoute(deps, purpose, async (client, r) => {
     const res = await client.visionJson<T>({ model: r.model, ...req });
     await addUsage(deps.db, { kind, model: r.model, costUsd: callCost(r.provider, r.model, res.usage) ?? 0 });
     return res.data;
@@ -252,8 +253,11 @@ async function runCatalog(deps: AiDeps, startJob: Job): Promise<void> {
   // A retry after a crash reuses the candidates that were already paid for.
   let uris = (job.payload.generated as string[] | undefined) ?? [];
   if (uris.length === 0) {
+    // Everything the photo shows, in words: image models redraw a garment as new unless told what to keep, and a
+    // vision model that sees wear (the analysis route, not nano) describes it better than the image model reads it.
+    const analysis = await vision<AnalysisResult>(deps, 'catalog', { system: ANALYSIS_SYSTEM, text: analysisText(item.slot), images: [original], schemaName: 'analysis', schema: ANALYSIS_SCHEMA, detail: 'high' }, 'analysis');
     const b64s = await generate(deps, 'catalog', {
-      prompt: catalogPrompt(item.slot, item.name, { name: item.colorName, hex: item.colorHex }, job.payload.hint as string | undefined, printText),
+      prompt: catalogPrompt(item.slot, item.name, { name: item.colorName, hex: item.colorHex }, job.payload.hint as string | undefined, printText, analysis),
       images: [original],
       quality: (job.payload.quality as 'low' | 'medium' | 'high' | undefined) ?? catalogQuality(settings),
       route: job.payload.model as Route | undefined,

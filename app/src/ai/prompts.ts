@@ -107,6 +107,66 @@ export interface AutofillResult {
   fromTag: ('brand' | 'size' | 'material')[];
 }
 
+// ---------- garment analysis ----------
+
+export const ANALYSIS_SYSTEM =
+  '你是服装打版师兼商品摄影师，眼睛很尖。照片里是用户自己的一件衣物，可能穿过洗过。你写的每一句都会原样交给画图模型，让它把这件衣服画成商品图，所以只写照片里看得见的事实，用英文，具体到部位。不写「没有 / 看不到」什么，看不见的不写，不要按品牌常识补。';
+
+export function analysisText(slot: Slot): string {
+  const cut =
+    slot === 'bottom'
+      ? 'cut：腰型（松紧 / 抽绳 / 纽扣拉链）、裆深、裤腿宽窄（straight / tapered / wide / slim）、裤长到哪里、脚口（罗纹 / 卷边 / 散口）、整体松紧。'
+      : slot === 'shoes'
+        ? 'cut：鞋型（低帮 / 高帮）、鞋头形状、鞋底厚薄和颜色、鞋带 / 搭扣。'
+        : slot === 'bag' || slot === 'accessory'
+          ? 'cut：形状、比例、大小、提手 / 肩带 / 开口方式。'
+          : 'cut：版型和比例：oversized / boxy / regular / slim；落肩还是正肩；衣长到哪里（cropped / hip / mid-thigh）；袖长、袖肥；下摆形状；整体松紧。';
+  return [
+    '这是裁好的一件衣物。每一项用英文写 1–3 句，只写看得见的；这一项没什么可写就填空字符串。',
+    'colour：整体颜色要准（navy 不是 black，heather grey 不是 light grey，褪色的黑写 faded black）；哪个部位比哪里深浅，色差是晒褪、水洗、磨白还是光线造成的。',
+    'material：面料和织法（French terry、fleece、heavyweight denim、nylon shell、chunky rib knit……）、厚薄、表面质感（起绒、起球、雪花、颗粒）、光泽（matte / slight sheen / glossy）、挺括还是垂坠。',
+    cut,
+    'details：领型 / 帽型、门襟和闭合（拉链 / 纽扣 / 暗扣，数量和金属颜色）、口袋（类型、数量、位置）、袖口和下摆（罗纹、毛边、卷边、明线）、缝线和拼接、看得见的里布、标签位置。',
+    'prints：印花 / 刺绣 / logo / 文字：内容逐字（含大小写）、位置、相对大小、工艺（print / embroidery / patch）、状态（开裂、褪色、起皮）。',
+    'wear：穿着痕迹：褪色在哪、水洗类型（acid / stone / snow wash）、磨损、起球、破洞、毛边、污渍，各在什么部位、多重。',
+    'creases：哪些褶皱是摆放折叠造成的（商品图要抚平），哪些是衣服本身的（压褶、抽褶、缝线起皱、面料自然的垂坠纹），后者要保留。',
+  ].join('\n');
+}
+
+export interface AnalysisResult {
+  colour: string;
+  material: string;
+  cut: string;
+  details: string;
+  prints: string;
+  wear: string;
+  creases: string;
+}
+
+const ANALYSIS_KEYS: [keyof AnalysisResult, string][] = [
+  ['colour', 'Colour'],
+  ['material', 'Material'],
+  ['cut', 'Cut and proportions'],
+  ['details', 'Details'],
+  ['prints', 'Prints, logos and text'],
+  ['wear', 'Wear'],
+  ['creases', 'Creases'],
+];
+
+export const ANALYSIS_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ANALYSIS_KEYS.map(([k]) => k),
+  properties: Object.fromEntries(ANALYSIS_KEYS.map(([k]) => [k, { type: 'string' }])),
+};
+
+/** The analysis as one paragraph for the image prompt; null when it says nothing. */
+export function analysisLine(a: AnalysisResult | null | undefined): string | null {
+  if (!a) return null;
+  const parts = ANALYSIS_KEYS.filter(([k]) => a[k]?.trim()).map(([k, label]) => `${label}: ${a[k].trim()}`);
+  return parts.length ? `What the photo shows of this garment, every point to be kept exactly as described. ${parts.join(' ')}` : null;
+}
+
 // ---------- catalog image ----------
 
 const SLOT_EN: Record<Slot, string> = {
@@ -118,7 +178,7 @@ const SLOT_EN: Record<Slot, string> = {
   accessory: 'accessory',
 };
 
-export function catalogPrompt(slot: Slot, name: string | null, color?: { name: string | null; hex: string | null }, hint?: string | null, printText?: string | null): string {
+export function catalogPrompt(slot: Slot, name: string | null, color?: { name: string | null; hex: string | null }, hint?: string | null, printText?: string | null, analysis?: AnalysisResult | null): string {
   const what = SLOT_EN[slot];
   const colorLine = color?.hex
     ? `The main colour measured from the photo is ${color.hex}${color.name ? ` (${color.name})` : ''}; reproduce exactly that colour, correcting only for the photo's lighting cast.`
@@ -139,6 +199,7 @@ export function catalogPrompt(slot: Slot, name: string | null, color?: { name: s
     "This is the owner's own garment, possibly worn and washed: keep every sign of wear exactly as in the photo (fading, stone or acid wash, faded or cracked prints, distressing, raw hems, pilling). A faded black stays faded, heather stays heather; do not make it look new and do not change its shade.",
     'Keep the exact cut and silhouette, length, collar, number and position of buttons, pockets and zips, stitching and fabric texture.',
     'Any text, logo or label: copy it character for character from the photo, same font, size and place. If it is too small to read, keep it as an illegible mark of the same size in the same place rather than inventing words.',
+    analysisLine(analysis),
     colorLine,
     printText?.trim() ? `The print on it reads exactly "${printText.trim()}": reproduce that text letter for letter, in the same font, size and place.` : null,
     // Last, so it wins over the generic rules: the owner knows the real garment.

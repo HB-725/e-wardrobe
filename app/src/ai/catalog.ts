@@ -7,7 +7,7 @@ import { IMAGE_MODELS, VISION_MODELS } from './models';
  */
 
 export type ProviderId = 'openai' | 'gemini';
-export type Purpose = 'catalog' | 'avatar' | 'tryon' | 'photo' | 'vision';
+export type Purpose = 'catalog' | 'avatar' | 'tryon' | 'photo' | 'vision' | 'analysis';
 export type Route = 'auto' | { keyId: string; model: string };
 export type Routes = Record<Purpose, Route>;
 
@@ -17,9 +17,10 @@ export const PURPOSES: { id: Purpose; label: string; kind: 'image' | 'vision' }[
   { id: 'tryon', label: '上身效果', kind: 'image' },
   { id: 'photo', label: '真人大片', kind: 'image' },
   { id: 'vision', label: '识别', kind: 'vision' },
+  { id: 'analysis', label: '分析衣服', kind: 'vision' },
 ];
 
-export const AUTO_ROUTES: Routes = { catalog: 'auto', avatar: 'auto', tryon: 'auto', photo: 'auto', vision: 'auto' };
+export const AUTO_ROUTES: Routes = { catalog: 'auto', avatar: 'auto', tryon: 'auto', photo: 'auto', vision: 'auto', analysis: 'auto' };
 
 export interface KeyEntry {
   id: string;
@@ -124,6 +125,21 @@ const CATALOG_ORDER: [ProviderId, string][] = [
 ];
 
 /**
+ * The garment analysis before a catalog image describes wear, cut and prints for the image model. gpt-5.4-nano
+ * cannot see sun-fade or acid wash (2026-11-05, 2 garments × 9 models); Gemini 3.1 Flash-Lite and gpt-5.4-mini up
+ * describe them well, Lite for about the price of nano. Nano only when nothing else is on any key.
+ */
+const ANALYSIS_ORDER: [ProviderId, string][] = [
+  ['gemini', 'gemini-3.1-flash-lite'],
+  ['gemini', 'gemini-3.5-flash-lite'],
+  ['openai', 'gpt-5.4-mini'],
+  ['gemini', 'gemini-3-flash-preview'],
+  ['gemini', 'gemini-2.5-flash'],
+  ['openai', 'gpt-4o'],
+  ['openai', 'gpt-5-mini'],
+];
+
+/**
  * What a model from a provider's list can be used for. Gemini names are matched by pattern rather than a fixed list,
  * so newer image models (…-image, …-image-preview) show up without an app update.
  */
@@ -177,7 +193,7 @@ export function resolveRoute(purpose: Purpose, routes: Routes, keys: KeyEntry[])
     if (k && usable(k, chosen.model)) return { keyId: k.id, provider: k.provider, model: chosen.model, fellBack: false };
   }
   const pick = (): Omit<Resolved, 'fellBack'> | null => {
-    for (const [provider, model] of purpose === 'catalog' ? CATALOG_ORDER : AUTO_ORDER[kind]) {
+    for (const [provider, model] of purpose === 'catalog' ? CATALOG_ORDER : purpose === 'analysis' ? ANALYSIS_ORDER : AUTO_ORDER[kind]) {
       const k = keys.find((x) => x.provider === provider && usable(x, model));
       if (k) return { keyId: k.id, provider, model };
     }
